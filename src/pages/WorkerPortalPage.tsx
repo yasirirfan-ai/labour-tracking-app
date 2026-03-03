@@ -908,13 +908,40 @@ export const WorkerPortalPage: React.FC = () => {
                     {nfcStatus !== 'idle' && (
                         <div
                             className={`nfc-status-bar ${nfcStatus === 'error' ? 'nfc-status-error' : nfcStatus === 'reading' ? 'nfc-status-reading' : ''}`}
-                            onClick={() => (nfcStatus === 'error') && startNfcListening()}
-                            style={{ cursor: (nfcStatus === 'error') ? 'pointer' : 'default', marginBottom: '2rem' }}
+                            style={{ marginBottom: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}
                         >
-                            {nfcStatus === 'listening' && <div className="nfc-heartbeat"></div>}
-                            {nfcStatus === 'listening' ? "NFC Active: Tap card to clock in/out" :
-                                nfcStatus === 'reading' ? "Reading Tag..." :
-                                    nfcStatus === 'error' ? "NFC Error: Click here to Retry / Activate" : "NFC Offline"}
+                            <div style={{ display: 'flex', alignItems: 'center', width: '100%', cursor: (nfcStatus === 'error') ? 'pointer' : 'default' }} onClick={() => (nfcStatus === 'error') && startNfcListening()}>
+                                {nfcStatus === 'listening' && <div className="nfc-heartbeat" style={{ marginRight: '10px' }}></div>}
+                                {nfcStatus === 'listening' ? "NFC Active: Tap card to clock in/out" :
+                                    nfcStatus === 'reading' ? "Reading Tag..." :
+                                        nfcStatus === 'error' ? "NFC Error: Web NFC Not Supported. Use Simulator Below." : "NFC Offline"}
+                            </div>
+
+                            <div style={{ width: '100%', display: 'flex', gap: '1rem' }} onClick={e => e.stopPropagation()}>
+                                <input
+                                    type="text"
+                                    placeholder="Simulate NFC Scan (Enter Tag ID)"
+                                    style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #ccc' }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && e.currentTarget.value) {
+                                            processNfcTap(e.currentTarget.value);
+                                            e.currentTarget.value = '';
+                                        }
+                                    }}
+                                />
+                                <button
+                                    onClick={(e) => {
+                                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                                        if (input.value) {
+                                            processNfcTap(input.value);
+                                            input.value = '';
+                                        }
+                                    }}
+                                    style={{ padding: '0.75rem 1.5rem', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+                                >
+                                    Scan
+                                </button>
+                            </div>
                         </div>
                     )}
                     {nfcStatus === 'idle' && (
