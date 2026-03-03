@@ -430,7 +430,7 @@ export const WorkerPortalPage: React.FC = () => {
             if (error || !worker) {
                 setNotification({
                     show: true,
-                    message: "NFC Tag not recognized. Please register this card in the Admin Portal.",
+                    message: `NFC Tag not recognized (ID: ${tagId || 'Unknown'}). Please register this card in the Admin Portal.`,
                     severity: 'warning'
                 });
                 setTimeout(() => setNotification(null), 5000);
