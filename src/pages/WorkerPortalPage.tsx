@@ -13,7 +13,7 @@ export const WorkerPortalPage: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [activeTasks, setActiveTasks] = useState<any[]>([]);
     const [disciplinaryIncidents, setDisciplinaryIncidents] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'personal_info' | 'conduct' | 'settings' | 'documentation' | 'training'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'personal_info' | 'conduct' | 'settings' | 'training'>('dashboard');
     const [signingData, setSigningData] = useState<{ [key: string]: { explanation: string, signature: string } }>({});
     const [nfcStatus, setNfcStatus] = useState<'idle' | 'listening' | 'reading' | 'error'>('idle');
     const [pendingPolicies, setPendingPolicies] = useState<any[]>([]);
@@ -891,18 +891,13 @@ export const WorkerPortalPage: React.FC = () => {
                         </div>
                     </li>
                     <li>
-                        <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-                            <i className="fa-solid fa-gear"></i> {!isCollapsed && <span>Settings</span>}
-                        </div>
-                    </li>
-                    <li>
-                        <div className={`nav-item ${activeTab === 'documentation' ? 'active' : ''}`} onClick={() => setActiveTab('documentation')}>
-                            <i className="fa-solid fa-file-invoice"></i> {!isCollapsed && <span>Documentation</span>}
-                        </div>
-                    </li>
-                    <li>
                         <div className={`nav-item ${activeTab === 'training' ? 'active' : ''}`} onClick={() => setActiveTab('training')}>
                             <i className="fa-solid fa-graduation-cap"></i> {!isCollapsed && <span>Training</span>}
+                        </div>
+                    </li>
+                    <li>
+                        <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+                            <i className="fa-solid fa-gear"></i> {!isCollapsed && <span>Settings</span>}
                         </div>
                     </li>
                 </ul>
@@ -1263,21 +1258,7 @@ export const WorkerPortalPage: React.FC = () => {
                         </div>
                     )}
 
-                    {activeTab === 'documentation' && (
-                        <div className="profile-section">
-                            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#262661' }}>Worker Resources</h3>
-                            <p style={{ color: '#64748B', marginTop: '0.5rem' }}>Official SOPs, safety guides, and training manuals</p>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginTop: '2.5rem' }}>
-                                {['SOP 3.7 Disciplinary Standards', 'Floor Safety Manual', 'Machine Operation Guide v4'].map(doc => (
-                                    <div key={doc} style={{ padding: '2rem', background: 'white', borderRadius: '20px', border: '1px solid #E2E8F0', textAlign: 'center' }}>
-                                        <i className="fa-solid fa-file-pdf" style={{ fontSize: '2rem', color: '#ef4444', marginBottom: '1rem', display: 'block' }}></i>
-                                        <div style={{ fontWeight: 800, color: '#262661' }}>{doc}</div>
-                                        <button style={{ marginTop: '1.25rem', padding: '0.6rem 1.25rem', borderRadius: '10px', border: '1.5px solid #E2E8F0', background: 'none', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>View Guide</button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+
 
                     {activeTab === 'training' && (
                         <div className="profile-section">
