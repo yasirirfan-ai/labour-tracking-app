@@ -6,22 +6,6 @@ import { completeAllTasks } from '../lib/taskService';
 import { Navigate } from 'react-router-dom';
 import { LEVEL_2_SOPS } from '../data/sopData';
 
-const LEVEL_1_TRAININGS = [
-    {
-        name: 'GMP and Quality Awareness',
-        pdfs: [
-            { name: 'SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate', path: '/training_materials/sops/Production associate I/SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate.pdf' },
-            { name: 'SOP Good Documentation Practices 17.4 Rev. New', path: '/training_materials/sops/Production associate I/SOP Good Documentation Practices 17.4 Rev. New.pdf' },
-            { name: 'SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New', path: '/training_materials/sops/Production associate I/SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New.pdf' },
-            { name: 'SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate', path: '/training_materials/sops/Production associate I/SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate.pdf' },
-            { name: 'SOP Personnel and Training New - Obsolate', path: '/training_materials/sops/Production associate I/SOP Personnel and Training New - Obsolate.pdf' },
-            { name: 'SOP Premise cleaning and sanitation - Obsolate', path: '/training_materials/sops/Production associate I/SOP Premise cleaning and sanitation - Obsolate.pdf' },
-            { name: 'SOP Visitor Policy 3.6-1 ', path: '/training_materials/sops/Production associate I/SOP Visitor Policy 3.6-1 .pdf' },
-            { name: '_SOP Pest Control', path: '/training_materials/sops/Production associate I/_SOP Pest Control.pdf' }
-        ]
-    }
-];
-
 export const WorkerPortalPage: React.FC = () => {
     const { user, loading: authLoading, logout } = useAuth();
     const [localUser, setLocalUser] = useState(user);
