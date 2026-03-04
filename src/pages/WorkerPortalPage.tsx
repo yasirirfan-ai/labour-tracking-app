@@ -21,7 +21,10 @@ export const WorkerPortalPage: React.FC = () => {
     const [isSigningPolicy, setIsSigningPolicy] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Warehouse' | 'Management' | 'Compounder I'>(user?.role === 'manager' ? 'Management' : 'Production');
-    const [selectedSOPSection, setSelectedSOPSection] = useState<string>('');
+    const [selectedSOPSection, setSelectedSOPSection] = useState<string>(() => {
+        const initialRole = user?.role === 'manager' ? 'Management' : 'Production';
+        return LEVEL_2_SOPS[initialRole] ? LEVEL_2_SOPS[initialRole][0].name : '';
+    });
     const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
     const [completedTrainings, setCompletedTrainings] = useState<string[]>(() => {
@@ -1373,7 +1376,15 @@ export const WorkerPortalPage: React.FC = () => {
                                         <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>VIEWING ROLE:</span>
                                         <select
                                             value={trainingRole}
-                                            onChange={e => setTrainingRole(e.target.value as any)}
+                                            onChange={e => {
+                                                const newRole = e.target.value as any;
+                                                setTrainingRole(newRole);
+                                                if (LEVEL_2_SOPS[newRole]) {
+                                                    setSelectedSOPSection(LEVEL_2_SOPS[newRole][0].name);
+                                                } else {
+                                                    setSelectedSOPSection('');
+                                                }
+                                            }}
                                             style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
                                         >
                                             <option value="Production">Production</option>
@@ -1383,7 +1394,7 @@ export const WorkerPortalPage: React.FC = () => {
                                             <option value="Management">Management</option>
                                         </select>
                                     </div>
-                                    {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 1 && (
+                                    {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 0 && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>SECTION:</span>
                                             <select
@@ -1402,7 +1413,7 @@ export const WorkerPortalPage: React.FC = () => {
 
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
                                     {(LEVEL_2_SOPS[trainingRole] || [])
-                                        .filter((section: any) => !selectedSOPSection || section.name === selectedSOPSection)
+                                        .filter((section: any) => section.name === selectedSOPSection)
                                         .map((section: any, sIdx: number) => (
                                             <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', gridColumn: '1 / -1' }}>
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
