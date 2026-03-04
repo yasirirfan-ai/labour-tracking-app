@@ -1489,7 +1489,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                                 <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{pdf.name}</div>
                                                             </div>
                                                             <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem', fontWeight: 600 }}>
-                                                                Status: <span style={{ color: '#ea580c' }}>Pending Acknowledgment</span>
+                                                                Status: <span style={{ color: '#ea580c' }}>Pending Read</span>
                                                             </div>
                                                             <button
                                                                 onClick={() => {
@@ -1500,7 +1500,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                                 onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }}
                                                                 onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
                                                             >
-                                                                Read & Acknowledge
+                                                                Read
                                                             </button>
                                                         </div>
                                                     ))}
@@ -1531,10 +1531,10 @@ export const WorkerPortalPage: React.FC = () => {
                                                         <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{training}</div>
                                                     </div>
                                                     <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem', fontWeight: 600 }}>
-                                                        Status: <span style={{ color: '#ea580c' }}>Pending Acknowledgment</span>
+                                                        Status: <span style={{ color: '#ea580c' }}>Pending Read</span>
                                                     </div>
                                                     <button style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }} onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }} onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}>
-                                                        Read & Acknowledge
+                                                        Read
                                                     </button>
                                                 </div>
                                             ))
