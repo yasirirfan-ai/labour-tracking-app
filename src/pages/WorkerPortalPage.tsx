@@ -28,8 +28,13 @@ export const WorkerPortalPage: React.FC = () => {
     const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
     const [completedTrainings, setCompletedTrainings] = useState<string[]>(() => {
-        const saved = localStorage.getItem(`completed_trainings_${user?.id}`);
-        return saved ? JSON.parse(saved) : ['GMP and Quality Awareness']; // Start with one completed as per original UI theme
+        try {
+            const saved = localStorage.getItem(`completed_trainings_${user?.id}`);
+            return saved ? JSON.parse(saved) : ['GMP and Quality Awareness'];
+        } catch (err) {
+            console.error('Error parsing completed trainings:', err);
+            return ['GMP and Quality Awareness'];
+        }
     });
 
     useEffect(() => {
@@ -935,8 +940,8 @@ export const WorkerPortalPage: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
                             <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontWeight: 800, color: '#1e1b4b' }}>{user.name}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700 }}>ID: {user.worker_id}</div>
+                                <div style={{ fontWeight: 800, color: '#1e1b4b' }}>{user?.name}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700 }}>ID: {user?.worker_id}</div>
                             </div>
                             <div style={{
                                 width: '44px',
