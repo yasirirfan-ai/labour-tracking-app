@@ -20,6 +20,7 @@ export const WorkerPortalPage: React.FC = () => {
     const [isSigningPolicy, setIsSigningPolicy] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Warehouse' | 'Management' | 'Compounder I'>(user?.role === 'manager' ? 'Management' : 'Production');
+    const [selectedSOPSection, setSelectedSOPSection] = useState<string>('');
     const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
     const [completedTrainings, setCompletedTrainings] = useState<string[]>(() => {
@@ -1444,7 +1445,7 @@ export const WorkerPortalPage: React.FC = () => {
                                         </div>
                                         <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#1e1b4b' }}>Level 2: Role-Based SOP Material</h4>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                         <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>VIEWING ROLE:</span>
                                         <select
                                             value={trainingRole}
@@ -1458,39 +1459,54 @@ export const WorkerPortalPage: React.FC = () => {
                                             <option value="Management">Management</option>
                                         </select>
                                     </div>
+                                    {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 1 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>SECTION:</span>
+                                            <select
+                                                value={selectedSOPSection}
+                                                onChange={e => setSelectedSOPSection(e.target.value)}
+                                                style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
+                                            >
+                                                {LEVEL_2_SOPS[trainingRole].map((section: any, idx: number) => (
+                                                    <option key={idx} value={section.name}>{section.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
                                 <p style={{ color: '#64748b', marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.95rem' }}>Controlled SOP reading and acknowledgment (No Slides)</p>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                                    {(LEVEL_2_SOPS[trainingRole] || []).map((section: any, sIdx: number) => (
-                                        <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', gridColumn: '1 / -1' }}>
-                                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e1b4b', borderBottom: '2px solid #f1f5f9', paddingBottom: '0.5rem', marginTop: sIdx > 0 ? '1.5rem' : '0' }}>{section.name}</div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                                                {section.pdfs.map((pdf: any, pIdx: number) => (
-                                                    <div key={pIdx} style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }} onMouseOver={e => (e.currentTarget.style.borderColor = '#cbd5e1')} onMouseOut={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
-                                                            <i className="fa-regular fa-file-lines" style={{ color: '#ea580c', fontSize: '1.25rem', marginTop: '0.2rem' }}></i>
-                                                            <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{pdf.name}</div>
+                                    {(LEVEL_2_SOPS[trainingRole] || [])
+                                        .filter((section: any) => !selectedSOPSection || section.name === selectedSOPSection)
+                                        .map((section: any, sIdx: number) => (
+                                            <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', gridColumn: '1 / -1' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                                                    {section.pdfs.map((pdf: any, pIdx: number) => (
+                                                        <div key={pIdx} style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }} onMouseOver={e => (e.currentTarget.style.borderColor = '#cbd5e1')} onMouseOut={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+                                                                <i className="fa-regular fa-file-lines" style={{ color: '#ea580c', fontSize: '1.25rem', marginTop: '0.2rem' }}></i>
+                                                                <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{pdf.name}</div>
+                                                            </div>
+                                                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem', fontWeight: 600 }}>
+                                                                Status: <span style={{ color: '#ea580c' }}>Pending Acknowledgment</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedPdf(pdf.path);
+                                                                    setCurrentTrainingName(pdf.name);
+                                                                }}
+                                                                style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                                                                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }}
+                                                                onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                                            >
+                                                                Read & Acknowledge
+                                                            </button>
                                                         </div>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem', fontWeight: 600 }}>
-                                                            Status: <span style={{ color: '#ea580c' }}>Pending Acknowledgment</span>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedPdf(pdf.path);
-                                                                setCurrentTrainingName(pdf.name);
-                                                            }}
-                                                            style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
-                                                            onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }}
-                                                            onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                                                        >
-                                                            Read & Acknowledge
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
                                     {(!LEVEL_2_SOPS[trainingRole] || LEVEL_2_SOPS[trainingRole].length === 0) && (
                                         ['QC', 'Warehouse', 'Management'].includes(trainingRole) ? (
                                             (trainingRole === 'QC' ? [
