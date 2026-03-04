@@ -140,5 +140,52 @@ export const LEVEL_2_SOPS = {
                 { name: 'Work Instruction Piston Filler', path: '/training_materials/sops/Quality Control/Work Instruction Piston Filler.pdf' }
             ]
         }
+    ],
+    'Quality Assurance': [
+        {
+            name: 'Quality Assurance',
+            pdfs: [
+                { name: 'SOP Control of Measuring and Test Instruments 5.4 Rev. New ', path: '/training_materials/sops/Quality Assurance/SOP Control of Measuring and Test Instruments 5.4 Rev. New .pdf' },
+                { name: 'SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate', path: '/training_materials/sops/Quality Assurance/SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate.pdf' },
+                { name: 'SOP Equipment Installation Qualification ', path: '/training_materials/sops/Quality Assurance/SOP Equipment Installation Qualification .pdf' },
+                { name: 'SOP Equipment Maintenance', path: '/training_materials/sops/Quality Assurance/SOP Equipment Maintenance.pdf' },
+                { name: 'SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New', path: '/training_materials/sops/Quality Assurance/SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New.pdf' },
+                { name: 'SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate', path: '/training_materials/sops/Quality Assurance/SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate.pdf' },
+                { name: 'SOP Matrix Quality Assurance', path: '/training_materials/sops/Quality Assurance/SOP Matrix Quality Assurance.pdf' },
+                { name: 'SOP Personnel and Training New - Obsolate', path: '/training_materials/sops/Quality Assurance/SOP Personnel and Training New - Obsolate.pdf' },
+                { name: 'SOP Pest Control 4.13 Revision 01', path: '/training_materials/sops/Quality Assurance/SOP Pest Control 4.13 Revision 01.pdf' },
+                { name: 'SOP Premise cleaning and sanitation - Obsolate', path: '/training_materials/sops/Quality Assurance/SOP Premise cleaning and sanitation - Obsolate.pdf' },
+                { name: 'SOP Response Plan for Incidents Involving Biohazards', path: '/training_materials/sops/Quality Assurance/SOP Response Plan for Incidents Involving Biohazards.pdf' },
+                { name: 'SOP Visitor Policy 3.6-1 ', path: '/training_materials/sops/Quality Assurance/SOP Visitor Policy 3.6-1 .pdf' },
+                { name: 'SOP_ APS-106_108 Wrap-around label applicator 5.1.6', path: '/training_materials/sops/Quality Assurance/SOP_ APS-106_108 Wrap-around label applicator 5.1.6.pdf' },
+                { name: 'SOP_ Kaishan Rotary Screw Air Compressor', path: '/training_materials/sops/Quality Assurance/SOP_ Kaishan Rotary Screw Air Compressor.pdf' },
+                { name: 'SOP_ Thermo Scientific Thermoflex 2500 Recirculating chiller', path: '/training_materials/sops/Quality Assurance/SOP_ Thermo Scientific Thermoflex 2500 Recirculating chiller.pdf' },
+                { name: 'SOP_Lot number machine_Videojet 1580 Inkjet printer', path: '/training_materials/sops/Quality Assurance/SOP_Lot number machine_Videojet 1580 Inkjet printer.pdf' },
+                { name: 'Work Instruction Piston Filler (1)', path: '/training_materials/sops/Quality Assurance/Work Instruction Piston Filler (1).pdf' },
+                { name: 'Work Instruction Piston Filler', path: '/training_materials/sops/Quality Assurance/Work Instruction Piston Filler.pdf' }
+            ]
+        }
+    ],
+    'Shipping & Recieving': [
+        {
+            name: 'Shipping & Recieving',
+            pdfs: [
+                { name: 'SOP Customer Returns 8.5.1', path: '/training_materials/sops/Shipping & Recieving/SOP Customer Returns 8.5.1.pdf' },
+                { name: 'SOP Shipping Procedure 8.4 Rev.01', path: '/training_materials/sops/Shipping & Recieving/SOP Shipping Procedure 8.4 Rev.01.pdf' }
+            ]
+        }
+    ],
+    'Purchase': [
+        {
+            name: 'Purchase',
+            pdfs: [
+                { name: 'SOP Incoming Inspection 6.3 Rev. 02 ', path: '/training_materials/sops/Purchase/SOP Incoming Inspection 6.3 Rev. 02 .pdf' },
+                { name: 'SOP Performance Evaluation of Suppliers of Significant Materials and Services', path: '/training_materials/sops/Purchase/SOP Performance Evaluation of Suppliers of Significant Materials and Services.pdf' },
+                { name: 'SOP Purchasing and Assessment of Suppliers 6.2-1', path: '/training_materials/sops/Purchase/SOP Purchasing and Assessment of Suppliers 6.2-1.pdf' },
+                { name: 'SOP Supplier Audits', path: '/training_materials/sops/Purchase/SOP Supplier Audits.pdf' },
+                { name: 'SOP Supplier Control', path: '/training_materials/sops/Purchase/SOP Supplier Control.pdf' },
+                { name: 'SOP Supplier Corrective Action Request (SCAR) 6.2.3', path: '/training_materials/sops/Purchase/SOP Supplier Corrective Action Request (SCAR) 6.2.3.pdf' }
+            ]
+        }
     ]
 } as any;

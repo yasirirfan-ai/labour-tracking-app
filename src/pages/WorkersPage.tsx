@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
+import { LEVEL_2_SOPS } from '../data/sopData';
 
 export const WorkersPage: React.FC = () => {
     const [workers, setWorkers] = useState<any[]>([]);
@@ -167,6 +168,22 @@ export const WorkersPage: React.FC = () => {
         );
     });
 
+    const calculateTrainingProgress = (worker: any) => {
+        const completed = worker.completed_trainings || [];
+
+        // Define total possible trainings based on the role
+        // For employees, we default to 'Production' if specific role mapping isn't clear
+        const role = worker.role === 'manager' ? 'Quality Assurance' : 'Production';
+        const sopsForRole = LEVEL_2_SOPS[role as keyof typeof LEVEL_2_SOPS] || [];
+
+        // Level 1: 3 core trainings + Level 2: Role-based SOPs
+        const level1Count = 3;
+        const totalPossible = level1Count + sopsForRole.length;
+
+        if (totalPossible === 0) return 0;
+        return Math.round((completed.length / totalPossible) * 100);
+    };
+
     if (isLoading) return <div className="loading-screen">Loading Workers...</div>;
 
     return (
@@ -208,6 +225,7 @@ export const WorkersPage: React.FC = () => {
                             <th>Worker ID</th>
                             <th>Name</th>
                             <th>Username/Email</th>
+                            <th>Training</th>
                             <th>Hourly Rate</th>
                             <th>Status</th>
                             <th style={{ textAlign: 'right' }}>Actions</th>
@@ -238,6 +256,19 @@ export const WorkersPage: React.FC = () => {
                                     </div>
                                 </td>
                                 <td style={{ color: 'var(--text-muted)' }}>{worker.username}</td>
+                                <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div style={{ flex: 1, height: '6px', background: '#E2E8F0', borderRadius: '3px', maxWidth: '100px' }}>
+                                            <div style={{
+                                                width: `${calculateTrainingProgress(worker)}%`,
+                                                height: '100%',
+                                                background: calculateTrainingProgress(worker) === 100 ? '#22C55E' : '#6366F1',
+                                                borderRadius: '3px'
+                                            }}></div>
+                                        </div>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1E1B4B' }}>{calculateTrainingProgress(worker)}%</span>
+                                    </div>
+                                </td>
                                 <td style={{ color: 'var(--text-muted)', fontWeight: 500 }}>$ {parseFloat(worker.hourly_rate || 0).toFixed(2)}/hr</td>
                                 <td>
                                     {worker.active === false

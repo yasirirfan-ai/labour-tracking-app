@@ -12,6 +12,7 @@ export interface User {
     phone?: string;
     email?: string;
     address?: string;
+    completed_trainings?: string[];
 }
 
 export interface DisciplinaryPolicy {

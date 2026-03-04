@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import Chart from 'chart.js/auto';
+import { LEVEL_2_SOPS } from '../data/sopData';
 
 export const ReportsPage: React.FC = () => {
 
@@ -43,7 +44,7 @@ export const ReportsPage: React.FC = () => {
                         cost: ((t.active_seconds || 0) / 3600) * (emp?.hourly_rate || 0)
                     };
                 });
-                
+
                 setTasks(richTasks);
                 setEmployees(userData || []);
                 setMos(moData || []);
@@ -59,10 +60,24 @@ export const ReportsPage: React.FC = () => {
     const calculateStats = (filteredList: any[]) => {
         const totalSec = filteredList.reduce((acc, t) => acc + (t.active_seconds || 0), 0);
         const totalCost = filteredList.reduce((acc, t) => acc + (t.cost || 0), 0);
+
+        // Calculate team training compliance
+        const workerCompliance = employees.map(worker => {
+            const completed = worker.completed_trainings || [];
+            const role = worker.role === 'manager' ? 'Quality Assurance' : 'Production';
+            const sopsForRole = LEVEL_2_SOPS[role as keyof typeof LEVEL_2_SOPS] || [];
+            const totalPossible = 3 + sopsForRole.length;
+            return totalPossible > 0 ? (completed.length / totalPossible) : 0;
+        });
+        const avgCompliance = workerCompliance.length > 0
+            ? (workerCompliance.reduce((a, b) => a + b, 0) / workerCompliance.length) * 100
+            : 0;
+
         return {
             totalHours: parseFloat((totalSec / 3600).toFixed(1)),
             totalCost: parseFloat(totalCost.toFixed(2)),
-            avgRate: totalSec > 0 ? parseFloat((totalCost / (totalSec / 3600)).toFixed(2)) : 0
+            avgRate: totalSec > 0 ? parseFloat((totalCost / (totalSec / 3600)).toFixed(2)) : 0,
+            avgCompliance: Math.round(avgCompliance)
         };
     };
 
@@ -81,7 +96,7 @@ export const ReportsPage: React.FC = () => {
 
     const updateCharts = () => {
         const filtered = getFilteredTasks();
-        
+
         // Prepare Data
         const hoursByWorker: Record<string, number> = {};
         const hoursByOp: Record<string, number> = {};
@@ -253,6 +268,14 @@ export const ReportsPage: React.FC = () => {
                         <div className="stat-detail">Blended rate</div>
                     </div>
                     <div className="icon-box icon-yellow"><i className="fa-solid fa-chart-line"></i></div>
+                </div>
+                <div className="report-stat-card">
+                    <div>
+                        <div className="stat-label">Training Compliance</div>
+                        <div className="stat-value">{currentStats.avgCompliance}%</div>
+                        <div className="stat-detail">Overall staff readiness</div>
+                    </div>
+                    <div className="icon-box" style={{ background: '#f0f9ff', color: '#0369a1' }}><i className="fa-solid fa-user-graduate"></i></div>
                 </div>
             </div>
 

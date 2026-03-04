@@ -20,28 +20,22 @@ export const WorkerPortalPage: React.FC = () => {
     const [policySignature, setPolicySignature] = useState('');
     const [isSigningPolicy, setIsSigningPolicy] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Warehouse' | 'Management' | 'Compounder I'>(user?.role === 'manager' ? 'Management' : 'Production');
+    const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Compounder I' | 'Quality Assurance' | 'Shipping & Recieving' | 'Purchase'>(user?.role === 'manager' ? 'Quality Assurance' : 'Production');
     const [selectedSOPSection, setSelectedSOPSection] = useState<string>(() => {
-        const initialRole = user?.role === 'manager' ? 'Management' : 'Production';
+        const initialRole = user?.role === 'manager' ? 'Quality Assurance' : 'Production';
         return LEVEL_2_SOPS[initialRole] ? LEVEL_2_SOPS[initialRole][0].name : '';
     });
     const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
-    const [completedTrainings, setCompletedTrainings] = useState<string[]>(() => {
-        try {
-            const saved = localStorage.getItem(`completed_trainings_${user?.id}`);
-            return saved ? JSON.parse(saved) : ['GMP and Quality Awareness'];
-        } catch (err) {
-            console.error('Error parsing completed trainings:', err);
-            return ['GMP and Quality Awareness'];
-        }
-    });
+    const [completedTrainings, setCompletedTrainings] = useState<string[]>([]);
 
     useEffect(() => {
         if (user) {
-            localStorage.setItem(`completed_trainings_${user.id}`, JSON.stringify(completedTrainings));
+            // Initial load from user object (synced via AuthContext/Supabase)
+            const initialCompleted = (user as any).completed_trainings || ['GMP and Quality Awareness'];
+            setCompletedTrainings(initialCompleted);
         }
-    }, [completedTrainings, user]);
+    }, [user?.id]);
 
     const LEVEL_1_TRAININGS = [
         {
@@ -135,7 +129,7 @@ export const WorkerPortalPage: React.FC = () => {
                 address: (user as any).address || '',
             });
         }
-    }, [user, authLoading]);
+    }, [user?.id, authLoading]);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -219,22 +213,8 @@ export const WorkerPortalPage: React.FC = () => {
                 supabase.removeChannel(disciplineChannel);
             };
         }
-    }, [user]);
+    }, [user?.id]);
 
-    useEffect(() => {
-        // Test notification on load to verify UI component
-        if (user) {
-            const testTimer = setTimeout(() => {
-                setNotification({
-                    show: true,
-                    message: "Bablyon Portal: Security and incident monitoring is active.",
-                    severity: 'success'
-                });
-                setTimeout(() => setNotification(null), 5000);
-            }, 1500);
-            return () => clearTimeout(testTimer);
-        }
-    }, [user]);
 
     const fetchUserStatus = async () => {
         if (!user) return;
@@ -742,7 +722,7 @@ export const WorkerPortalPage: React.FC = () => {
                     width: 100%;
                     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                     border-radius: 24px;
-                    padding: 3rem;
+                    padding: 2.5rem 3rem;
                     color: white;
                     margin-bottom: 2.5rem;
                     display: flex;
@@ -751,6 +731,7 @@ export const WorkerPortalPage: React.FC = () => {
                     box-shadow: 0 20px 40px -10px rgba(16, 185, 129, 0.3);
                     position: relative;
                     overflow: hidden;
+                    gap: 2.5rem;
                 }
 
                 .on-duty-banner::after {
@@ -788,7 +769,7 @@ export const WorkerPortalPage: React.FC = () => {
                 }
 
                 .banner-title {
-                    font-size: 3.5rem;
+                    font-size: 2.8rem;
                     font-weight: 900;
                     margin: 0;
                     letter-spacing: -0.04em;
@@ -808,9 +789,9 @@ export const WorkerPortalPage: React.FC = () => {
                 }
 
                 .clock-btn-premium {
-                    padding: 1.25rem 2.5rem;
+                    padding: 0.8rem 1.8rem;
                     border-radius: 18px;
-                    font-size: 1.1rem;
+                    font-size: 1rem;
                     font-weight: 800;
                     border: none;
                     cursor: pointer;
@@ -1376,8 +1357,9 @@ export const WorkerPortalPage: React.FC = () => {
                                             <option value="Production">Production</option>
                                             <option value="Compounder I">Compounder I</option>
                                             <option value="QC">Quality Control (QC)</option>
-                                            <option value="Warehouse">Warehouse</option>
-                                            <option value="Management">Management</option>
+                                            <option value="Quality Assurance">Quality Assurance</option>
+                                            <option value="Shipping & Recieving">Shipping & Recieving</option>
+                                            <option value="Purchase">Purchase</option>
                                         </select>
                                     </div>
                                     {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 0 && (
@@ -1429,37 +1411,10 @@ export const WorkerPortalPage: React.FC = () => {
                                             </div>
                                         ))}
                                     {(!LEVEL_2_SOPS[trainingRole] || LEVEL_2_SOPS[trainingRole].length === 0) && (
-                                        ['QC', 'Warehouse', 'Management'].includes(trainingRole) ? (
-                                            (trainingRole === 'QC' ? [
-                                                'Sampling Procedure',
-                                                'Incoming Inspection',
-                                                'OOS',
-                                                'Control of Measuring Instruments'
-                                            ] : trainingRole === 'Warehouse' ? [
-                                                'Receipt and Storage of Chemicals',
-                                                'Shipping Procedure',
-                                                'Recall Procedure'
-                                            ] : [
-                                                'Risk Assessment',
-                                                'Root Cause Analysis',
-                                                'CAPA',
-                                                'Internal Audits',
-                                                'Supplier Evaluation'
-                                            ]).map((training, idx) => (
-                                                <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }} onMouseOver={e => (e.currentTarget.style.borderColor = '#cbd5e1')} onMouseOut={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
-                                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
-                                                        <i className="fa-regular fa-file-lines" style={{ color: '#ea580c', fontSize: '1.25rem', marginTop: '0.2rem' }}></i>
-                                                        <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{training}</div>
-                                                    </div>
-                                                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem', fontWeight: 600 }}>
-                                                        Status: <span style={{ color: '#ea580c' }}>Pending Read</span>
-                                                    </div>
-                                                    <button style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }} onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }} onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}>
-                                                        Read
-                                                    </button>
-                                                </div>
-                                            ))
-                                        ) : null
+                                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', background: '#f8fafc', borderRadius: '24px', border: '2px dashed #e2e8f0' }}>
+                                            <i className="fa-solid fa-folder-open" style={{ fontSize: '3rem', color: '#cbd5e1', marginBottom: '1rem', display: 'block' }}></i>
+                                            <p style={{ color: '#64748b', fontWeight: 700, fontSize: '1.1rem', margin: 0 }}>No specific SOP materials found for this role.</p>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -1496,9 +1451,19 @@ export const WorkerPortalPage: React.FC = () => {
                         </div>
                         <div style={{ padding: '1.25rem 2rem', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                             <button
-                                onClick={() => {
-                                    if (currentTrainingName && !completedTrainings.includes(currentTrainingName)) {
-                                        setCompletedTrainings(prev => [...prev, currentTrainingName]);
+                                onClick={async () => {
+                                    if (currentTrainingName && user) {
+                                        const newCompleted = completedTrainings.includes(currentTrainingName)
+                                            ? completedTrainings
+                                            : [...completedTrainings, currentTrainingName];
+
+                                        setCompletedTrainings(newCompleted);
+
+                                        // Persist to Supabase
+                                        await ((supabase as any)
+                                            .from('users')
+                                            .update({ completed_trainings: newCompleted })
+                                            .eq('id', user.id));
                                     }
                                     setSelectedPdf(null);
                                     setCurrentTrainingName(null);
