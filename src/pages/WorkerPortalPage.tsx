@@ -1332,50 +1332,52 @@ export const WorkerPortalPage: React.FC = () => {
                             </div>
 
                             <div>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                         <div style={{ width: '40px', height: '40px', background: '#ffedd5', color: '#ea580c', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
                                             <i className="fa-solid fa-book-open-reader"></i>
                                         </div>
                                         <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#1e1b4b' }}>Level 2: Role-Based SOP Material</h4>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>VIEWING ROLE:</span>
-                                        <select
-                                            value={trainingRole}
-                                            onChange={e => {
-                                                const newRole = e.target.value as any;
-                                                setTrainingRole(newRole);
-                                                if (LEVEL_2_SOPS[newRole]) {
-                                                    setSelectedSOPSection(LEVEL_2_SOPS[newRole][0].name);
-                                                } else {
-                                                    setSelectedSOPSection('');
-                                                }
-                                            }}
-                                            style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
-                                        >
-                                            <option value="Production">Production</option>
-                                            <option value="Compounder I">Compounder I</option>
-                                            <option value="QC">Quality Control (QC)</option>
-                                            <option value="Quality Assurance">Quality Assurance</option>
-                                            <option value="Shipping & Recieving">Shipping & Recieving</option>
-                                            <option value="Purchase">Purchase</option>
-                                        </select>
-                                    </div>
-                                    {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 0 && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>SECTION:</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>VIEWING ROLE:</span>
                                             <select
-                                                value={selectedSOPSection}
-                                                onChange={e => setSelectedSOPSection(e.target.value)}
+                                                value={trainingRole}
+                                                onChange={e => {
+                                                    const newRole = e.target.value as any;
+                                                    setTrainingRole(newRole);
+                                                    if (LEVEL_2_SOPS[newRole]) {
+                                                        setSelectedSOPSection(LEVEL_2_SOPS[newRole][0].name);
+                                                    } else {
+                                                        setSelectedSOPSection('');
+                                                    }
+                                                }}
                                                 style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
                                             >
-                                                {LEVEL_2_SOPS[trainingRole].map((section: any, idx: number) => (
-                                                    <option key={idx} value={section.name}>{section.name}</option>
-                                                ))}
+                                                <option value="Production">Production</option>
+                                                <option value="Compounder I">Compounder I</option>
+                                                <option value="QC">Quality Control (QC)</option>
+                                                <option value="Quality Assurance">Quality Assurance</option>
+                                                <option value="Shipping & Recieving">Shipping & Recieving</option>
+                                                <option value="Purchase">Purchase</option>
                                             </select>
                                         </div>
-                                    )}
+                                        {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 1 && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>SECTION:</span>
+                                                <select
+                                                    value={selectedSOPSection}
+                                                    onChange={e => setSelectedSOPSection(e.target.value)}
+                                                    style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
+                                                >
+                                                    {LEVEL_2_SOPS[trainingRole].map((section: any, idx: number) => (
+                                                        <option key={idx} value={section.name}>{section.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <p style={{ color: '#64748b', marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.95rem' }}>Controlled SOP reading and acknowledgment (No Slides)</p>
 
