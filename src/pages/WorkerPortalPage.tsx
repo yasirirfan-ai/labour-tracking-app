@@ -20,6 +20,52 @@ export const WorkerPortalPage: React.FC = () => {
     const [isSigningPolicy, setIsSigningPolicy] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Warehouse' | 'Management'>(user?.role === 'manager' ? 'Management' : 'Production');
+    const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
+    const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
+    const [completedTrainings, setCompletedTrainings] = useState<string[]>(() => {
+        const saved = localStorage.getItem(`completed_trainings_${user?.id}`);
+        return saved ? JSON.parse(saved) : ['GMP and Quality Awareness']; // Start with one completed as per original UI theme
+    });
+
+    useEffect(() => {
+        if (user) {
+            localStorage.setItem(`completed_trainings_${user.id}`, JSON.stringify(completedTrainings));
+        }
+    }, [completedTrainings, user]);
+
+    const LEVEL_1_TRAININGS = [
+        {
+            name: 'GMP and Quality Awareness',
+            pdfs: [
+                { name: 'Training Presentation (Updated)', path: '/training_materials/GMP_presentation_short_updated_02202025.pdf' },
+                { name: 'Training Presentation (Original)', path: '/training_materials/GMP_presentation_updated_12162024.pdf' }
+            ]
+        },
+        {
+            name: 'Gowning, Hand Washing and Conduct',
+            pdfs: [{ name: 'Training Material', path: '/training_materials/Gowning, Hand washing and Conduct 3.5.2 - Training Material rev.112524.pdf' }]
+        },
+        {
+            name: 'Premises Cleaning and Sanitation',
+            pdfs: [{ name: 'Training Material', path: '/training_materials/Premises Cleaning and Sanitation - Training Material rev.030425.pdf' }]
+        },
+        {
+            name: 'Pest Control',
+            pdfs: [{ name: 'Training Material', path: '/training_materials/Pest Control 4.13 - Training Material rev101124.pdf' }]
+        },
+        {
+            name: 'Biohazard Response',
+            pdfs: [{ name: 'Training Material', path: '/training_materials/Biohazard Response - Training Material rev.101124.pdf' }]
+        },
+        {
+            name: 'Personnel and Training',
+            pdfs: [{ name: 'Training Material', path: '/training_materials/Personnel and Training 3.4-2 - Training Material rev.101024.pdf' }]
+        },
+        {
+            name: 'Visitor Policy',
+            pdfs: [{ name: 'Training Material', path: '/training_materials/Visitor Policy - Training Material rev.101124.pdf' }]
+        }
+    ];
 
     const handleSignIncident = async (incidentId: string) => {
         const data = signingData[incidentId];
@@ -597,11 +643,18 @@ export const WorkerPortalPage: React.FC = () => {
                     font-size: 1.2rem;
                 }
 
+                .form-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                }
+
                 .form-group label {
-                    font-size: 0.9rem;
-                    font-weight: 700;
-                    color: #1e1b4b;
-                    margin-bottom: 0.75rem;
+                    font-size: 0.85rem;
+                    font-weight: 800;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    letter-spacing: 0.025em;
                 }
 
                 .form-group input, .form-group textarea {
@@ -1229,7 +1282,7 @@ export const WorkerPortalPage: React.FC = () => {
                                     <p style={{ color: '#94a3b8', marginTop: '0.5rem', fontWeight: 600, fontSize: '1.1rem' }}>Complete your mandatory structural training</p>
                                 </div>
                                 <div style={{ background: '#f0fdf4', color: '#15803d', padding: '0.75rem 1.5rem', borderRadius: '16px', fontWeight: 800, border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <i className="fa-solid fa-chart-pie"></i> Progress: 20%
+                                    <i className="fa-solid fa-chart-pie"></i> Progress: {Math.round((completedTrainings.filter(t => LEVEL_1_TRAININGS.find(l1 => l1.name === t)).length / LEVEL_1_TRAININGS.length) * 100)}%
                                 </div>
                             </div>
 
@@ -1242,32 +1295,64 @@ export const WorkerPortalPage: React.FC = () => {
                                 </div>
                                 <p style={{ color: '#64748b', marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.95rem' }}>Required for ALL employees (Slides + Quiz + Sign Off)</p>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                                    {[
-                                        'GMP and Quality Awareness',
-                                        'Gowning, Hand Washing and Conduct',
-                                        'Premises Cleaning and Sanitation',
-                                        'Pest Control',
-                                        'Biohazard Response',
-                                        'Personnel and Training',
-                                        'Visitor Policy'
-                                    ].map((training, idx) => (
-                                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+                                    {LEVEL_1_TRAININGS.map((training, idx) => (
+                                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.25rem' }}>
                                                 <div style={{ width: '40px', height: '40px', background: idx === 0 ? '#dcfce7' : '#f8fafc', color: idx === 0 ? '#10b981' : '#94a3b8', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: idx === 0 ? 'none' : '1px solid #e2e8f0' }}>
                                                     {idx === 0 ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-display"></i>}
                                                 </div>
-                                                <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{training}</div>
+                                                <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{training.name}</div>
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
-                                                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Formal Slides</div>
-                                                {idx === 0 ? (
-                                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', background: '#dcfce7', padding: '0.35rem 0.85rem', borderRadius: '99px' }}>COMPLETED</span>
-                                                ) : idx === 1 ? (
-                                                    <button style={{ padding: '0.5rem 1rem', borderRadius: '10px', border: 'none', background: '#4f46e5', color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 2px 4px rgba(79, 70, 229, 0.2)' }}>Start Course</button>
-                                                ) : (
-                                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', padding: '0.35rem 0.85rem', borderRadius: '99px' }}>LOCKED</span>
-                                                )}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Formal Slides</div>
+                                                    {completedTrainings.includes(training.name) ? (
+                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', background: '#dcfce7', padding: '0.35rem 0.85rem', borderRadius: '99px' }}>COMPLETED</span>
+                                                    ) : (
+                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4f46e5', background: '#eef2ff', padding: '0.35rem 0.85rem', borderRadius: '99px' }}>IN PROGRESS</span>
+                                                    )}
+                                                </div>
+
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                    {training.pdfs.map((pdf, pIdx) => (
+                                                        <button
+                                                            key={pIdx}
+                                                            onClick={() => {
+                                                                setSelectedPdf(pdf.path);
+                                                                setCurrentTrainingName(training.name);
+                                                            }}
+                                                            style={{
+                                                                flex: 1,
+                                                                minWidth: training.pdfs.length > 1 ? '140px' : '100%',
+                                                                padding: '0.65rem',
+                                                                borderRadius: '10px',
+                                                                border: '1.5px solid #e2e8f0',
+                                                                background: 'white',
+                                                                color: '#4f46e5',
+                                                                fontWeight: 700,
+                                                                fontSize: '0.8rem',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                gap: '0.5rem'
+                                                            }}
+                                                            onMouseOver={e => {
+                                                                e.currentTarget.style.backgroundColor = '#eef2ff';
+                                                                e.currentTarget.style.borderColor = '#4f46e5';
+                                                            }}
+                                                            onMouseOut={e => {
+                                                                e.currentTarget.style.backgroundColor = 'white';
+                                                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                                            }}
+                                                        >
+                                                            <i className="fa-solid fa-file-pdf"></i>
+                                                            {training.pdfs.length > 1 ? `Part ${pIdx + 1}` : 'View Slides'}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -1340,6 +1425,50 @@ export const WorkerPortalPage: React.FC = () => {
                     )}
                 </div>
             </main>
+
+            {/* PDF Viewer Modal */}
+            {selectedPdf && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.95)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+                    <div style={{ background: 'white', width: '100%', maxWidth: '1200px', borderRadius: '32px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', height: '90vh' }}>
+                        <div style={{ background: '#1e1b4b', padding: '1.25rem 2rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Training Material Viewer</h3>
+                                <p style={{ margin: '0.25rem 0 0', opacity: 0.7, fontSize: '0.85rem' }}>Review the following slides carefully before proceeding.</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSelectedPdf(null);
+                                    setCurrentTrainingName(null);
+                                }}
+                                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}
+                            >
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <div style={{ flex: 1, background: '#f1f5f9', position: 'relative' }}>
+                            <iframe
+                                src={`${selectedPdf}#toolbar=0&navpanes=0&view=FitH`}
+                                style={{ width: '100%', height: '100%', border: 'none' }}
+                                title="Training Slide Viewer"
+                            />
+                        </div>
+                        <div style={{ padding: '1.25rem 2rem', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                            <button
+                                onClick={() => {
+                                    if (currentTrainingName && !completedTrainings.includes(currentTrainingName)) {
+                                        setCompletedTrainings(prev => [...prev, currentTrainingName]);
+                                    }
+                                    setSelectedPdf(null);
+                                    setCurrentTrainingName(null);
+                                }}
+                                style={{ padding: '0.75rem 2rem', borderRadius: '12px', border: 'none', background: '#10b981', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)' }}
+                            >
+                                I have finished reading
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
