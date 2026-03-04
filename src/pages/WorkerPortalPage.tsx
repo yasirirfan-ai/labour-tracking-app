@@ -963,7 +963,7 @@ export const WorkerPortalPage: React.FC = () => {
                 </header>
 
                 <div className="worker-content" style={{ padding: '2.5rem 3.5rem' }}>
-                    {nfcStatus !== 'idle' && (
+                    {activeTab === 'dashboard' && nfcStatus !== 'idle' && (
                         <div
                             className={`nfc-status-bar ${nfcStatus === 'error' ? 'nfc-status-error' : nfcStatus === 'reading' ? 'nfc-status-reading' : ''}`}
                             style={{ marginBottom: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}
@@ -1002,7 +1002,7 @@ export const WorkerPortalPage: React.FC = () => {
                             </div>
                         </div>
                     )}
-                    {nfcStatus === 'idle' && (
+                    {activeTab === 'dashboard' && nfcStatus === 'idle' && (
                         <div className="nfc-status-bar" onClick={startNfcListening} style={{ cursor: 'pointer', background: '#FEF3C7', borderColor: '#FDE68A', color: '#92400E' }}>
                             <i className="fa-solid fa-hand-pointer" style={{ marginRight: '10px' }}></i>
                             NFC Pending: Tap here to enable scanner
