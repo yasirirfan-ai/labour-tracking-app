@@ -19,7 +19,7 @@ export const WorkerPortalPage: React.FC = () => {
     const [policySignature, setPolicySignature] = useState('');
     const [isSigningPolicy, setIsSigningPolicy] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Warehouse' | 'Management'>(user?.role === 'manager' ? 'Management' : 'Production');
+    const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Warehouse' | 'Management' | 'Compounder I'>(user?.role === 'manager' ? 'Management' : 'Production');
     const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
     const [completedTrainings, setCompletedTrainings] = useState<string[]>(() => {
@@ -66,6 +66,83 @@ export const WorkerPortalPage: React.FC = () => {
             pdfs: [{ name: 'Training Material', path: '/training_materials/Visitor Policy - Training Material rev.101124.pdf' }]
         }
     ];
+
+    const LEVEL_2_SOPS = {
+        'Production': [
+            {
+                name: 'Production associate I',
+                pdfs: [
+                    { name: 'SOP Good Documentation Practices 17.4 Rev. New', path: '/training_materials/sops/Production associate I/SOP Good Documentation Practices 17.4 Rev. New.pdf' },
+                    { name: 'SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New', path: '/training_materials/sops/Production associate I/SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New.pdf' },
+                    { name: 'SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate', path: '/training_materials/sops/Production associate I/SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate.pdf' },
+                    { name: 'SOP Personnel and Training New - Obsolate', path: '/training_materials/sops/Production associate I/SOP Personnel and Training New - Obsolate.pdf' },
+                    { name: 'SOP Premise cleaning and sanitation - Obsolate', path: '/training_materials/sops/Production associate I/SOP Premise cleaning and sanitation - Obsolate.pdf' },
+                    { name: 'SOP Visitor Policy 3.6-1 ', path: '/training_materials/sops/Production associate I/SOP Visitor Policy 3.6-1 .pdf' },
+                    { name: '_SOP Pest Control', path: '/training_materials/sops/Production associate I/_SOP Pest Control.pdf' }
+                ]
+            },
+            {
+                name: 'Production associate II',
+                pdfs: [
+                    { name: 'SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate', path: '/training_materials/sops/Production associate II/SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate.pdf' },
+                    { name: 'SOP Good Documentation Practices 17.4 Rev. New', path: '/training_materials/sops/Production associate II/SOP Good Documentation Practices 17.4 Rev. New.pdf' },
+                    { name: 'SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New', path: '/training_materials/sops/Production associate II/SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New.pdf' },
+                    { name: 'SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate', path: '/training_materials/sops/Production associate II/SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate.pdf' },
+                    { name: 'SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate', path: '/training_materials/sops/Production associate II/SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate.pdf' },
+                    { name: 'SOP Personnel and Training New - Obsolate', path: '/training_materials/sops/Production associate II/SOP Personnel and Training New - Obsolate.pdf' },
+                    { name: 'SOP Premise cleaning and sanitation - Obsolate', path: '/training_materials/sops/Production associate II/SOP Premise cleaning and sanitation - Obsolate.pdf' },
+                    { name: 'SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate', path: '/training_materials/sops/Production associate II/SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate.pdf' },
+                    { name: 'SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate', path: '/training_materials/sops/Production associate II/SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate.pdf' },
+                    { name: 'SOP Visitor Policy 3.6-1 ', path: '/training_materials/sops/Production associate II/SOP Visitor Policy 3.6-1 .pdf' },
+                    { name: 'SOP_ APS-106_108 Wrap-around label applicator 5.1.6', path: '/training_materials/sops/Production associate II/SOP_ APS-106_108 Wrap-around label applicator 5.1.6.pdf' },
+                    { name: 'SOP_ Kaishan Rotary Screw Air Compressor', path: '/training_materials/sops/Production associate II/SOP_ Kaishan Rotary Screw Air Compressor.pdf' },
+                    { name: 'SOP_Lot number machine_Videojet 1580 Inkjet printer', path: '/training_materials/sops/Production associate II/SOP_Lot number machine_Videojet 1580 Inkjet printer.pdf' },
+                    { name: '_SOP Pest Control', path: '/training_materials/sops/Production associate II/_SOP Pest Control.pdf' }
+                ]
+            },
+            {
+                name: 'Production associate III',
+                pdfs: [
+                    { name: 'SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate', path: '/training_materials/sops/Production associate III/SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate.pdf' },
+                    { name: 'SOP Good Documentation Practices 17.4 Rev. New', path: '/training_materials/sops/Production associate III/SOP Good Documentation Practices 17.4 Rev. New.pdf' },
+                    { name: 'SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New', path: '/training_materials/sops/Production associate III/SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New.pdf' },
+                    { name: 'SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate', path: '/training_materials/sops/Production associate III/SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate.pdf' },
+                    { name: 'SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate', path: '/training_materials/sops/Production associate III/SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate.pdf' },
+                    { name: 'SOP Personnel and Training New - Obsolate', path: '/training_materials/sops/Production associate III/SOP Personnel and Training New - Obsolate.pdf' },
+                    { name: 'SOP Premise cleaning and sanitation - Obsolate', path: '/training_materials/sops/Production associate III/SOP Premise cleaning and sanitation - Obsolate.pdf' },
+                    { name: 'SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate', path: '/training_materials/sops/Production associate III/SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate.pdf' },
+                    { name: 'SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate', path: '/training_materials/sops/Production associate III/SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate.pdf' },
+                    { name: 'SOP Visitor Policy 3.6-1 ', path: '/training_materials/sops/Production associate III/SOP Visitor Policy 3.6-1 .pdf' },
+                    { name: 'SOP_ APS-106_108 Wrap-around label applicator 5.1.6', path: '/training_materials/sops/Production associate III/SOP_ APS-106_108 Wrap-around label applicator 5.1.6.pdf' },
+                    { name: 'SOP_ Kaishan Rotary Screw Air Compressor', path: '/training_materials/sops/Production associate III/SOP_ Kaishan Rotary Screw Air Compressor.pdf' },
+                    { name: 'SOP_Lot number machine_Videojet 1580 Inkjet printer', path: '/training_materials/sops/Production associate III/SOP_Lot number machine_Videojet 1580 Inkjet printer.pdf' },
+                    { name: '_SOP Pest Control', path: '/training_materials/sops/Production associate III/_SOP Pest Control.pdf' }
+                ]
+            }
+        ],
+        'Compounder I': [
+            {
+                name: 'Compounder I',
+                pdfs: [
+                    { name: 'SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate', path: '/training_materials/sops/Compounder I/SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate.pdf' },
+                    { name: 'SOP Good Documentation Practices 17.4 Rev. New', path: '/training_materials/sops/Compounder I/SOP Good Documentation Practices 17.4 Rev. New.pdf' },
+                    { name: 'SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New', path: '/training_materials/sops/Compounder I/SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New.pdf' },
+                    { name: 'SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate', path: '/training_materials/sops/Compounder I/SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate.pdf' },
+                    { name: 'SOP Personnel and Training New - Obsolate', path: '/training_materials/sops/Compounder I/SOP Personnel and Training New - Obsolate.pdf' },
+                    { name: 'SOP Premise cleaning and sanitation - Obsolate', path: '/training_materials/sops/Compounder I/SOP Premise cleaning and sanitation - Obsolate.pdf' },
+                    { name: 'SOP Production and Process Control of Batching Process 7.2.3 Rev.01 - Obsolate', path: '/training_materials/sops/Compounder I/SOP Production and Process Control of Batching Process 7.2.3 Rev.01 - Obsolate.pdf' },
+                    { name: 'SOP Production Pre Weigh Process 7.2.1 Rev01 - Obsolate', path: '/training_materials/sops/Compounder I/SOP Production Pre Weigh Process 7.2.1 Rev01 - Obsolate.pdf' },
+                    { name: 'SOP Visitor Policy 3.6-1 ', path: '/training_materials/sops/Compounder I/SOP Visitor Policy 3.6-1 .pdf' },
+                    { name: 'SOP_ APS-106_108 Wrap-around label applicator 5.1.6', path: '/training_materials/sops/Compounder I/SOP_ APS-106_108 Wrap-around label applicator 5.1.6.pdf' },
+                    { name: 'SOP_ In Line High Shear Batch Mixer 5.1.7 Rev. New ', path: '/training_materials/sops/Compounder I/SOP_ In Line High Shear Batch Mixer 5.1.7 Rev. New .pdf' },
+                    { name: 'SOP_ Kaishan Rotary Screw Air Compressor', path: '/training_materials/sops/Compounder I/SOP_ Kaishan Rotary Screw Air Compressor.pdf' },
+                    { name: 'SOP_ Silverson High Shear Batch Mixer FX60', path: '/training_materials/sops/Compounder I/SOP_ Silverson High Shear Batch Mixer FX60.pdf' },
+                    { name: 'SOP_Lot number machine_Videojet 1580 Inkjet printer', path: '/training_materials/sops/Compounder I/SOP_Lot number machine_Videojet 1580 Inkjet printer.pdf' },
+                    { name: '_SOP Pest Control', path: '/training_materials/sops/Compounder I/_SOP Pest Control.pdf' }
+                ]
+            }
+        ]
+    } as any;
 
     const handleSignIncident = async (incidentId: string) => {
         const data = signingData[incidentId];
@@ -1375,6 +1452,7 @@ export const WorkerPortalPage: React.FC = () => {
                                             style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
                                         >
                                             <option value="Production">Production</option>
+                                            <option value="Compounder I">Compounder I</option>
                                             <option value="QC">Quality Control (QC)</option>
                                             <option value="Warehouse">Warehouse</option>
                                             <option value="Management">Management</option>
@@ -1384,41 +1462,68 @@ export const WorkerPortalPage: React.FC = () => {
                                 <p style={{ color: '#64748b', marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.95rem' }}>Controlled SOP reading and acknowledgment (No Slides)</p>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                                    {(trainingRole === 'QC' ? [
-                                        'Sampling Procedure',
-                                        'Incoming Inspection',
-                                        'OOS',
-                                        'Control of Measuring Instruments'
-                                    ] : trainingRole === 'Warehouse' ? [
-                                        'Receipt and Storage of Chemicals',
-                                        'Shipping Procedure',
-                                        'Recall Procedure'
-                                    ] : trainingRole === 'Management' ? [
-                                        'Risk Assessment',
-                                        'Root Cause Analysis',
-                                        'CAPA',
-                                        'Internal Audits',
-                                        'Supplier Evaluation'
-                                    ] : [
-                                        'Production Process Controls',
-                                        'Line Clearance',
-                                        'Rework',
-                                        'Identification and Traceability',
-                                        'Retains'
-                                    ]).map((training, idx) => (
-                                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }} onMouseOver={e => (e.currentTarget.style.borderColor = '#cbd5e1')} onMouseOut={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
-                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
-                                                <i className="fa-regular fa-file-lines" style={{ color: '#ea580c', fontSize: '1.25rem', marginTop: '0.2rem' }}></i>
-                                                <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{training}</div>
+                                    {(LEVEL_2_SOPS[trainingRole] || []).map((section: any, sIdx: number) => (
+                                        <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', gridColumn: '1 / -1' }}>
+                                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e1b4b', borderBottom: '2px solid #f1f5f9', paddingBottom: '0.5rem', marginTop: sIdx > 0 ? '1.5rem' : '0' }}>{section.name}</div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                                                {section.pdfs.map((pdf: any, pIdx: number) => (
+                                                    <div key={pIdx} style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }} onMouseOver={e => (e.currentTarget.style.borderColor = '#cbd5e1')} onMouseOut={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+                                                            <i className="fa-regular fa-file-lines" style={{ color: '#ea580c', fontSize: '1.25rem', marginTop: '0.2rem' }}></i>
+                                                            <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{pdf.name}</div>
+                                                        </div>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem', fontWeight: 600 }}>
+                                                            Status: <span style={{ color: '#ea580c' }}>Pending Acknowledgment</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedPdf(pdf.path);
+                                                                setCurrentTrainingName(pdf.name);
+                                                            }}
+                                                            style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                                                            onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }}
+                                                            onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                                        >
+                                                            Read & Acknowledge
+                                                        </button>
+                                                    </div>
+                                                ))}
                                             </div>
-                                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem', fontWeight: 600 }}>
-                                                Status: <span style={{ color: '#ea580c' }}>Pending Acknowledgment</span>
-                                            </div>
-                                            <button style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }} onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }} onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}>
-                                                Read & Acknowledge
-                                            </button>
                                         </div>
                                     ))}
+                                    {(!LEVEL_2_SOPS[trainingRole] || LEVEL_2_SOPS[trainingRole].length === 0) && (
+                                        ['QC', 'Warehouse', 'Management'].includes(trainingRole) ? (
+                                            (trainingRole === 'QC' ? [
+                                                'Sampling Procedure',
+                                                'Incoming Inspection',
+                                                'OOS',
+                                                'Control of Measuring Instruments'
+                                            ] : trainingRole === 'Warehouse' ? [
+                                                'Receipt and Storage of Chemicals',
+                                                'Shipping Procedure',
+                                                'Recall Procedure'
+                                            ] : [
+                                                'Risk Assessment',
+                                                'Root Cause Analysis',
+                                                'CAPA',
+                                                'Internal Audits',
+                                                'Supplier Evaluation'
+                                            ]).map((training, idx) => (
+                                                <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }} onMouseOver={e => (e.currentTarget.style.borderColor = '#cbd5e1')} onMouseOut={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
+                                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+                                                        <i className="fa-regular fa-file-lines" style={{ color: '#ea580c', fontSize: '1.25rem', marginTop: '0.2rem' }}></i>
+                                                        <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{training}</div>
+                                                    </div>
+                                                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem', fontWeight: 600 }}>
+                                                        Status: <span style={{ color: '#ea580c' }}>Pending Acknowledgment</span>
+                                                    </div>
+                                                    <button style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }} onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }} onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}>
+                                                        Read & Acknowledge
+                                                    </button>
+                                                </div>
+                                            ))
+                                        ) : null
+                                    )}
                                 </div>
                             </div>
                         </div>
