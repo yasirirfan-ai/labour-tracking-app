@@ -522,7 +522,7 @@ export const WorkerPortalPage: React.FC = () => {
     const isClockedIn = localUser?.status === 'present';
 
     return (
-        <div className="worker-portal-layout">
+        <div className="worker-portal-layout app-container">
             <style dangerouslySetInnerHTML={{
                 __html: `
                 .worker-main-wrapper {
@@ -809,6 +809,34 @@ export const WorkerPortalPage: React.FC = () => {
                     transform: translateY(-4px) scale(1.02);
                     box-shadow: 0 15px 30px rgba(0,0,0,0.2);
                 }
+
+                .worker-dashboard-grid {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+                    gap: 2.5rem;
+                }
+
+                @media (max-width: 1024px) {
+                    .worker-dashboard-grid {
+                        grid-template-columns: 1fr;
+                        gap: 1.5rem;
+                    }
+                    .worker-content {
+                        padding: 1.5rem 1rem !important;
+                    }
+                    .on-duty-banner {
+                        padding: 2rem 1.5rem;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 1.5rem;
+                    }
+                    .banner-title {
+                        font-size: 2rem;
+                    }
+                    .worker-topbar {
+                        padding: 0 1.5rem !important;
+                    }
+                }
             ` }} />
 
             {notification?.show && (
@@ -991,7 +1019,7 @@ export const WorkerPortalPage: React.FC = () => {
                     )}
 
                     {activeTab === 'dashboard' && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: '2.5rem', width: '100%' }}>
+                        <div className="worker-dashboard-grid" style={{ width: '100%' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
                                 <div className={`on-duty-banner ${!isClockedIn ? 'off-duty-banner' : ''}`}>
                                     <div className="banner-content">
@@ -1078,7 +1106,7 @@ export const WorkerPortalPage: React.FC = () => {
                     )}
 
                     {activeTab === 'personal_info' && (
-                        <div className="profile-section">
+                        <div className="profile-section" style={{ width: '100%' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3.5rem', alignItems: 'center' }}>
                                 <div>
                                     <h3 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, color: '#1e1b4b' }}>Personal Information</h3>
@@ -1100,7 +1128,7 @@ export const WorkerPortalPage: React.FC = () => {
                     )}
 
                     {activeTab === 'conduct' && (
-                        <div className="conduct-section">
+                        <div className="conduct-section" style={{ width: '100%' }}>
                             <div style={{ marginBottom: '4rem' }}>
                                 <h3 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: '#1e1b4b', letterSpacing: '-0.03em' }}>Conduct Record</h3>
                                 <p style={{ color: '#94a3b8', marginTop: '0.5rem', fontWeight: 600, fontSize: '1.1rem' }}>Review your compliance status and official acknowledgments</p>
@@ -1229,7 +1257,7 @@ export const WorkerPortalPage: React.FC = () => {
                     )}
 
                     {activeTab === 'settings' && (
-                        <div className="profile-section">
+                        <div className="profile-section" style={{ width: '100%' }}>
                             <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#262661' }}>Application Settings</h3>
                             <p style={{ color: '#64748B', marginTop: '0.5rem' }}>Manage your portal preferences and notification alerts</p>
                             <div style={{ marginTop: '2.5rem' }}>
@@ -1247,23 +1275,25 @@ export const WorkerPortalPage: React.FC = () => {
 
 
                     {activeTab === 'training' && (
-                        <div className="profile-section">
+                        <div className="profile-section" style={{ width: '100%' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
                                 <div>
                                     <h3 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: '#1e1b4b', letterSpacing: '-0.03em' }}>Babylon Training System</h3>
                                     <p style={{ color: '#94a3b8', marginTop: '0.5rem', fontWeight: 600, fontSize: '1.1rem' }}>Complete your mandatory structural training</p>
                                 </div>
-                                <div style={{ background: '#f0fdf4', color: '#15803d', padding: '0.75rem 1.5rem', borderRadius: '16px', fontWeight: 800, border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <i className="fa-solid fa-chart-pie"></i> Progress: {Math.round((completedTrainings.filter(t => LEVEL_1_TRAININGS.find(l1 => l1.name === t)).length / LEVEL_1_TRAININGS.length) * 100)}%
-                                </div>
                             </div>
 
                             <div style={{ marginBottom: '3rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                                    <div style={{ width: '40px', height: '40px', background: '#e0e7ff', color: '#4f46e5', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
-                                        <i className="fa-solid fa-layer-group"></i>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        <div style={{ width: '40px', height: '40px', background: '#e0e7ff', color: '#4f46e5', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
+                                            <i className="fa-solid fa-layer-group"></i>
+                                        </div>
+                                        <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#1e1b4b' }}>Level 1: Core Orientation</h4>
                                     </div>
-                                    <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#1e1b4b' }}>Level 1: Core Orientation</h4>
+                                    <div style={{ background: '#f0fdf4', color: '#15803d', padding: '0.5rem 1rem', borderRadius: '12px', fontWeight: 800, border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                                        <i className="fa-solid fa-chart-pie"></i> Progress: {Math.round((completedTrainings.filter(t => LEVEL_1_TRAININGS.find(l1 => l1.name === t)).length / LEVEL_1_TRAININGS.length) * 100)}%
+                                    </div>
                                 </div>
                                 <p style={{ color: '#64748b', marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.95rem' }}>Required for ALL employees (Slides + Quiz + Sign Off)</p>
 
@@ -1339,44 +1369,57 @@ export const WorkerPortalPage: React.FC = () => {
                                         </div>
                                         <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#1e1b4b' }}>Level 2: Role-Based SOP Material</h4>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>VIEWING ROLE:</span>
-                                            <select
-                                                value={trainingRole}
-                                                onChange={e => {
-                                                    const newRole = e.target.value as any;
-                                                    setTrainingRole(newRole);
-                                                    if (LEVEL_2_SOPS[newRole]) {
-                                                        setSelectedSOPSection(LEVEL_2_SOPS[newRole][0].name);
-                                                    } else {
-                                                        setSelectedSOPSection('');
-                                                    }
-                                                }}
-                                                style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
-                                            >
-                                                <option value="Production">Production</option>
-                                                <option value="Compounder I">Compounder I</option>
-                                                <option value="QC">Quality Control (QC)</option>
-                                                <option value="Quality Assurance">Quality Assurance</option>
-                                                <option value="Shipping & Recieving">Shipping & Recieving</option>
-                                                <option value="Purchase">Purchase</option>
-                                            </select>
-                                        </div>
-                                        {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 1 && (
+                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                        {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 0 && typeof trainingRole === 'string' && (() => {
+                                            const roleSops = LEVEL_2_SOPS[trainingRole] || [];
+                                            const totalRoleSops = roleSops.reduce((acc: any, section: any) => acc + section.pdfs.length, 0);
+                                            const completedRoleSops = completedTrainings.filter(t => roleSops.some((section: any) => section.pdfs.some((pdf: any) => pdf.name === t))).length;
+                                            const progress = totalRoleSops > 0 ? Math.round((completedRoleSops / totalRoleSops) * 100) : 0;
+                                            return (
+                                                <div style={{ background: progress === 100 ? '#f0fdf4' : '#fff7ed', color: progress === 100 ? '#15803d' : '#ea580c', padding: '0.5rem 1rem', borderRadius: '12px', fontWeight: 800, border: `1px solid ${progress === 100 ? '#bbf7d0' : '#ffedd5'}`, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                                                    <i className="fa-solid fa-chart-pie"></i> Progress: {progress}%
+                                                </div>
+                                            );
+                                        })()}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>SECTION:</span>
+                                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>VIEWING ROLE:</span>
                                                 <select
-                                                    value={selectedSOPSection}
-                                                    onChange={e => setSelectedSOPSection(e.target.value)}
+                                                    value={trainingRole}
+                                                    onChange={e => {
+                                                        const newRole = e.target.value as any;
+                                                        setTrainingRole(newRole);
+                                                        if (LEVEL_2_SOPS[newRole]) {
+                                                            setSelectedSOPSection(LEVEL_2_SOPS[newRole][0].name);
+                                                        } else {
+                                                            setSelectedSOPSection('');
+                                                        }
+                                                    }}
                                                     style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
                                                 >
-                                                    {LEVEL_2_SOPS[trainingRole].map((section: any, idx: number) => (
-                                                        <option key={idx} value={section.name}>{section.name}</option>
-                                                    ))}
+                                                    <option value="Production">Production</option>
+                                                    <option value="Compounder I">Compounder I</option>
+                                                    <option value="QC">Quality Control (QC)</option>
+                                                    <option value="Quality Assurance">Quality Assurance</option>
+                                                    <option value="Shipping & Recieving">Shipping & Recieving</option>
+                                                    <option value="Purchase">Purchase</option>
                                                 </select>
                                             </div>
-                                        )}
+                                            {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 1 && (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>SECTION:</span>
+                                                    <select
+                                                        value={selectedSOPSection}
+                                                        onChange={e => setSelectedSOPSection(e.target.value)}
+                                                        style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
+                                                    >
+                                                        {LEVEL_2_SOPS[trainingRole].map((section: any, idx: number) => (
+                                                            <option key={idx} value={section.name}>{section.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <p style={{ color: '#64748b', marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.95rem' }}>Controlled SOP reading and acknowledgment (No Slides)</p>
@@ -1387,28 +1430,41 @@ export const WorkerPortalPage: React.FC = () => {
                                         .map((section: any, sIdx: number) => (
                                             <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', gridColumn: '1 / -1' }}>
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                                                    {section.pdfs.map((pdf: any, pIdx: number) => (
-                                                        <div key={pIdx} style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }} onMouseOver={e => (e.currentTarget.style.borderColor = '#cbd5e1')} onMouseOut={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
-                                                                <i className="fa-regular fa-file-lines" style={{ color: '#ea580c', fontSize: '1.25rem', marginTop: '0.2rem' }}></i>
-                                                                <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{pdf.name}</div>
+                                                    {section.pdfs.map((pdf: any, pIdx: number) => {
+                                                        const isCompleted = completedTrainings.includes(pdf.name);
+                                                        return (
+                                                            <div key={pIdx} style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }} onMouseOver={e => (e.currentTarget.style.borderColor = '#cbd5e1')} onMouseOut={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
+                                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+                                                                    <i className="fa-regular fa-file-lines" style={{ color: '#ea580c', fontSize: '1.25rem', marginTop: '0.2rem' }}></i>
+                                                                    <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{pdf.name}</div>
+                                                                </div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                                                                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Status:</span>
+                                                                    <span style={{
+                                                                        fontSize: '0.75rem',
+                                                                        fontWeight: 800,
+                                                                        color: isCompleted ? '#15803d' : '#ea580c',
+                                                                        background: isCompleted ? '#dcfce7' : 'transparent',
+                                                                        padding: isCompleted ? '0.2rem 0.6rem' : '0',
+                                                                        borderRadius: '99px'
+                                                                    }}>
+                                                                        {isCompleted ? 'Completed' : 'Pending Read'}
+                                                                    </span>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedPdf(pdf.path);
+                                                                        setCurrentTrainingName(pdf.name);
+                                                                    }}
+                                                                    style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                                                                    onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }}
+                                                                    onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                                                >
+                                                                    {isCompleted ? 'Read Again' : 'Read'}
+                                                                </button>
                                                             </div>
-                                                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem', fontWeight: 600 }}>
-                                                                Status: <span style={{ color: '#ea580c' }}>Pending Read</span>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedPdf(pdf.path);
-                                                                    setCurrentTrainingName(pdf.name);
-                                                                }}
-                                                                style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
-                                                                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }}
-                                                                onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                                                            >
-                                                                Read
-                                                            </button>
-                                                        </div>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         ))}
