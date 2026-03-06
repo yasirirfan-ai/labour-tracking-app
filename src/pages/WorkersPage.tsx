@@ -67,7 +67,7 @@ export const WorkersPage: React.FC = () => {
             password: defaultPassword, // Set default password
             role: 'employee',
             active: true,
-            nfc_id: formData.nfc_id
+            nfc_id: formData.nfc_id || null
         });
 
         if (!error) {
@@ -96,7 +96,7 @@ export const WorkersPage: React.FC = () => {
             username: formData.username,
             worker_id: formData.worker_id,
             hourly_rate: parseFloat(formData.rate),
-            nfc_id: formData.nfc_id
+            nfc_id: formData.nfc_id || null
         }).eq('id', selectedWorker.id);
 
         if (!error) {
