@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
-import { completeAllTasks } from '../lib/taskService';
+import { completeAllTasks, pauseAllActiveTasks } from '../lib/taskService';
 import { Navigate } from 'react-router-dom';
 import { LEVEL_2_SOPS } from '../data/sopData';
 
@@ -28,6 +28,9 @@ export const WorkerPortalPage: React.FC = () => {
     const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
     const [completedTrainings, setCompletedTrainings] = useState<string[]>([]);
+    const [showBreakOverlay, setShowBreakOverlay] = useState(false);
+
+    const MAX_WORK_SECONDS = 5 * 60 * 60; // 5 hours in seconds
 
     useEffect(() => {
         if (user) {
@@ -132,9 +135,22 @@ export const WorkerPortalPage: React.FC = () => {
     }, [user?.id, authLoading]);
 
     useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+
+            // Check for 5-hour work limit
+            if (localUser?.status === 'present' && localUser?.availability === 'available' && localUser?.last_status_change) {
+                const workStarted = new Date(localUser.last_status_change).getTime();
+                const now = new Date().getTime();
+                const elapsedSeconds = Math.floor((now - workStarted) / 1000);
+
+                if (elapsedSeconds >= MAX_WORK_SECONDS) {
+                    handleTakeBreak(true); // Trigger automatic break
+                }
+            }
+        }, 1000);
         return () => clearInterval(timer);
-    }, []);
+    }, [localUser]);
 
     const handleSaveProfile = async () => {
         if (!user) return;
@@ -410,9 +426,47 @@ export const WorkerPortalPage: React.FC = () => {
             await updateUserStatus(user.id, 'offline', 'available');
             await logActivity(user.id, 'clock_out', 'Worker clocked out via portal');
             await fetchUserStatus();
+            setShowBreakOverlay(false);
         } catch (err) {
             console.error(err);
             alert('Failed to clock out');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleTakeBreak = async (isAuto = false) => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            await pauseAllActiveTasks(user.id, isAuto ? 'Break Required (5-Hour Limit)' : 'Worker requested break');
+            await updateUserStatus(user.id, 'present', 'break');
+            await logActivity(user.id, 'break_start', isAuto ? 'Forced break due to 5-hour limit' : 'Worker started break');
+            await fetchUserStatus();
+            if (isAuto) {
+                setShowBreakOverlay(true);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Failed to start break');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEndBreak = async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            await updateUserStatus(user.id, 'present', 'available');
+            await logActivity(user.id, 'break_end', 'Worker ended break');
+            // We don't auto-resume tasks here because the user might want choice, 
+            // but we could call resumeAllAutoPausedTasks(user.id) if preferred.
+            await fetchUserStatus();
+            setShowBreakOverlay(false);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to end break');
         } finally {
             setLoading(false);
         }
@@ -1039,9 +1093,20 @@ export const WorkerPortalPage: React.FC = () => {
                                                 <i className="fa-solid fa-play"></i> {loading ? 'Clocking in...' : 'Clock In Now'}
                                             </button>
                                         ) : (
-                                            <button className="clock-btn-premium btn-out" onClick={handleClockOut} disabled={loading}>
-                                                <i className="fa-solid fa-stop"></i> {loading ? 'Clocking out...' : 'Clock Out Now'}
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                                {localUser?.availability === 'available' ? (
+                                                    <button className="clock-btn-premium" style={{ color: '#f59e0b' }} onClick={() => handleTakeBreak(false)} disabled={loading}>
+                                                        <i className="fa-solid fa-mug-hot"></i> {loading ? 'Starting...' : 'Take Break'}
+                                                    </button>
+                                                ) : (
+                                                    <button className="clock-btn-premium" style={{ color: '#10b981' }} onClick={handleEndBreak} disabled={loading}>
+                                                        <i className="fa-solid fa-play"></i> {loading ? 'Ending...' : 'End Break'}
+                                                    </button>
+                                                )}
+                                                <button className="clock-btn-premium btn-out" onClick={handleClockOut} disabled={loading}>
+                                                    <i className="fa-solid fa-stop"></i> {loading ? 'Clocking out...' : 'Clock Out Now'}
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -1531,6 +1596,39 @@ export const WorkerPortalPage: React.FC = () => {
                                 I have finished reading
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Break Notification Overlay */}
+            {showBreakOverlay && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.9)', zIndex: 10002, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+                    <div style={{ background: 'white', maxWidth: '500px', width: '100%', borderRadius: '24px', padding: '3rem', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+                        <div style={{ width: '80px', height: '80px', background: '#FEF3C7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem' }}>
+                            <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: '2.5rem', color: '#D97706' }}></i>
+                        </div>
+                        <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#1E1B4B', marginBottom: '1rem' }}>Time for a Break!</h2>
+                        <p style={{ color: '#64748B', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '2.5rem' }}>
+                            You have been working for 5 hours straight. For your health and safety, all active tasks have been paused. Please take a moment to rest.
+                        </p>
+                        <button
+                            onClick={handleEndBreak}
+                            style={{
+                                width: '100%',
+                                padding: '1.25rem',
+                                borderRadius: '16px',
+                                background: '#10B981',
+                                color: 'white',
+                                border: 'none',
+                                fontSize: '1.2rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)'
+                            }}
+                        >
+                            Return to Work
+                        </button>
                     </div>
                 </div>
             )}
