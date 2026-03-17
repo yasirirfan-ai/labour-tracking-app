@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    login: (username: string, password: string) => Promise<boolean>;
+    login: (username: string, password: string, requiredRole?: 'manager' | 'employee') => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
 }
 
@@ -23,7 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
     }, []);
 
-    const login = async (username: string, password: string): Promise<boolean> => {
+    const login = async (username: string, password: string, requiredRole?: 'manager' | 'employee'): Promise<{ success: boolean; error?: string }> => {
         const { data, error } = await supabase
             .from('users')
             .select('*')
@@ -32,18 +32,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .maybeSingle();
 
         if (error || !data) {
-            return false;
+            return { success: false, error: 'Invalid username or password' };
+        }
+
+        if (requiredRole && (data as any).role !== requiredRole) {
+            const portalName = requiredRole === 'manager' ? 'Admin' : 'Worker';
+            return { success: false, error: `Access Denied: This account is not authorized for ${portalName} Portal` };
         }
 
         if ((data as any).role !== 'manager' && (data as any).role !== 'employee') {
-            alert('Access denied. Invalid user role.');
-            return false;
+            return { success: false, error: 'Access denied. Invalid user role.' };
         }
 
         const userData = data as any as User;
         setUser(userData);
         localStorage.setItem('bt_user', JSON.stringify(userData));
-        return true;
+        return { success: true };
     };
 
     const logout = () => {

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 
 export const Dashboard: React.FC = () => {
     const [stats, setStats] = useState({ activeWorkers: 0, totalWorkers: 0, runningTimers: 0, todayHours: 0, todayCost: 0 });
-    const [activeMos, setActiveMos] = useState<string[]>([]);
+    const [activeMos, setActiveMos] = useState<any[]>([]);
     const [tasks, setTasks] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -43,7 +43,7 @@ export const Dashboard: React.FC = () => {
                          const s = (m.current_status || '').toLowerCase();
                          return s !== 'completed' && s !== 'done' && s !== 'draft';
                      });
-                     setActiveMos(active.map((m: any) => m.mo_number));
+                     setActiveMos(active);
                 }
             }
         } catch (err) {
@@ -122,17 +122,23 @@ export const Dashboard: React.FC = () => {
                     <div className="list-container">
                         {activeMos.length > 0 ? (
                             activeMos.map(mo => (
-                                <Link key={mo} to="/control-matrix" className="list-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                <Link key={mo.id} to={`/control-matrix#mo-${mo.mo_number}`} className="list-item" style={{ textDecoration: 'none', color: 'inherit' }}>
                                     <div className="item-main">
                                         <div style={{ width: '40px', height: '40px', background: '#EEF2FF', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', fontWeight: 700, fontSize: '0.8rem' }}>
                                             MO
                                         </div>
                                         <div>
-                                            <div className="item-title">{mo}</div>
-                                            <div className="item-sub">In Progress</div>
+                                            <div className="item-title">{mo.mo_number} {mo.product_name ? `- ${mo.product_name}` : ''}</div>
+                                            <div style={{ marginTop: '4px' }}>
+                                                <span className={`badge badge-${(mo.current_status || 'draft').toLowerCase()}`} style={{ fontSize: '0.7rem' }}>
+                                                    {mo.current_status || 'In Progress'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <span className="status-badge badge-blue">{getActiveCountForMo(mo)} active operations</span>
+                                    <span className={`status-badge ${getActiveCountForMo(mo.mo_number) > 0 ? 'badge-green' : 'badge-blue'}`}>
+                                        {getActiveCountForMo(mo.mo_number)} active operations
+                                    </span>
                                 </Link>
                             ))
                         ) : (

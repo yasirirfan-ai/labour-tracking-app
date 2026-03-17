@@ -277,24 +277,23 @@ export const EmployeeActivityPage: React.FC = () => {
 
                                     {/* Timeline Table */}
                                     <h3 style={{ fontSize: '0.9rem', textTransform: 'uppercase', color: '#64748B', marginBottom: '1rem', fontWeight: 700 }}>Activity Log</h3>
-                                    <div style={{ background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+                                    <div className="table-responsive-container" style={{ background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                                         {timeline.length > 0 ? (
                                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                                                 <thead>
                                                     <tr style={{ background: '#F1F5F9', color: '#475569' }}>
-                                                        <th style={{ textAlign: 'left', padding: '0.75rem 1rem', fontWeight: 600 }}>Time</th>
-                                                        <th style={{ textAlign: 'left', padding: '0.75rem 1rem', fontWeight: 600 }}>Event</th>
+                                                        <th className="sticky-column" style={{ textAlign: 'left', padding: '0.75rem 1rem', fontWeight: 600 }}>Time</th>
+                                                        <th className="sticky-column" style={{ textAlign: 'left', padding: '0.75rem 1rem', fontWeight: 600, left: '100px' }}>Event</th>
                                                         <th style={{ textAlign: 'left', padding: '0.75rem 1rem', fontWeight: 600 }}>Description</th>
-
                                                     </tr>
                                                 </thead>
-                                                <tbody>
+                                                <tbody style={{ background: 'white' }}>
                                                     {timeline.map(log => {
                                                         const time = new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                                         return (
                                                             <tr key={log.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                                                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontFamily: 'monospace' }}>{time}</td>
-                                                                <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0F172A' }}>
+                                                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', color: '#64748B', fontFamily: 'monospace' }}>{time}</td>
+                                                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0F172A', left: '100px' }}>
                                                                     {log.event_type.replace(/_/g, ' ').toUpperCase()}
                                                                 </td>
                                                                 <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>

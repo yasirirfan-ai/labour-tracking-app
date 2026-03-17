@@ -264,6 +264,17 @@ export const ControlTablePage: React.FC = () => {
         }
     };
 
+    const handleDeleteTask = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this activity entry?')) return;
+        try {
+            const { error } = await supabase.from('tasks').delete().eq('id', id);
+            if (error) throw error;
+            fetchData();
+        } catch (err: any) {
+            alert('Error deleting task: ' + err.message);
+        }
+    };
+
     const handleCreateClick = () => {
         setCreateForm({
             worker_id: '',
@@ -533,74 +544,81 @@ export const ControlTablePage: React.FC = () => {
                 })}
             </div>
 
-            <div className="section-card">
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                        <thead>
-                            <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Worker ID</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Name</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>MO</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Operation</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Clock In</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Start Time</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Clock Out</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Last Action</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Duration</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Status</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Edit</th>
+            <div className="table-responsive-container">
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                    <thead>
+                        <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Worker ID</th>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569', left: '100px' }}>Name</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>MO</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Operation</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Clock In</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Start Time</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Clock Out</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Last Action</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Duration</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Status</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Edit</th>
+                        </tr>
+                    </thead>
+                    <tbody style={{ background: 'white' }}>
+                        {filteredTasks.map(task => (
+                            <tr key={task.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#64748B', fontFamily: `'JetBrains Mono', monospace` }}>{task.worker_id_str}</td>
+                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', left: '100px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <div style={{ width: '32px', height: '32px', background: 'var(--primary)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '0.8rem' }}>
+                                            {task.worker_avatar}
+                                        </div>
+                                        <span style={{ fontWeight: 600, color: '#1E293B' }}>{task.worker_name}</span>
+                                    </div>
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem' }}>
+                                    <span className="badge badge-blue" style={{ fontSize: '0.75rem' }}>{task.mo_reference}</span>
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{task.description}</td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
+                                    {formatDateTime(task.created_at)}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
+                                    {formatTimeOnly(task.start_time)}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
+                                    {formatDateTime(task.end_time)}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
+                                    {formatTimeOnly(task.last_action_time)}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ fontFamily: `'JetBrains Mono', monospace`, color: '#334155', fontWeight: 600 }}>
+                                            {formatCurrentTime(task)}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem' }}>{getStatusLabel(task.status)}</td>
+                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                    <button
+                                        onClick={() => handleEditClick(task)}
+                                        className="icon-btn"
+                                        title="Edit Entry"
+                                        style={{ color: '#475569', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
+                                    >
+                                        <i className="fa-solid fa-pen-to-square"></i>
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteTask(task.id)}
+                                        className="icon-btn delete"
+                                        title="Delete Entry"
+                                        style={{ color: '#EF4444', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
+                                    >
+                                        <i className="fa-regular fa-trash-can"></i>
+                                    </button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {filteredTasks.map(task => (
-                                <tr key={task.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#64748B', fontFamily: `'JetBrains Mono', monospace` }}>{task.worker_id_str}</td>
-                                    <td style={{ padding: '0.75rem 1rem' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <div style={{ width: '32px', height: '32px', background: 'var(--primary)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '0.8rem' }}>
-                                                {task.worker_avatar}
-                                            </div>
-                                            <span style={{ fontWeight: 600, color: '#1E293B' }}>{task.worker_name}</span>
-                                        </div>
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem' }}>
-                                        <span className="badge badge-blue" style={{ fontSize: '0.75rem' }}>{task.mo_reference}</span>
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{task.description}</td>
-                                    <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
-                                        {formatDateTime(task.created_at)}
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
-                                        {formatTimeOnly(task.start_time)}
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
-                                        {formatDateTime(task.end_time)}
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
-                                        {formatTimeOnly(task.last_action_time)}
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span style={{ fontFamily: `'JetBrains Mono', monospace`, color: '#334155', fontWeight: 600 }}>
-                                                {formatCurrentTime(task)}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem' }}>{getStatusLabel(task.status)}</td>
-                                    <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                                        <button
-                                            onClick={() => handleEditClick(task)}
-                                            className="icon-btn"
-                                            style={{ color: '#475569', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
-                                        >
-                                            <i className="fa-solid fa-pen-to-square"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                        ))}
+                    </tbody>
+                </table>
             </div>
 
             {/* Edit Modal (Compact) */}
@@ -732,10 +750,10 @@ export const ControlTablePage: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
 
             {/* Create Manual Entry Modal */}
-            <div className={`offcanvas ${isCreateOpen ? 'show' : ''}`} style={{
+            < div className={`offcanvas ${isCreateOpen ? 'show' : ''}`} style={{
                 right: 'auto', left: '50%', top: '50%', transform: `translate(-50%, -50%)`,
                 width: '700px', height: 'auto',
                 borderRadius: '12px', opacity: isCreateOpen ? 1 : 0,
@@ -895,7 +913,7 @@ export const ControlTablePage: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {isCreateOpen && <div className="overlay active" style={{ zIndex: 3000 }} onClick={() => setIsCreateOpen(false)}></div>}
 

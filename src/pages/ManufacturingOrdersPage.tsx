@@ -283,14 +283,14 @@ export const ManufacturingOrdersPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="table-container">
+            <div className="table-responsive-container">
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                         <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', textAlign: 'left' }}>
                             <th style={{ padding: '0.75rem 1rem', width: '40px' }}></th> {/* Grip */}
                             <th style={{ padding: '0.75rem 1rem', width: '50px', textAlign: 'center' }}><i className="fa-solid fa-thumbtack" style={{ color: '#94A3B8' }}></i></th>
-                            <th style={{ padding: '0.75rem 1rem' }}>MO Number</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Product Name</th>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem' }}>MO Number</th>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', left: '100px' }}>Product Name</th>
                             <th style={{ padding: '0.75rem 1rem' }}>SKU</th>
                             <th style={{ padding: '0.75rem 1rem' }}>Qty</th>
                             <th style={{ padding: '0.75rem 1rem' }}>PO Number</th>
@@ -336,8 +336,8 @@ export const ManufacturingOrdersPage: React.FC = () => {
                                         <i className="fa-solid fa-thumbtack"></i>
                                     </button>
                                 </td>
-                                <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--primary)' }}>{index + 1}</td>
-                                <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{order.product_name}</td>
+                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--primary)' }}>{index + 1}</td>
+                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, left: '100px' }}>{order.product_name}</td>
                                 <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', color: '#64748B' }}>{order.sku}</td>
                                 <td style={{ padding: '0.75rem 1rem' }}>{order.quantity}</td>
                                 <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{order.po_number}</td>

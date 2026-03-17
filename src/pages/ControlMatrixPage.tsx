@@ -137,8 +137,8 @@ export const ControlMatrixPage: React.FC = () => {
         }
     };
 
-    /* const deleteTask = async (taskId: string) => {
-        if (!confirm('Remove this assignment?')) return;
+    const deleteTask = async (taskId: string) => {
+        if (!confirm('Remove this worker assignment?')) return;
         try {
             const { error } = await supabase.from('tasks').delete().eq('id', taskId);
             if (error) throw error;
@@ -146,7 +146,7 @@ export const ControlMatrixPage: React.FC = () => {
         } catch (err) {
             console.error('Error deleting task:', err);
         }
-    }; */
+    };
 
     const handleTaskAction = async (task: Task, action: 'start' | 'pause' | 'resume' | 'complete', reason?: string) => {
         // Check if worker is on break
@@ -444,6 +444,37 @@ export const ControlMatrixPage: React.FC = () => {
                                                 </button>
                                             </>
                                         )}
+
+                                        <button 
+                                            title="Remove Assignment" 
+                                            onClick={() => deleteTask(task.id)} 
+                                            style={{ 
+                                                width: '42px', 
+                                                height: '42px', 
+                                                borderRadius: '50%', 
+                                                background: '#F8FAFC', 
+                                                color: '#94A3B8', 
+                                                border: '1px solid #E2E8F0', 
+                                                cursor: 'pointer', 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center', 
+                                                fontSize: '1rem', 
+                                                transition: 'all 0.2s' 
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = '#FEE2E2';
+                                                e.currentTarget.style.color = '#DC2626';
+                                                e.currentTarget.style.borderColor = '#FEE2E2';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = '#F8FAFC';
+                                                e.currentTarget.style.color = '#94A3B8';
+                                                e.currentTarget.style.borderColor = '#E2E8F0';
+                                            }}
+                                        >
+                                            <i className="fa-regular fa-trash-can"></i>
+                                        </button>
                                     </div>
                                 </div>
                             );

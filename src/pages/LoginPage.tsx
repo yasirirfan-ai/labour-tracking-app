@@ -19,28 +19,12 @@ export const LoginPage: React.FC = () => {
         e.preventDefault();
         setError('');
 
-        // We need to check role before setting the user in context if possible, 
-        // but current AuthContext.login just sets it. 
-        // We'll handle it here by logging out if the role is wrong.
-        const success = await login(username, password);
+        const requiredRole = loginRole === 'admin' ? 'manager' : 'employee';
+        const result = await login(username, password, requiredRole);
 
-        if (!success) {
-            setError('Invalid username or password');
+        if (!result.success) {
+            setError(result.error || 'Invalid username or password');
             return;
-        }
-
-        // Check if role matches selected portal
-        const savedUser = JSON.parse(localStorage.getItem('bt_user') || '{}');
-        const userRole = savedUser.role;
-
-        if (loginRole === 'admin' && userRole !== 'manager') {
-            setError('Access Denied: Restricted Portal - This account is not authorized for Admin Access');
-            localStorage.removeItem('bt_user');
-            setTimeout(() => window.location.reload(), 1500);
-        } else if (loginRole === 'worker' && userRole !== 'employee') {
-            setError('Access Denied: Restricted Portal - This account is not authorized for Worker Access');
-            localStorage.removeItem('bt_user');
-            setTimeout(() => window.location.reload(), 1500);
         }
     };
 
