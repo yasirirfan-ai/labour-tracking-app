@@ -13,6 +13,8 @@ import { ReportsPage } from './pages/ReportsPage';
 import { WorkerPortalPage } from './pages/WorkerPortalPage';
 import { DisciplineAdminPage } from './pages/DisciplineAdminPage';
 import { NfcManagementPage } from './pages/NfcManagementPage';
+import { HireWorkerPage } from './pages/HireWorkerPage';
+import { EmployeeDetailView } from './pages/EmployeeDetailView';
 
 function App() {
   return (
@@ -28,6 +30,9 @@ function App() {
             <Route path="manufacturing-orders" element={<ManufacturingOrdersPage />} />
             <Route path="employee-activity" element={<EmployeeActivityPage />} />
             <Route path="workers" element={<WorkersPage />} />
+            <Route path="workers/:id" element={<EmployeeDetailView />} />
+            <Route path="workers/hire" element={<HireWorkerPage />} />
+            <Route path="workers/edit/:id" element={<HireWorkerPage />} />
             <Route path="operations" element={<OperationsPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="discipline" element={<DisciplineAdminPage />} />

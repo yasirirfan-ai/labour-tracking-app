@@ -13,6 +13,79 @@ export interface User {
     email?: string;
     address?: string;
     completed_trainings?: string[];
+    // New fields for the overhauls
+    first_name?: string;
+    middle_name?: string;
+    last_name?: string;
+    preferred_name?: string;
+    birth_date?: string;
+    ssn?: string;
+    gender?: string;
+    marital_status?: string;
+    hire_date?: string;
+    address_street1?: string;
+    address_street2?: string;
+    address_city?: string;
+    address_state?: string;
+    address_zip?: string;
+    address_country?: string;
+    work_phone?: string;
+    work_phone_ext?: string;
+    mobile_phone?: string;
+    home_phone?: string;
+    work_email?: string;
+    home_email?: string;
+    employment_status?: string;
+    job_title?: string;
+    reporting_to?: string;
+    department?: string;
+    division?: string;
+    location?: string;
+    pay_schedule?: string;
+    pay_type?: string;
+    pay_period?: string;
+    shirt_size?: string;
+    linkedin_url?: string;
+    twitter_url?: string;
+    facebook_url?: string;
+    photo_url?: string;
+    active?: boolean;
+    nfc_id?: string;
+    
+    // Emergency Contact
+    emergency_contact_name?: string;
+    emergency_contact_relationship?: string;
+    emergency_contact_phone?: string;
+    emergency_contact_phone_ext?: string;
+    emergency_contact_home_phone?: string;
+    emergency_contact_mobile_phone?: string;
+    emergency_contact_email?: string;
+    emergency_contact_address_street1?: string;
+    emergency_contact_address_street2?: string;
+    emergency_contact_address_city?: string;
+    emergency_contact_address_state?: string;
+    emergency_contact_address_zip?: string;
+    emergency_contact_address_country?: string;
+    is_primary_contact?: boolean;
+    
+    // Secondary Contact
+    secondary_contact_name?: string;
+    secondary_contact_relationship?: string;
+    secondary_contact_phone?: string;
+    
+    // EEO Fields
+    ethnicity?: string;
+    eeo_job_category?: string;
+    
+    // Bonus Fields
+    annual_bonus_percentage?: number;
+    annual_bonus_amount?: number;
+
+    // Veteran Status Fields
+    is_active_duty_veteran?: boolean;
+    is_armed_forces_medal_veteran?: boolean;
+    is_disabled_veteran?: boolean;
+    is_recently_separated_veteran?: boolean;
 }
 
 export interface DisciplinaryPolicy {
