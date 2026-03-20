@@ -770,7 +770,7 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field">
                                         <label>Annual Percentage</label>
-                                        <div className="bonus-input-wrapper percentage">
+                                        <div className="bonus-input-wrapper bonus-percentage">
                                             <input 
                                                 type="number" 
                                                 value={employee.annual_bonus_percentage ?? ''}
@@ -1516,7 +1516,7 @@ export const EmployeeDetailView: React.FC = () => {
                     stroke-width: 3.8;
                     stroke-linecap: round;
                 }
-                .percentage {
+                .progress-percentage {
                     fill: var(--primary, #1e1b4b);
                     font-size: 8px;
                     font-weight: 800;
