@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { EmployeeTable } from '../components/EmployeeTable';
-import { EmployeeSnapshot } from '../components/EmployeeSnapshot';
+import { EmployeeCardGrid } from '../components/EmployeeCardGrid';
 import { useNavigate } from 'react-router-dom';
 import type { User } from '../types';
 
@@ -18,10 +17,6 @@ export const WorkersPage: React.FC = () => {
     
     // New state for overhaul
     const navigate = useNavigate();
-    const [hoveredWorker, pHoveredWorker] = useState<User | null>(null);
-    const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
-    const [viewMode, setViewMode] = useState<'List' | 'Directory' | 'Org Chart'>('List');
-
     useEffect(() => { fetchWorkers(); }, []);
 
     const fetchWorkers = async () => {
@@ -35,11 +30,6 @@ export const WorkersPage: React.FC = () => {
     const handleAddNew = () => {
         navigate('/workers/hire');
     };
-
-    const handleEditNavigation = (worker: User) => {
-        navigate(`/workers/edit/${worker.id}`);
-    };
-
 
     const handleArchive = async (id: string, currentStatus: boolean) => {
         const action = currentStatus ? 'archive' : 'restore';
@@ -99,15 +89,6 @@ export const WorkersPage: React.FC = () => {
         navigate(`/workers/${employee.id}`);
     };
 
-    const handleMouseEnterName = (e: React.MouseEvent, employee: User) => {
-        setHoverPosition({ x: e.clientX, y: e.clientY });
-        pHoveredWorker(employee);
-    };
-
-    const handleMouseLeaveName = () => {
-        pHoveredWorker(null);
-    };
-
     if (isLoading) return <div className="loading-screen">Loading Workers...</div>;
 
     return (
@@ -117,42 +98,17 @@ export const WorkersPage: React.FC = () => {
                 <div className="people-header-main">
                     <div className="title-section">
                         <h1 className="people-title">People</h1>
-                        <button className="quick-access-btn">
-                            <i className="fa-solid fa-arrow-up-right-from-square"></i> Quick access to the directory
-                        </button>
                     </div>
                     
                     <div className="header-actions">
                         <button className="btn-new-employee" onClick={handleAddNew}>
                             <i className="fa-solid fa-circle-plus"></i> New Employee
                         </button>
-                        
-                        <div className="view-mode-tabs">
-                            <button className={`view-tab ${viewMode === 'List' ? 'active' : ''}`} onClick={() => setViewMode('List')}>
-                                <i className="fa-solid fa-list"></i> List
-                            </button>
-                            <button className={`view-tab ${viewMode === 'Directory' ? 'active' : ''}`} onClick={() => setViewMode('Directory')}>
-                                <i className="fa-solid fa-address-book"></i> Directory
-                            </button>
-                            <button className={`view-tab ${viewMode === 'Org Chart' ? 'active' : ''}`} onClick={() => setViewMode('Org Chart')}>
-                                <i className="fa-solid fa-sitemap"></i> Org Chart
-                            </button>
-                        </div>
                     </div>
                 </div>
             </header>
 
-            <div className="filter-bar">
-                <div className="filter-group">
-                    <button className="filter-settings-btn"><i className="fa-solid fa-sliders"></i></button>
-                    <div className="select-wrapper">
-                        <select value="Hourly Employees" disabled>
-                            <option>Hourly Employees</option>
-                        </select>
-                        <span className="count-badge"><i className="fa-solid fa-users"></i> {filteredWorkers.length}</span>
-                    </div>
-                </div>
-
+            <div className="filter-bar" style={{ justifyContent: 'flex-end' }}>
                 <div className="search-filter-group">
                     <div className="search-wrapper">
                         <i className="fa-solid fa-magnifying-glass"></i>
@@ -176,18 +132,11 @@ export const WorkersPage: React.FC = () => {
                 </div>
             </div>
 
-            <EmployeeTable 
+            <EmployeeCardGrid 
                 employees={filteredWorkers} 
                 onEmployeeClick={handleEmployeeClick}
-                onMouseEnterName={handleMouseEnterName}
-                onMouseLeaveName={handleMouseLeaveName}
-                onEdit={handleEditNavigation}
-                onArchive={handleArchive}
+                onDelete={handleArchive}
             />
-
-            {hoveredWorker && (
-                <EmployeeSnapshot employee={hoveredWorker} position={hoverPosition} />
-            )}
 
             <style>{`
                 .people-header {

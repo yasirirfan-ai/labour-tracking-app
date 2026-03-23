@@ -80,12 +80,29 @@ export interface User {
     // Bonus Fields
     annual_bonus_percentage?: number;
     annual_bonus_amount?: number;
+    pay_group?: string;
+    annual_pay?: number;
 
     // Veteran Status Fields
     is_active_duty_veteran?: boolean;
     is_armed_forces_medal_veteran?: boolean;
     is_disabled_veteran?: boolean;
     is_recently_separated_veteran?: boolean;
+    pto_balance?: string;
+    sick_balance?: string;
+    license_type?: string;
+    license_effective?: string;
+    license_expiration?: string;
+    license_notes?: string;
+    education?: {
+        institution: string;
+        degree: string;
+        major: string;
+        gpa: string;
+        start_date: string;
+        end_date: string;
+    }[];
+    training_completion?: number;
 }
 
 export interface DisciplinaryPolicy {

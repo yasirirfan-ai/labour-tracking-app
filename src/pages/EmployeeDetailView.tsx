@@ -7,8 +7,12 @@ export const EmployeeDetailView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [employee, setEmployee] = useState<User | null>(null);
+    const [initialEmployee, setInitialEmployee] = useState<User | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('Time Off');
+    const [activeTab, setActiveTab] = useState('Personal');
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [historySearch, setHistorySearch] = useState('');
     const [eeoSearch, setEeoSearch] = useState('');
@@ -24,8 +28,12 @@ export const EmployeeDetailView: React.FC = () => {
             .eq('id', id || '')
             .single();
         
-        if (data) setEmployee(data as User);
-        else if (error) console.error('Error fetching employee:', error);
+        if (data) {
+            setEmployee(data as User);
+            setInitialEmployee(data as User);
+        } else if (error) {
+            console.error('Error fetching employee:', error);
+        }
         setLoading(false);
     };
 
@@ -35,9 +43,66 @@ export const EmployeeDetailView: React.FC = () => {
 
 
     if (loading) return <div className="loading-screen">Loading Profile...</div>;
-    if (!employee) return <div>Employee not found</div>;
+    if (!employee || !initialEmployee) return <div>Employee not found</div>;
 
-    const tabs = ['Personal', 'Job', 'Time Off', 'Emergency'];
+    const isDirty = JSON.stringify(employee) !== JSON.stringify(initialEmployee);
+
+    const formatSSN = (value: string) => {
+        const val = value.replace(/\D/g, '');
+        let formatted = val;
+        if (val.length > 3) {
+            formatted = val.slice(0, 3) + '-' + val.slice(3);
+        }
+        if (val.length > 5) {
+            formatted = val.slice(0, 3) + '-' + val.slice(3, 5) + '-' + val.slice(5, 9);
+        }
+        return formatted;
+    };
+
+    const handleSave = async () => {
+        if (!employee) return;
+        setValidationErrors({});
+        
+        // Validation
+        const errors: Record<string, string> = {};
+        if (!employee.worker_id?.trim()) errors.worker_id = "Employee # is required";
+        if (!employee.first_name?.trim()) errors.first_name = "First Name is required";
+        
+        const validatePhone = (val?: string) => {
+            if (!val) return true;
+            return /^[0-9+() -]*$/.test(val);
+        };
+
+        if (!validatePhone(employee.phone)) errors.phone = "Phone must be numeric";
+        if (!validatePhone(employee.work_phone)) errors.work_phone = "Work Phone must be numeric";
+        if (!validatePhone(employee.mobile_phone)) errors.mobile_phone = "Mobile Phone must be numeric";
+        if (!validatePhone(employee.home_phone)) errors.home_phone = "Home Phone must be numeric";
+        if (!validatePhone(employee.emergency_contact_phone)) errors.emergency_contact_phone = "Emergency Phone must be numeric";
+
+        if (Object.keys(errors).length > 0) {
+            setValidationErrors(errors);
+            setToast({ message: "Please fix the validation errors before saving.", type: 'error' });
+            setTimeout(() => setToast(null), 3000);
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const { error } = await (supabase.from('users') as any).update(employee).eq('id', (employee as any).id);
+            if (error) throw error;
+            
+            setInitialEmployee(employee);
+            setToast({ message: "Worker updated successfully", type: 'success' });
+            setTimeout(() => setToast(null), 3000);
+        } catch (err: any) {
+            setToast({ message: err.message || "Failed to save changes", type: 'error' });
+            setTimeout(() => setToast(null), 3000);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const tabs = ['Personal', 'Job', 'Training', 'Emergency', 'Time Off'];
 
     const historyData = [
         { date: '04/16/2025', description: `${employee.name.split(' ')[0]} is now eligible to begin accruing time`, used: null, earned: null, balance: '0.00' },
@@ -152,6 +217,93 @@ export const EmployeeDetailView: React.FC = () => {
                 </aside>
 
                 <main className="main-details">
+                    {activeTab === 'Training' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                            <div className="section-title-row">
+                                <i className="fa-solid fa-graduation-cap"></i>
+                                <h2>Training & Development</h2>
+                            </div>
+                            
+                            <div className="training-summary-card">
+                                <div className="progress-circle-large">
+                                    <svg viewBox="0 0 36 36">
+                                        <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                        <path className="circle" strokeDasharray={`${employee.training_completion || 65}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                        <text x="18" y="20.35" className="progress-percentage">{employee.training_completion || 65}%</text>
+                                    </svg>
+                                </div>
+                                <div className="training-stats">
+                                    <div style={{ display: 'flex', gap: '2rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Level 1 Progress</label>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b' }}>92%</div>
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Level 2 Progress</label>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b' }}>45%</div>
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Total SOPs</label>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b' }}>12/18</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                                <div className="info-card">
+                                    <div className="card-header">
+                                        <i className="fa-solid fa-clock"></i>
+                                        <h3>Upcoming Training</h3>
+                                    </div>
+                                    <div className="training-list">
+                                        <div className="training-item">
+                                            <i className="fa-solid fa-circle-play text-gray"></i>
+                                            <div className="sop-info">
+                                                <strong>SOP-74: Biohazard Cleanup</strong>
+                                                <p>Level 1 Certification • Due in 3 days</p>
+                                            </div>
+                                            <span className="sop-type">Safety</span>
+                                        </div>
+                                        <div className="training-item">
+                                            <i className="fa-solid fa-circle-play text-gray"></i>
+                                            <div className="sop-info">
+                                                <strong>SOP-12: Line Clearance</strong>
+                                                <p>Level 2 Technical • Due in 5 days</p>
+                                            </div>
+                                            <span className="sop-type">Ops</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="info-card">
+                                    <div className="card-header">
+                                        <i className="fa-solid fa-circle-check"></i>
+                                        <h3>Recently Completed</h3>
+                                    </div>
+                                    <div className="training-list">
+                                        <div className="training-item">
+                                            <i className="fa-solid fa-circle-check text-green"></i>
+                                            <div className="sop-info">
+                                                <strong>SOP-01: Gowning Procedure</strong>
+                                                <p>Completed Mar 15, 2025</p>
+                                            </div>
+                                            <span className="sop-type">Quality</span>
+                                        </div>
+                                        <div className="training-item">
+                                            <i className="fa-solid fa-circle-check text-green"></i>
+                                            <div className="sop-info">
+                                                <strong>SOP-05: Hand Washing</strong>
+                                                <p>Completed Mar 12, 2025</p>
+                                            </div>
+                                            <span className="sop-type">Quality</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'Time Off' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div className="section-title-row">
@@ -162,7 +314,15 @@ export const EmployeeDetailView: React.FC = () => {
                         <div className="time-off-grid">
                             <div className="time-off-card">
                                 <div className="card-icon"><i className="fa-solid fa-palm-tree"></i></div>
-                                <div className="card-value">12.6 Hours</div>
+                                <div className="card-value">
+                                    <input 
+                                        type="text" 
+                                        className="card-value-input" 
+                                        value={employee.pto_balance || '12.6'} 
+                                        onChange={(e) => setEmployee(prev => prev ? { ...prev, pto_balance: e.target.value } : null)} 
+                                    />
+                                    <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>Hours</span>
+                                </div>
                                 <div className="card-label">Paid Time Off (PTO) Available</div>
                                 <div className="card-sublabel">Babylon PTO</div>
                                 <div className="card-actions">
@@ -175,7 +335,15 @@ export const EmployeeDetailView: React.FC = () => {
 
                             <div className="time-off-card">
                                 <div className="card-icon"><i className="fa-solid fa-hospital"></i></div>
-                                <div className="card-value">11.5 Hours</div>
+                                <div className="card-value">
+                                    <input 
+                                        type="text" 
+                                        className="card-value-input" 
+                                        value={employee.sick_balance || '11.5'} 
+                                        onChange={(e) => setEmployee(prev => prev ? { ...prev, sick_balance: e.target.value } : null)} 
+                                    />
+                                    <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>Hours</span>
+                                </div>
                                 <div className="card-label">Sick Time Available</div>
                                 <div className="card-sublabel">Babylon Sick Time Year 1</div>
                                 <div className="card-actions">
@@ -302,47 +470,69 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field">
                                         <label>Employee #</label>
-                                        <div className="info-value">{employee.worker_id}</div>
+                                        <input type="text" className={`info-input ${validationErrors.worker_id ? 'error' : ''}`} value={employee.worker_id || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, worker_id: e.target.value } : null)} />
+                                        {validationErrors.worker_id && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.worker_id}</span>}
                                     </div>
                                     <div className="info-field">
                                         <label>Status</label>
-                                        <div className="info-value"><span className="status-badge active">Active</span></div>
+                                        <select className="info-input" value={employee.active === false ? "false" : "true"} onChange={(e) => setEmployee(prev => prev ? { ...prev, active: e.target.value === "true" } : null)}>
+                                            <option value="true">Active</option>
+                                            <option value="false">Archived</option>
+                                        </select>
                                     </div>
                                     <div className="info-field">
                                         <label>First Name</label>
-                                        <div className="info-value">{employee.first_name || employee.name?.split(' ')[0]}</div>
+                                        <input type="text" className={`info-input ${validationErrors.first_name ? 'error' : ''}`} value={employee.first_name || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, first_name: e.target.value } : null)} />
+                                        {validationErrors.first_name && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.first_name}</span>}
                                     </div>
                                     <div className="info-field">
                                         <label>Middle Name</label>
-                                        <div className="info-value">{employee.middle_name || '-'}</div>
+                                        <input type="text" className="info-input" value={employee.middle_name || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, middle_name: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>Last Name</label>
-                                        <div className="info-value">{employee.last_name || employee.name?.split(' ').slice(1).join(' ')}</div>
+                                        <input type="text" className="info-input" value={employee.last_name || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, last_name: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>Preferred Name</label>
-                                        <div className="info-value">{employee.preferred_name || '-'}</div>
+                                        <input type="text" className="info-input" value={employee.preferred_name || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, preferred_name: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>Birth Date</label>
-                                        <div className="info-value">{employee.birth_date ? new Date(employee.birth_date).toLocaleDateString() : '-'}</div>
+                                        <input type="date" className="info-input" value={employee.birth_date || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, birth_date: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>SSN</label>
-                                        <div className="info-value">{employee.ssn ? 'XXX-XX-' + employee.ssn.slice(-4) : '-'}</div>
+                                        <input type="text" className="info-input" value={employee.ssn || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, ssn: formatSSN(e.target.value) } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>Gender</label>
-                                        <div className="info-value">{employee.gender || '-'}</div>
+                                        <select className="info-input" value={employee.gender || ""} onChange={(e) => setEmployee(prev => prev ? { ...prev, gender: e.target.value } : null)}>
+                                            <option value="">-Select-</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                        </select>
                                     </div>
                                     <div className="info-field">
                                         <label>Marital Status</label>
-                                        <div className="info-value">{employee.marital_status || '-'}</div>
+                                        <select className="info-input" value={employee.marital_status || ""} onChange={(e) => setEmployee(prev => prev ? { ...prev, marital_status: e.target.value } : null)}>
+                                            <option value="">-Select-</option>
+                                            <option value="Single">Single</option>
+                                            <option value="Married">Married</option>
+                                        </select>
                                     </div>
                                     <div className="info-field">
                                         <label>Shirt Size</label>
-                                        <div className="info-value">{employee.shirt_size || '-Select-'}</div>
+                                        <select className="info-input" value={employee.shirt_size || ""} onChange={(e) => setEmployee(prev => prev ? { ...prev, shirt_size: e.target.value } : null)}>
+                                            <option value="">-Select-</option>
+                                            <option value="S">S</option>
+                                            <option value="M">M</option>
+                                            <option value="L">L</option>
+                                            <option value="XL">XL</option>
+                                            <option value="2XL">2XL</option>
+                                            <option value="3XL">3XL</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -356,27 +546,27 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field full-width">
                                         <label>Street 1</label>
-                                        <div className="info-value">{employee.address_street1 || '-'}</div>
+                                        <input type="text" className="info-input" value={employee.address_street1 || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_street1: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field full-width">
                                         <label>Street 2</label>
-                                        <div className="info-value">{employee.address_street2 || '-'}</div>
+                                        <input type="text" className="info-input" value={employee.address_street2 || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_street2: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>City</label>
-                                        <div className="info-value">{employee.address_city || '-'}</div>
+                                        <input type="text" className="info-input" value={employee.address_city || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_city: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>State</label>
-                                        <div className="info-value">{employee.address_state || '-'}</div>
+                                        <input type="text" className="info-input" value={employee.address_state || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_state: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>ZIP</label>
-                                        <div className="info-value">{employee.address_zip || '-'}</div>
+                                        <input type="text" className="info-input" value={employee.address_zip || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_zip: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>Country</label>
-                                        <div className="info-value">{employee.address_country || 'United States'}</div>
+                                        <input type="text" className="info-input" value={employee.address_country || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_country: e.target.value } : null)} />
                                     </div>
                                 </div>
                             </div>
@@ -390,27 +580,30 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field">
                                         <label>Work Phone</label>
-                                        <div className="info-icon-value"><i className="fa-solid fa-phone-office"></i> {employee.work_phone || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.work_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_phone: e.target.value } : null)} /></div>
+                                        {validationErrors.work_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.work_phone}</span>}
                                     </div>
                                     <div className="info-field">
                                         <label>Ext</label>
-                                        <div className="info-value">{employee.work_phone_ext || '-'}</div>
+                                        <input type="text" className="info-input" value={employee.work_phone_ext || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_phone_ext: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>Mobile Phone</label>
-                                        <div className="info-icon-value"><i className="fa-solid fa-mobile-screen"></i> {employee.mobile_phone || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-mobile-screen" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.mobile_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, mobile_phone: e.target.value } : null)} /></div>
+                                        {validationErrors.mobile_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.mobile_phone}</span>}
                                     </div>
                                     <div className="info-field">
                                         <label>Home Phone</label>
-                                        <div className="info-icon-value"><i className="fa-solid fa-phone"></i> {employee.home_phone || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.home_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_phone: e.target.value } : null)} /></div>
+                                        {validationErrors.home_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.home_phone}</span>}
                                     </div>
                                     <div className="info-field full-width">
                                         <label>Work Email</label>
-                                        <div className="info-icon-value"><i className="fa-solid fa-envelope"></i> {employee.work_email || employee.username || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i><input type="email" className="info-input" style={{flex: 1}} value={employee.work_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_email: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>Home Email</label>
-                                        <div className="info-icon-value"><i className="fa-solid fa-envelope"></i> {employee.home_email || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i><input type="email" className="info-input" style={{flex: 1}} value={employee.home_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_email: e.target.value } : null)} /></div>
                                     </div>
                                 </div>
                             </div>
@@ -424,15 +617,15 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field full-width">
                                         <label>LinkedIn</label>
-                                        <div className="info-icon-value"><i className="fa-brands fa-linkedin"></i> {employee.linkedin_url || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-linkedin" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={employee.linkedin_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, linkedin_url: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>Twitter Username</label>
-                                        <div className="info-icon-value"><i className="fa-brands fa-twitter"></i> {employee.twitter_url || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-twitter" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={employee.twitter_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, twitter_url: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>Facebook</label>
-                                        <div className="info-icon-value"><i className="fa-brands fa-facebook"></i> {employee.facebook_url || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-facebook" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={employee.facebook_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, facebook_url: e.target.value } : null)} /></div>
                                     </div>
                                 </div>
                             </div>
@@ -469,7 +662,10 @@ export const EmployeeDetailView: React.FC = () => {
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No licenses/passport/visa information entries have been added.</td>
+                                                <td><input type="text" className="table-input" value={employee.license_type || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, license_type: e.target.value } : null)} placeholder="Type" /></td>
+                                                <td><input type="date" className="table-input" value={employee.license_effective || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, license_effective: e.target.value } : null)} /></td>
+                                                <td><input type="date" className="table-input" value={employee.license_expiration || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, license_expiration: e.target.value } : null)} /></td>
+                                                <td><input type="text" className="table-input" value={employee.license_notes || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, license_notes: e.target.value } : null)} placeholder="Notes" /></td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -490,19 +686,33 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field">
                                         <label>Hire Date</label>
-                                        <div className="info-value">{employee.hire_date || '-'}</div>
+                                        <input type="date" className="info-input" value={employee.hire_date || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, hire_date: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
                                         <label>Pay Group</label>
-                                        <div className="info-value">-Select-</div>
+                                        <select className="info-input" value={employee.pay_schedule || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, pay_schedule: e.target.value } : null)}>
+                                            <option value="">-Select-</option>
+                                            <option value="Twice a month">Twice a month</option>
+                                            <option value="Monthly">Monthly</option>
+                                        </select>
                                     </div>
                                     <div className="info-field half-width">
                                         <label>Direct Reports</label>
-                                        <div className="info-value">No Direct Reports</div>
+                                        <input type="text" className="info-input" value={employee.reporting_to || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, reporting_to: e.target.value } : null)} placeholder="Enter manager name" />
                                     </div>
                                     <div className="info-field">
                                         <label>Annual Pay</label>
-                                        <div className="info-icon-value"><span>$</span> {employee.hourly_rate ? (employee.hourly_rate * 2080).toLocaleString() : '-'} <span>USD</span></div>
+                                        <div className="info-icon-value">
+                                            <span>$</span>
+                                            <input 
+                                                type="number" 
+                                                className="info-input" 
+                                                style={{ border: 'none', background: 'transparent', width: '80px', padding: '0', fontSize: 'inherit' }} 
+                                                value={employee.hourly_rate || ''} 
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, hourly_rate: parseFloat(e.target.value) } : null)} 
+                                            />
+                                            <span>USD</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -526,9 +736,9 @@ export const EmployeeDetailView: React.FC = () => {
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td>{employee.hire_date || '04/16/2025'}</td>
-                                            <td>{employee.employment_status || 'Full Time'}</td>
-                                            <td>-</td>
+                                            <td><input type="date" className="table-input" value={employee.hire_date || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, hire_date: e.target.value } : null)} /></td>
+                                            <td><input type="text" className="table-input" value={employee.employment_status || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, employment_status: e.target.value } : null)} /></td>
+                                            <td><input type="text" className="table-input" placeholder="Add comment..." /></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -557,10 +767,16 @@ export const EmployeeDetailView: React.FC = () => {
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td>{employee.hire_date || '04/16/2025'}</td>
-                                            <td>{employee.pay_schedule || 'Twice a month'}</td>
-                                            <td>{employee.pay_type || 'Hourly'}</td>
-                                            <td>${(Number(employee.hourly_rate) || 0).toFixed(2)} USD / {employee.pay_period || 'Hour'}</td>
+                                            <td><input type="date" className="table-input" value={employee.hire_date || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, hire_date: e.target.value } : null)} /></td>
+                                            <td><input type="text" className="table-input" value={employee.pay_schedule || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, pay_schedule: e.target.value } : null)} /></td>
+                                            <td><input type="text" className="table-input" value={employee.pay_type || 'Hourly'} onChange={(e) => setEmployee(prev => prev ? { ...prev, pay_type: e.target.value } : null)} /></td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span>$</span>
+                                                    <input type="number" className="table-input" style={{ width: '60px' }} value={employee.hourly_rate || 0} onChange={(e) => setEmployee(prev => prev ? { ...prev, hourly_rate: parseFloat(e.target.value) } : null)} />
+                                                    <span>USD</span>
+                                                </div>
+                                            </td>
                                             <td>-</td>
                                             <td>-</td>
                                             <td>-</td>
@@ -592,13 +808,13 @@ export const EmployeeDetailView: React.FC = () => {
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td>{employee.hire_date || '04/16/2025'}</td>
-                                            <td>{employee.location || '-'}</td>
-                                            <td>{employee.division || '-'}</td>
-                                            <td>{employee.department || '-'}</td>
-                                            <td>-</td>
-                                            <td>{employee.job_title || '-'}</td>
-                                            <td style={{ color: 'var(--primary, #1e1b4b)', fontWeight: 700 }}>{employee.reporting_to || '-'}</td>
+                                            <td><input type="date" className="table-input" value={employee.hire_date || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, hire_date: e.target.value } : null)} /></td>
+                                            <td><input type="text" className="table-input" value={employee.location || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, location: e.target.value } : null)} /></td>
+                                            <td><input type="text" className="table-input" value={employee.division || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, division: e.target.value } : null)} /></td>
+                                            <td><input type="text" className="table-input" value={employee.department || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, department: e.target.value } : null)} /></td>
+                                            <td><input type="text" className="table-input" placeholder="-" /></td>
+                                            <td><input type="text" className="table-input" value={employee.job_title || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, job_title: e.target.value } : null)} /></td>
+                                            <td><input type="text" className="table-input" value={employee.reporting_to || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, reporting_to: e.target.value } : null)} /></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -645,7 +861,6 @@ export const EmployeeDetailView: React.FC = () => {
                                                                 onClick={async () => {
                                                                     setEmployee(prev => prev ? { ...prev, ethnicity: opt } : null);
                                                                     setOpenDropdown(null);
-                                                                    await (supabase.from('users') as any).update({ ethnicity: opt }).eq('id', employee.id);
                                                                 }}
                                                             >
                                                                 {opt}
@@ -690,7 +905,6 @@ export const EmployeeDetailView: React.FC = () => {
                                                                 onClick={async () => {
                                                                     setEmployee(prev => prev ? { ...prev, eeo_job_category: opt } : null);
                                                                     setOpenDropdown(null);
-                                                                    await (supabase.from('users') as any).update({ eeo_job_category: opt }).eq('id', employee.id);
                                                                 }}
                                                             >
                                                                 {opt}
@@ -711,7 +925,6 @@ export const EmployeeDetailView: React.FC = () => {
                                                     onChange={async (e) => {
                                                         const val = e.target.checked;
                                                         setEmployee(prev => prev ? { ...prev, is_active_duty_veteran: val } : null);
-                                                        await (supabase.from('users') as any).update({ is_active_duty_veteran: val }).eq('id', employee.id);
                                                     }}
                                                 />
                                                 <span className="checkmark"></span>
@@ -724,7 +937,6 @@ export const EmployeeDetailView: React.FC = () => {
                                                     onChange={async (e) => {
                                                         const val = e.target.checked;
                                                         setEmployee(prev => prev ? { ...prev, is_armed_forces_medal_veteran: val } : null);
-                                                        await (supabase.from('users') as any).update({ is_armed_forces_medal_veteran: val }).eq('id', employee.id);
                                                     }}
                                                 />
                                                 <span className="checkmark"></span>
@@ -737,7 +949,6 @@ export const EmployeeDetailView: React.FC = () => {
                                                     onChange={async (e) => {
                                                         const val = e.target.checked;
                                                         setEmployee(prev => prev ? { ...prev, is_disabled_veteran: val } : null);
-                                                        await (supabase.from('users') as any).update({ is_disabled_veteran: val }).eq('id', employee.id);
                                                     }}
                                                 />
                                                 <span className="checkmark"></span>
@@ -750,7 +961,6 @@ export const EmployeeDetailView: React.FC = () => {
                                                     onChange={async (e) => {
                                                         const val = e.target.checked;
                                                         setEmployee(prev => prev ? { ...prev, is_recently_separated_veteran: val } : null);
-                                                        await (supabase.from('users') as any).update({ is_recently_separated_veteran: val }).eq('id', employee.id);
                                                     }}
                                                 />
                                                 <span className="checkmark"></span>
@@ -777,7 +987,6 @@ export const EmployeeDetailView: React.FC = () => {
                                                 onChange={async (e) => {
                                                     const val = parseFloat(e.target.value);
                                                     setEmployee(prev => prev ? { ...prev, annual_bonus_percentage: val } : null);
-                                                    await (supabase.from('users') as any).update({ annual_bonus_percentage: val }).eq('id', employee.id);
                                                 }}
                                                 placeholder="0"
                                             />
@@ -794,7 +1003,6 @@ export const EmployeeDetailView: React.FC = () => {
                                                 onChange={async (e) => {
                                                     const val = parseFloat(e.target.value);
                                                     setEmployee(prev => prev ? { ...prev, annual_bonus_amount: val } : null);
-                                                    await (supabase.from('users') as any).update({ annual_bonus_amount: val }).eq('id', employee.id);
                                                 }}
                                                 placeholder="0.00"
                                             />
@@ -908,37 +1116,93 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field full-width">
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.5rem 0' }}>
-                                            <input type="checkbox" checked={employee.is_primary_contact !== false} readOnly style={{ transform: 'scale(1.2)' }} />
+                                            <input 
+                                                type="checkbox" 
+                                                checked={employee.is_primary_contact !== false} 
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, is_primary_contact: e.target.checked } : null)}
+                                                style={{ transform: 'scale(1.2)' }} 
+                                            />
                                             <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>This is the primary emergency contact</span>
                                         </div>
                                     </div>
                                     <div className="info-field half-width">
                                         <label>Contact Name</label>
-                                        <div className="info-value">{employee.emergency_contact_name || '-'}</div>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.emergency_contact_name || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_name: e.target.value } : null)} 
+                                        />
                                     </div>
                                     <div className="info-field half-width">
                                         <label>Relationship</label>
-                                        <div className="info-value">{employee.emergency_contact_relationship || '-'}</div>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.emergency_contact_relationship || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_relationship: e.target.value } : null)} 
+                                        />
                                     </div>
                                     <div className="info-field">
                                         <label>Phone</label>
-                                        <div className="info-icon-value"><i className="fa-solid fa-phone"></i> {employee.emergency_contact_phone || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
+                                            <i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i>
+                                            <input 
+                                                type="text" 
+                                                className="info-input" 
+                                                style={{flex: 1}} 
+                                                value={employee.emergency_contact_phone || ''} 
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_phone: e.target.value } : null)} 
+                                            />
+                                        </div>
                                     </div>
                                     <div className="info-field">
                                         <label>Ext</label>
-                                        <div className="info-value">{employee.emergency_contact_phone_ext || '-'}</div>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.emergency_contact_phone_ext || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_phone_ext: e.target.value } : null)} 
+                                        />
                                     </div>
                                     <div className="info-field">
                                         <label>Home Phone</label>
-                                        <div className="info-icon-value"><i className="fa-solid fa-phone"></i> {employee.emergency_contact_home_phone || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
+                                            <i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i>
+                                            <input 
+                                                type="text" 
+                                                className="info-input" 
+                                                style={{flex: 1}} 
+                                                value={employee.emergency_contact_home_phone || ''} 
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_home_phone: e.target.value } : null)} 
+                                            />
+                                        </div>
                                     </div>
                                     <div className="info-field">
                                         <label>Mobile Phone</label>
-                                        <div className="info-icon-value"><i className="fa-solid fa-mobile-screen"></i> {employee.emergency_contact_mobile_phone || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
+                                            <i className="fa-solid fa-mobile-screen" style={{color: "#94a3b8"}}></i>
+                                            <input 
+                                                type="text" 
+                                                className="info-input" 
+                                                style={{flex: 1}} 
+                                                value={employee.emergency_contact_mobile_phone || ''} 
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_mobile_phone: e.target.value } : null)} 
+                                            />
+                                        </div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>Email</label>
-                                        <div className="info-icon-value"><i className="fa-solid fa-envelope"></i> {employee.emergency_contact_email || '-'}</div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
+                                            <i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i>
+                                            <input 
+                                                type="email" 
+                                                className="info-input" 
+                                                style={{flex: 1}} 
+                                                value={employee.emergency_contact_email || ''} 
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_email: e.target.value } : null)} 
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -952,54 +1216,101 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field full-width">
                                         <label>Street 1</label>
-                                        <div className="info-value">{employee.emergency_contact_address_street1 || '-'}</div>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.emergency_contact_address_street1 || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_street1: e.target.value } : null)} 
+                                        />
                                     </div>
                                     <div className="info-field full-width">
                                         <label>Street 2</label>
-                                        <div className="info-value">{employee.emergency_contact_address_street2 || '-'}</div>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.emergency_contact_address_street2 || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_street2: e.target.value } : null)} 
+                                        />
                                     </div>
                                     <div className="info-field">
                                         <label>City</label>
-                                        <div className="info-value">{employee.emergency_contact_address_city || '-'}</div>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.emergency_contact_address_city || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_city: e.target.value } : null)} 
+                                        />
                                     </div>
                                     <div className="info-field">
                                         <label>State</label>
-                                        <div className="info-value">{employee.emergency_contact_address_state || '-'}</div>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.emergency_contact_address_state || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_state: e.target.value } : null)} 
+                                        />
                                     </div>
                                     <div className="info-field">
                                         <label>ZIP</label>
-                                        <div className="info-value">{employee.emergency_contact_address_zip || '-'}</div>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.emergency_contact_address_zip || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_zip: e.target.value } : null)} 
+                                        />
                                     </div>
                                     <div className="info-field">
                                         <label>Country</label>
-                                        <div className="info-value">{employee.emergency_contact_address_country || 'United States'}</div>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.emergency_contact_address_country || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_country: e.target.value } : null)} 
+                                        />
                                     </div>
                                 </div>
                             </div>
 
                             {/* Secondary Contact */}
-                            {employee.secondary_contact_name && (
-                                <div className="info-card">
-                                    <div className="card-header">
-                                        <i className="fa-solid fa-user-friends"></i>
-                                        <h3>Secondary Emergency Contact</h3>
+                            <div className="info-card">
+                                <div className="card-header">
+                                    <i className="fa-solid fa-user-friends"></i>
+                                    <h3>Secondary Emergency Contact</h3>
+                                </div>
+                                <div className="card-grid">
+                                    <div className="info-field half-width">
+                                        <label>Contact Name</label>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.secondary_contact_name || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, secondary_contact_name: e.target.value } : null)} 
+                                        />
                                     </div>
-                                    <div className="card-grid">
-                                        <div className="info-field half-width">
-                                            <label>Contact Name</label>
-                                            <div className="info-value">{employee.secondary_contact_name}</div>
-                                        </div>
-                                        <div className="info-field half-width">
-                                            <label>Relationship</label>
-                                            <div className="info-value">{employee.secondary_contact_relationship}</div>
-                                        </div>
-                                        <div className="info-field full-width">
-                                            <label>Phone</label>
-                                            <div className="info-icon-value"><i className="fa-solid fa-phone"></i> {employee.secondary_contact_phone}</div>
+                                    <div className="info-field half-width">
+                                        <label>Relationship</label>
+                                        <input 
+                                            type="text" 
+                                            className="info-input" 
+                                            value={employee.secondary_contact_relationship || ''} 
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, secondary_contact_relationship: e.target.value } : null)} 
+                                        />
+                                    </div>
+                                    <div className="info-field full-width">
+                                        <label>Phone</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
+                                            <i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i>
+                                            <input 
+                                                type="text" 
+                                                className="info-input" 
+                                                style={{flex: 1}} 
+                                                value={employee.secondary_contact_phone || ''} 
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, secondary_contact_phone: e.target.value } : null)} 
+                                            />
                                         </div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     )}
 
@@ -1181,8 +1492,101 @@ export const EmployeeDetailView: React.FC = () => {
                         </div>
                     )}
 
+                    {activeTab === 'Emergency' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                            <div className="section-title-row">
+                                <i className="fa-solid fa-truck-medical"></i>
+                                <h2>Emergency Contacts</h2>
+                            </div>
+
+                            <div className="info-card">
+                                <div className="card-header">
+                                    <i className="fa-solid fa-address-book"></i>
+                                    <h3>Primary Contact</h3>
+                                </div>
+                                <div className="card-grid">
+                                    <div className="info-field">
+                                        <label>Contact Name</label>
+                                        <input 
+                                            type="text" 
+                                            className="info-input"
+                                            value={employee.emergency_contact_name || ''} 
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setEmployee(prev => prev ? { ...prev, emergency_contact_name: val } : null);
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Relationship</label>
+                                        <input 
+                                            type="text" 
+                                            className="info-input"
+                                            value={employee.emergency_contact_relationship || ''} 
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setEmployee(prev => prev ? { ...prev, emergency_contact_relationship: val } : null);
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Contact Phone</label>
+                                        <input 
+                                            type="text" 
+                                            className="info-input"
+                                            value={employee.emergency_contact_phone || ''} 
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setEmployee(prev => prev ? { ...prev, emergency_contact_phone: val } : null);
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Contact Email</label>
+                                        <input 
+                                            type="email" 
+                                            className="info-input"
+                                            value={employee.emergency_contact_email || ''} 
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setEmployee(prev => prev ? { ...prev, emergency_contact_email: val } : null);
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                 </main>
             </div>
+
+            {isDirty && (
+                <div className="sticky-footer" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', padding: '1rem 2rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', zIndex: 100 }}>
+                    <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Unsaved changes</span>
+                    <button 
+                        onClick={() => { setEmployee(initialEmployee); setValidationErrors({}); }} 
+                        style={{ padding: '0.5rem 1rem', background: '#f1f5f9', color: '#334155', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={handleSave} 
+                        disabled={isSaving}
+                        style={{ padding: '0.5rem 1.5rem', background: 'var(--primary, #2563eb)', color: 'white', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                        {isSaving ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-save"></i>}
+                        Save Changes
+                    </button>
+                </div>
+            )}
+            
+            {toast && (
+                <div style={{ position: 'fixed', bottom: '80px', right: '2rem', padding: '1rem 1.5rem', background: toast.type === 'error' ? '#fee2e2' : '#dcfce3', color: toast.type === 'error' ? '#991b1b' : '#166534', border: `1px solid ${toast.type === 'error' ? '#f87171' : '#4ade80'}`, borderRadius: '8px', zIndex: 101, display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+                    <i className={toast.type === 'error' ? "fa-solid fa-triangle-exclamation" : "fa-solid fa-circle-check"}></i>
+                    {toast.message}
+                </div>
+            )}
 
             <style>{`
                 .profile-container {
@@ -1192,16 +1596,16 @@ export const EmployeeDetailView: React.FC = () => {
                     color: #1e293b;
                 }
                 .profile-header {
-                    background: white;
+                    background: var(--primary, #1e1b4b);
                     border-radius: 20px;
-                    border: 1px solid #e2e8f0;
+                    border: 1px solid rgba(255,255,255,0.1);
                     margin-bottom: 2rem;
                     overflow: hidden;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
                 }
                 .header-top {
                     padding: 1rem 2rem;
-                    border-bottom: 1px solid #f1f5f9;
+                    border-bottom: 1px solid rgba(255,255,255,0.05);
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -1209,7 +1613,7 @@ export const EmployeeDetailView: React.FC = () => {
                 .back-btn {
                     background: none;
                     border: none;
-                    color: #64748b;
+                    color: rgba(255,255,255,0.6);
                     font-weight: 700;
                     font-size: 0.9rem;
                     cursor: pointer;
@@ -1250,29 +1654,30 @@ export const EmployeeDetailView: React.FC = () => {
                     font-weight: 800;
                     letter-spacing: 2px;
                 }
-                .profile-title-info h1 { margin: 0; font-size: 2rem; font-weight: 900; color: #0f172a; letter-spacing: -0.02em; }
-                .profile-title-info p { margin: 0.25rem 0 0; color: #3b82f6; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85rem; }
+                .profile-title-info h1 { margin: 0; font-size: 2.25rem; font-weight: 900; color: white; letter-spacing: -0.02em; }
+                .profile-title-info p { margin: 0.25rem 0 0; color: var(--accent, #f59e0b); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85rem; }
                 .header-actions { margin-left: auto; }
-                .more-btn { background: #f8fafc; border: 1px solid #e2e8f0; width: 40px; height: 40px; border-radius: 10px; color: #64748b; cursor: pointer; }
+                .more-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); width: 40px; height: 40px; border-radius: 10px; color: white; cursor: pointer; }
                 
                 .profile-nav {
                     display: flex;
                     padding: 0 2rem;
                     gap: 2.5rem;
-                    border-top: 1px solid #f1f5f9;
+                    border-top: 1px solid rgba(255,255,255,0.05);
+                    background: rgba(0,0,0,0.1);
                 }
                 .nav-tab {
                     padding: 1.25rem 0;
                     background: none;
                     border: none;
                     font-weight: 700;
-                    color: #64748b;
+                    color: rgba(255,255,255,0.6);
                     cursor: pointer;
                     position: relative;
                     font-size: 0.95rem;
                     transition: all 0.2s;
                 }
-                .nav-tab.active { color: var(--primary, #1e1b4b); }
+                .nav-tab.active { color: white; }
                 .nav-tab.active::after {
                     content: '';
                     position: absolute;
@@ -1342,7 +1747,31 @@ export const EmployeeDetailView: React.FC = () => {
                     box-shadow: 0 1px 3px rgba(0,0,0,0.02);
                 }
                 .card-icon { font-size: 2.5rem; color: #f1f5f9; position: absolute; right: -10px; top: -10px; transform: rotate(-15deg); }
-                .card-value { font-size: 2.25rem; font-weight: 900; color: #0f172a; letter-spacing: -0.02em; margin-bottom: 0.25rem; }
+                .card-value { 
+                    font-size: 2.25rem; 
+                    font-weight: 900; 
+                    color: #0f172a; 
+                    letter-spacing: -0.02em; 
+                    margin-bottom: 0.25rem;
+                    display: flex;
+                    align-items: baseline;
+                    gap: 8px;
+                    white-space: nowrap;
+                }
+                .card-value-input {
+                    background: transparent;
+                    border: none;
+                    font-size: inherit;
+                    font-weight: inherit;
+                    color: inherit;
+                    width: auto;
+                    min-width: 40px;
+                    max-width: 100px;
+                    padding: 0;
+                    margin: 0;
+                    outline: none;
+                    text-align: left;
+                }
                 .card-label { font-size: 0.95rem; font-weight: 700; color: #1e293b; }
                 .card-sublabel { font-size: 0.85rem; color: #64748b; font-weight: 500; margin-top: 0.1rem; }
                 .card-actions { display: flex; gap: 8px; margin-top: 1.5rem; }
@@ -1470,6 +1899,22 @@ export const EmployeeDetailView: React.FC = () => {
                     font-size: 0.9rem;
                     border-bottom: 1px solid #f1f5f9;
                     color: #475569;
+                }
+                .table-input {
+                    width: 100%;
+                    border: none;
+                    background: transparent;
+                    font-size: inherit;
+                    font-family: inherit;
+                    color: inherit;
+                    padding: 4px 0;
+                    outline: none;
+                    transition: all 0.2s;
+                    border-bottom: 1px solid transparent;
+                }
+                .table-input:focus {
+                    border-bottom-color: var(--accent, #f59e0b);
+                    background: rgba(245, 158, 11, 0.03);
                 }
                 .small-action-btn {
                     background: white;

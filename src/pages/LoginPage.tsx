@@ -8,7 +8,7 @@ export const LoginPage: React.FC = () => {
     const [loginRole, setLoginRole] = useState<'admin' | 'worker'>('worker');
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const { login, user } = useAuth();
+    const { login, loginWithGoogle, user, authError, clearAuthError } = useAuth();
 
     if (user) {
         if (user.role === 'manager') return <Navigate to="/" replace />;
@@ -18,6 +18,7 @@ export const LoginPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        if (clearAuthError) clearAuthError();
 
         const requiredRole = loginRole === 'admin' ? 'manager' : 'employee';
         const result = await login(username, password, requiredRole);
@@ -200,6 +201,52 @@ export const LoginPage: React.FC = () => {
                     align-items: center;
                     gap: 0.5rem;
                 }
+
+                .divider {
+                    display: flex;
+                    align-items: center;
+                    text-align: center;
+                    margin: 1.5rem 0;
+                    color: #94a3b8;
+                    font-size: 0.875rem;
+                }
+
+                .divider::before,
+                .divider::after {
+                    content: '';
+                    flex: 1;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+
+                .divider span {
+                    padding: 0 0.75rem;
+                    font-weight: 500;
+                }
+
+                .google-btn {
+                    width: 100%;
+                    background: white;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 12px;
+                    padding: 0.875rem;
+                    color: #334155;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.5rem;
+                    transition: all 0.2s;
+                }
+
+                .google-btn:hover {
+                    background: #f8fafc;
+                    border-color: #94a3b8;
+                }
+
+                /* Ensure font awesome loads if not already */
+                @import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css");
             ` }} />
             <div className="login-card">
                 <div className="logo-container">
@@ -224,10 +271,10 @@ export const LoginPage: React.FC = () => {
                     </button>
                 </div>
 
-                {error && (
+                {(error || authError) && (
                     <div className="error-message">
                         <i className="fa-solid fa-triangle-exclamation"></i>
-                        {error}
+                        {error || authError}
                     </div>
                 )}
 
@@ -262,8 +309,21 @@ export const LoginPage: React.FC = () => {
 
                     <a href="#" className="forgot-password">Forgot password?</a>
 
-                    <button type="submit" className="submit-btn">
+                    <button type="submit" className="submit-btn" onClick={() => { if(clearAuthError) clearAuthError(); }}>
                         Sign In
+                    </button>
+
+                    <div className="divider">
+                        <span>OR</span>
+                    </div>
+
+                    <button 
+                        type="button" 
+                        className="google-btn" 
+                        onClick={() => loginWithGoogle(loginRole === 'admin' ? 'manager' : 'employee')}
+                    >
+                        <i className="fa-brands fa-google"></i>
+                        Sign in with Google
                     </button>
                 </form>
             </div>
