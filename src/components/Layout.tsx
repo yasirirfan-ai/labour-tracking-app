@@ -30,7 +30,7 @@ export const Layout: React.FC = () => {
                 setIsMobileOpen={setIsMobileOpen}
             />
 
-            <main className={`main-content ${isCollapsed ? 'expanded' : ''}`}>
+            <main className={`main-content ${isCollapsed ? 'collapsed' : ''}`}>
                 <button className="mobile-menu-btn" onClick={() => setIsMobileOpen(true)}>
                     <i className="fa-solid fa-bars"></i>
                 </button>

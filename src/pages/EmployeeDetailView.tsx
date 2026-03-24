@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import {
+    syncLeaveBalances,
+    fetchLeaveHistory,
+    getTenureMonths,
+    getPtoRate,
+    isSickLeaveUsable
+} from '../lib/accrualService';
+import type { LeaveHistoryRow } from '../lib/accrualService';
 import type { User } from '../types';
+import { LEVEL_2_SOPS } from '../data/sopData';
+import { LEVEL_1_TRAININGS } from '../data/trainingData';
 
 export const EmployeeDetailView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -19,6 +29,9 @@ export const EmployeeDetailView: React.FC = () => {
     const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
     const [isCommissionModalOpen, setIsCommissionModalOpen] = useState(false);
     const [isEquityModalOpen, setIsEquityModalOpen] = useState(false);
+    const [accrualHistoryType, setAccrualHistoryType] = useState<'pto' | 'sick'>('pto');
+    const [leaveHistory, setLeaveHistory] = useState<LeaveHistoryRow[]>([]);
+    const [selectedTrainingRole, setSelectedTrainingRole] = useState<string | null>(null);
 
     const fetchEmployee = async () => {
         setLoading(true);
@@ -27,7 +40,7 @@ export const EmployeeDetailView: React.FC = () => {
             .select('*')
             .eq('id', id || '')
             .single();
-        
+
         if (data) {
             setEmployee(data as User);
             setInitialEmployee(data as User);
@@ -39,8 +52,25 @@ export const EmployeeDetailView: React.FC = () => {
 
     useEffect(() => {
         if (id) fetchEmployee();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
+    /** Auto-sync + fetch history whenever the Time Off tab becomes active */
+    const isSyncingRef = React.useRef(false);
+    useEffect(() => {
+        if (activeTab === 'Time Off' && employee && !isSyncingRef.current) {
+            isSyncingRef.current = true;
+            syncLeaveBalances(employee).then((result: any) => {
+                if (!result.error) {
+                    setEmployee(prev => prev ? { ...prev, pto_balance: String(result.pto), sick_balance: String(result.sick) } : null);
+                    setInitialEmployee(prev => prev ? { ...prev, pto_balance: String(result.pto), sick_balance: String(result.sick) } : null);
+                }
+                isSyncingRef.current = false;
+            });
+            fetchLeaveHistory(employee.id).then((rows: LeaveHistoryRow[]) => setLeaveHistory(rows));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, !!employee]);
 
     if (loading) return <div className="loading-screen">Loading Profile...</div>;
     if (!employee || !initialEmployee) return <div>Employee not found</div>;
@@ -62,12 +92,12 @@ export const EmployeeDetailView: React.FC = () => {
     const handleSave = async () => {
         if (!employee) return;
         setValidationErrors({});
-        
+
         // Validation
         const errors: Record<string, string> = {};
         if (!employee.worker_id?.trim()) errors.worker_id = "Employee # is required";
         if (!employee.first_name?.trim()) errors.first_name = "First Name is required";
-        
+
         const validatePhone = (val?: string) => {
             if (!val) return true;
             return /^[0-9+() -]*$/.test(val);
@@ -81,8 +111,42 @@ export const EmployeeDetailView: React.FC = () => {
 
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
-            setToast({ message: "Please fix the validation errors before saving.", type: 'error' });
-            setTimeout(() => setToast(null), 3000);
+
+            // Map each field to the tab it lives on so we can auto-navigate.
+            const fieldTabMap: Record<string, string> = {
+                worker_id:               'Personal',
+                first_name:              'Personal',
+                phone:                   'Personal',
+                work_phone:              'Personal',
+                mobile_phone:            'Personal',
+                home_phone:              'Personal',
+                emergency_contact_phone: 'Emergency',
+            };
+
+            // Find the first failing field and switch to its tab.
+            const firstErrorField = Object.keys(errors)[0];
+            const targetTab = fieldTabMap[firstErrorField] || 'Personal';
+            setActiveTab(targetTab);
+
+            // Build a helpful message.
+            const fieldLabels: Record<string, string> = {
+                worker_id:               'Employee #',
+                first_name:              'First Name',
+                phone:                   'Phone',
+                work_phone:              'Work Phone',
+                mobile_phone:            'Mobile Phone',
+                home_phone:              'Home Phone',
+                emergency_contact_phone: 'Emergency Phone',
+            };
+            const missingLabels = Object.keys(errors)
+                .map(k => fieldLabels[k] || k)
+                .join(', ');
+
+            setToast({
+                message: `Fix on "${targetTab}" tab: ${missingLabels}`,
+                type: 'error',
+            });
+            setTimeout(() => setToast(null), 5000);
             return;
         }
 
@@ -90,7 +154,7 @@ export const EmployeeDetailView: React.FC = () => {
         try {
             const { error } = await (supabase.from('users') as any).update(employee).eq('id', (employee as any).id);
             if (error) throw error;
-            
+
             setInitialEmployee(employee);
             setToast({ message: "Worker updated successfully", type: 'success' });
             setTimeout(() => setToast(null), 3000);
@@ -102,17 +166,8 @@ export const EmployeeDetailView: React.FC = () => {
         }
     };
 
-    const tabs = ['Personal', 'Job', 'Training', 'Emergency', 'Time Off'];
 
-    const historyData = [
-        { date: '04/16/2025', description: `${employee.name.split(' ')[0]} is now eligible to begin accruing time`, used: null, earned: null, balance: '0.00' },
-        { date: '04/30/2025', description: 'Prorated accrual for 04/16/2025 to 04/29/2025', used: null, earned: '1.56', balance: '1.56' },
-        { date: '05/15/2025', description: 'Accrual for 04/30/2025 to 05/14/2025', used: null, earned: '1.67', balance: '3.23' },
-        { date: '05/31/2025', description: 'Accrual for 05/15/2025 to 05/30/2025', used: null, earned: '1.67', balance: '4.90' },
-        { date: '06/15/2025', description: 'Accrual for 05/31/2025 to 06/14/2025', used: null, earned: '1.67', balance: '6.57' },
-        { date: '12/03/2025', description: 'Time off used for 12/03/2025 to 12/05/2025 - Family vacation', used: '-24.00', earned: null, balance: '0.94' },
-        { date: '03/15/2026', description: 'Accrual for 02/28/2026 to 03/14/2026', used: null, earned: '1.67', balance: '12.63' },
-    ];
+    const tabs = ['Personal', 'Job', 'Training', 'Emergency', 'Time Off'];
 
     const ethnicityOptions = [
         "American Indian or Alaska Native",
@@ -147,9 +202,6 @@ export const EmployeeDetailView: React.FC = () => {
                     <button className="back-btn" onClick={() => navigate('/workers')}>
                         <i className="fa-solid fa-arrow-left"></i> Back to People
                     </button>
-                    <div className="pagination-info">
-                        1 of 5 Next <i className="fa-solid fa-chevron-right"></i>
-                    </div>
                 </div>
                 
                 <div className="header-main">
@@ -165,9 +217,6 @@ export const EmployeeDetailView: React.FC = () => {
                     <div className="profile-title-info">
                         <h1>{employee.name}</h1>
                         <p>{employee.job_title || 'Manufacturing Associate'}</p>
-                    </div>
-                    <div className="header-actions">
-                        <button className="more-btn"><i className="fa-solid fa-ellipsis"></i></button>
                     </div>
                 </div>
 
@@ -198,7 +247,19 @@ export const EmployeeDetailView: React.FC = () => {
 
                     <section className="sidebar-section">
                         <h3>Hire Date</h3>
-                        <div className="vital-item"><i className="fa-solid fa-calendar"></i> {employee.hire_date || 'Apr 16, 2025'} <br/> 11m - 3d</div>
+                        <div className="vital-item">
+                            <i className="fa-solid fa-calendar"></i> 
+                            {employee.hire_date || '—'} 
+                            <br/> 
+                            {employee.hire_date ? (
+                                (() => {
+                                    const m = getTenureMonths(employee.hire_date);
+                                    const y = Math.floor(m / 12);
+                                    const r = m % 12;
+                                    return `${y > 0 ? y + 'y ' : ''}${r}m`;
+                                })()
+                            ) : '—'}
+                        </div>
                     </section>
 
                     <section className="sidebar-section">
@@ -217,248 +278,374 @@ export const EmployeeDetailView: React.FC = () => {
                 </aside>
 
                 <main className="main-details">
-                    {activeTab === 'Training' && (
+                    {activeTab === 'Training' && (() => {
+                        const completed = employee.completed_trainings || [];
+                        
+                        // Level 1 Progress
+                        const l1CompletedCount = completed.filter(t => LEVEL_1_TRAININGS.find(l1 => l1.name === t)).length;
+                        const l1Total = LEVEL_1_TRAININGS.length;
+                        const l1Percent = l1Total > 0 ? Math.round((l1CompletedCount / l1Total) * 100) : 0;
+
+                        // Level 2 Progress (using role-based SOPs)
+                        const autoRole = (employee.job_title?.includes('QC') || employee.department === 'QC') ? 'QC' : 
+                                     (employee.job_title?.includes('Compounder')) ? 'Compounder I' :
+                                     (employee.job_title?.includes('QA') || employee.department === 'QA') ? 'Quality Assurance' :
+                                     (employee.department?.toLowerCase().includes('shipp')) ? 'Shipping & Recieving' :
+                                     (employee.department?.toLowerCase().includes('purchas')) ? 'Purchase' : 'Production';
+                                     
+                        const role = selectedTrainingRole || autoRole;
+                                     
+                        const roleSops = LEVEL_2_SOPS[role] || [];
+                        const l2Total = roleSops.reduce((acc: number, section: any) => acc + section.pdfs.length, 0);
+                        const l2CompletedCount = completed.filter(t => roleSops.some((section: any) => section.pdfs.some((pdf: any) => pdf.name === t))).length;
+                        const l2Percent = l2Total > 0 ? Math.round((l2CompletedCount / l2Total) * 100) : 0;
+                        const totalPercent = Math.round((l1Percent + l2Percent) / 2);
+
+                        return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div className="section-title-row">
                                 <i className="fa-solid fa-graduation-cap"></i>
                                 <h2>Training & Development</h2>
+                                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>VIEWING ROLE:</span>
+                                    <select 
+                                        value={role} 
+                                        onChange={(e) => setSelectedTrainingRole(e.target.value)}
+                                        style={{ 
+                                            padding: '0.4rem 0.8rem', 
+                                            borderRadius: '8px', 
+                                            border: '1px solid #e2e8f0', 
+                                            fontSize: '0.8rem', 
+                                            fontWeight: 700, 
+                                            color: '#1e1b4b',
+                                            cursor: 'pointer',
+                                            background: '#f8fafc'
+                                        }}
+                                    >
+                                        {Object.keys(LEVEL_2_SOPS).map(r => (
+                                            <option key={r} value={r}>{r}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             
-                            <div className="training-summary-card">
-                                <div className="progress-circle-large">
-                                    <svg viewBox="0 0 36 36">
-                                        <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                        <path className="circle" strokeDasharray={`${employee.training_completion || 65}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                        <text x="18" y="20.35" className="progress-percentage">{employee.training_completion || 65}%</text>
-                                    </svg>
-                                </div>
-                                <div className="training-stats">
-                                    <div style={{ display: 'flex', gap: '2rem' }}>
-                                        <div>
-                                            <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Level 1 Progress</label>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b' }}>92%</div>
-                                        </div>
-                                        <div>
-                                            <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Level 2 Progress</label>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b' }}>45%</div>
-                                        </div>
-                                        <div>
-                                            <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Total SOPs</label>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b' }}>12/18</div>
-                                        </div>
+                            <div className="training-summary-row" style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: 'repeat(3, 1fr)', 
+                                gap: '2rem',
+                                background: 'white',
+                                padding: '2.5rem',
+                                borderRadius: '24px',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                            }}>
+                                {/* Level 1 Circle */}
+                                <div style={{ textAlign: 'center' }}>
+                                    <div className="progress-circle-mid" style={{ marginBottom: '1.25rem' }}>
+                                        <svg viewBox="0 0 36 36">
+                                            <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                            <path className="circle" style={{ stroke: l1Percent === 100 ? '#10b981' : '#f59e0b' }} strokeDasharray={`${l1Percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                            <text x="18" y="20.35" className="progress-percentage-mid">{l1Percent}%</text>
+                                        </svg>
                                     </div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Level 1 Progress</div>
+                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{l1CompletedCount} / {l1Total} SOPs</div>
+                                </div>
+
+                                {/* Level 2 Circle */}
+                                <div style={{ textAlign: 'center' }}>
+                                    <div className="progress-circle-mid" style={{ marginBottom: '1.25rem' }}>
+                                        <svg viewBox="0 0 36 36">
+                                            <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                            <path className="circle" style={{ stroke: l2Percent === 100 ? '#10b981' : '#4f46e5' }} strokeDasharray={`${l2Percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                            <text x="18" y="20.35" className="progress-percentage-mid">{l2Percent}%</text>
+                                        </svg>
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Level 2 Progress</div>
+                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{l2CompletedCount} / {l2Total} SOPs</div>
+                                </div>
+
+                                {/* Total Circle */}
+                                <div style={{ textAlign: 'center' }}>
+                                    <div className="progress-circle-mid" style={{ marginBottom: '1.25rem' }}>
+                                        <svg viewBox="0 0 36 36">
+                                            <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                            <path className="circle" style={{ stroke: totalPercent === 100 ? '#10b981' : '#1e1b4b' }} strokeDasharray={`${totalPercent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                            <text x="18" y="20.35" className="progress-percentage-mid">{l1CompletedCount + l2CompletedCount}</text>
+                                        </svg>
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Completed</div>
+                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{Math.round(((l1CompletedCount + l2CompletedCount) / (l1Total + l2Total)) * 100)}% Overall</div>
                                 </div>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                                <div className="info-card">
-                                    <div className="card-header">
-                                        <i className="fa-solid fa-clock"></i>
-                                        <h3>Upcoming Training</h3>
-                                    </div>
-                                    <div className="training-list">
-                                        <div className="training-item">
-                                            <i className="fa-solid fa-circle-play text-gray"></i>
-                                            <div className="sop-info">
-                                                <strong>SOP-74: Biohazard Cleanup</strong>
-                                                <p>Level 1 Certification • Due in 3 days</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>Core Orientation (Level 1)</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                                    {LEVEL_1_TRAININGS.map((t, idx) => {
+                                        const isDone = completed.includes(t.name);
+                                        return (
+                                            <div key={idx} style={{ 
+                                                background: 'white', 
+                                                padding: '1.25rem', 
+                                                borderRadius: '16px', 
+                                                border: '1px solid #e2e8f0',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '1rem'
+                                            }}>
+                                                <div style={{ 
+                                                    width: '40px', height: '40px', borderRadius: '10px', 
+                                                    background: isDone ? '#dcfce7' : '#f1f5f9',
+                                                    color: isDone ? '#10b981' : '#94a3b8',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}>
+                                                    <i className={`fa-solid ${isDone ? 'fa-check' : 'fa-clock'}`}></i>
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b' }}>{t.name}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: isDone ? '#10b981' : '#64748b', fontWeight: 700 }}>
+                                                        {isDone ? 'COMPLETED' : 'PENDING'}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span className="sop-type">Safety</span>
-                                        </div>
-                                        <div className="training-item">
-                                            <i className="fa-solid fa-circle-play text-gray"></i>
-                                            <div className="sop-info">
-                                                <strong>SOP-12: Line Clearance</strong>
-                                                <p>Level 2 Technical • Due in 5 days</p>
-                                            </div>
-                                            <span className="sop-type">Ops</span>
-                                        </div>
-                                    </div>
+                                        );
+                                    })}
                                 </div>
+                            </div>
 
-                                <div className="info-card">
-                                    <div className="card-header">
-                                        <i className="fa-solid fa-circle-check"></i>
-                                        <h3>Recently Completed</h3>
-                                    </div>
-                                    <div className="training-list">
-                                        <div className="training-item">
-                                            <i className="fa-solid fa-circle-check text-green"></i>
-                                            <div className="sop-info">
-                                                <strong>SOP-01: Gowning Procedure</strong>
-                                                <p>Completed Mar 15, 2025</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>Role SOPs (Level 2: {role})</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                                    {roleSops.map((section: any) => section.pdfs.map((pdf: any, idx: number) => {
+                                        const isDone = completed.includes(pdf.name);
+                                        return (
+                                            <div key={`${section.name}-${idx}`} style={{ 
+                                                background: 'white', 
+                                                padding: '1.25rem', 
+                                                borderRadius: '16px', 
+                                                border: '1px solid #e2e8f0',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '1rem'
+                                            }}>
+                                                <div style={{ 
+                                                    width: '40px', height: '40px', borderRadius: '10px', 
+                                                    background: isDone ? '#dcfce7' : '#f1f5f9',
+                                                    color: isDone ? '#10b981' : '#94a3b8',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}>
+                                                    <i className={`fa-solid ${isDone ? 'fa-check' : 'fa-book'}`}></i>
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{pdf.name}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: isDone ? '#10b981' : '#64748b', fontWeight: 700 }}>
+                                                        {isDone ? 'COMPLETED' : 'PENDING'}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span className="sop-type">Quality</span>
-                                        </div>
-                                        <div className="training-item">
-                                            <i className="fa-solid fa-circle-check text-green"></i>
-                                            <div className="sop-info">
-                                                <strong>SOP-05: Hand Washing</strong>
-                                                <p>Completed Mar 12, 2025</p>
-                                            </div>
-                                            <span className="sop-type">Quality</span>
-                                        </div>
-                                    </div>
+                                        );
+                                    }))}
                                 </div>
                             </div>
                         </div>
-                    )}
+                    );
+                })()}
 
-                    {activeTab === 'Time Off' && (
+                    {activeTab === 'Time Off' && (() => {
+                        const hireDate    = employee.hire_date || '';
+                        const tenureMonths = hireDate ? getTenureMonths(hireDate) : 0;
+                        const ptoRate     = getPtoRate(tenureMonths);
+                        const sickUsable  = hireDate ? isSickLeaveUsable(hireDate) : false;
+                        const ptoBalance  = parseFloat(employee.pto_balance  || '0');
+                        const sickBalance = parseFloat(employee.sick_balance || '0');
+
+                        /** Filter real leave history by selected type */
+                        const displayRows = leaveHistory.filter(r => r.type === accrualHistoryType);
+
+                        return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+                            {/* Header */}
                             <div className="section-title-row">
                                 <i className="fa-solid fa-calendar-alt"></i>
                                 <h2>Time Off</h2>
-                                <button className="settings-btn"><i className="fa-solid fa-wand-magic-sparkles"></i> Customize Layout</button>
-                            </div>
-                        <div className="time-off-grid">
-                            <div className="time-off-card">
-                                <div className="card-icon"><i className="fa-solid fa-palm-tree"></i></div>
-                                <div className="card-value">
-                                    <input 
-                                        type="text" 
-                                        className="card-value-input" 
-                                        value={employee.pto_balance || '12.6'} 
-                                        onChange={(e) => setEmployee(prev => prev ? { ...prev, pto_balance: e.target.value } : null)} 
-                                    />
-                                    <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>Hours</span>
-                                </div>
-                                <div className="card-label">Paid Time Off (PTO) Available</div>
-                                <div className="card-sublabel">Babylon PTO</div>
-                                <div className="card-actions">
-                                    <button><i className="fa-solid fa-calendar-plus"></i></button>
-                                    <button><i className="fa-solid fa-list-check"></i></button>
-                                    <button><i className="fa-solid fa-plus-minus"></i></button>
-                                    <button className="more"><i className="fa-solid fa-gear"></i> <i className="fa-solid fa-chevron-down"></i></button>
+                                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 3px rgba(34,197,94,0.2)' }}></span>
+                                    Live
                                 </div>
                             </div>
 
-                            <div className="time-off-card">
-                                <div className="card-icon"><i className="fa-solid fa-hospital"></i></div>
-                                <div className="card-value">
-                                    <input 
-                                        type="text" 
-                                        className="card-value-input" 
-                                        value={employee.sick_balance || '11.5'} 
-                                        onChange={(e) => setEmployee(prev => prev ? { ...prev, sick_balance: e.target.value } : null)} 
-                                    />
-                                    <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>Hours</span>
+
+                            {/* Balance Cards */}
+                            <div className="time-off-grid">
+                                {/* PTO Card */}
+                                <div className="time-off-card">
+                                    <div className="card-icon"><i className="fa-solid fa-palm-tree"></i></div>
+                                    <div className="card-value">
+                                        <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
+                                            {ptoBalance.toFixed(2)}
+                                        </span>
+                                        <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>Hrs</span>
+                                    </div>
+                                    <div className="card-label">Paid Time Off (PTO) Available</div>
+                                    <div className="card-sublabel">{ptoRate.toFixed(2)} hrs / pay period</div>
+                                    <div className="card-actions">
+                                        <button><i className="fa-solid fa-calendar-plus"></i></button>
+                                        <button><i className="fa-solid fa-list-check"></i></button>
+                                        <button><i className="fa-solid fa-plus-minus"></i></button>
+                                        <button className="more"><i className="fa-solid fa-gear"></i> <i className="fa-solid fa-chevron-down"></i></button>
+                                    </div>
                                 </div>
-                                <div className="card-label">Sick Time Available</div>
-                                <div className="card-sublabel">Babylon Sick Time Year 1</div>
-                                <div className="card-actions">
-                                     <button><i className="fa-solid fa-calendar-plus"></i></button>
-                                    <button><i className="fa-solid fa-list-check"></i></button>
-                                    <button><i className="fa-solid fa-plus-minus"></i></button>
-                                    <button className="more"><i className="fa-solid fa-gear"></i> <i className="fa-solid fa-chevron-down"></i></button>
+
+                                {/* Sick Card */}
+                                <div className="time-off-card">
+                                    <div className="card-icon">
+                                        <i className="fa-solid fa-hospital"></i>
+                                        {!sickUsable && (
+                                            <span style={{
+                                                fontSize: '0.65rem', fontWeight: 700, background: '#fef3c7',
+                                                color: '#92400e', padding: '0.15rem 0.5rem',
+                                                borderRadius: '20px', marginLeft: '0.5rem',
+                                            }}>90-day wait</span>
+                                        )}
+                                    </div>
+                                    <div className="card-value">
+                                        <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
+                                            {sickBalance.toFixed(2)}
+                                        </span>
+                                        <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>Hrs</span>
+                                    </div>
+                                    <div className="card-label">Sick Time Available</div>
+                                    <div className="card-sublabel">48-hr cap · accrues from hours worked</div>
+                                    <div className="card-actions">
+                                        <button disabled={!sickUsable} style={{ opacity: sickUsable ? 1 : 0.4 }}><i className="fa-solid fa-calendar-plus"></i></button>
+                                        <button><i className="fa-solid fa-list-check"></i></button>
+                                        <button><i className="fa-solid fa-plus-minus"></i></button>
+                                        <button className="more"><i className="fa-solid fa-gear"></i> <i className="fa-solid fa-chevron-down"></i></button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="upcoming-section">
-                            <h3><i className="fa-solid fa-clock"></i> Upcoming Time Off</h3>
-                            <div className="empty-state">
-                                <div className="shiba-container">
+                            {/* No Upcoming */}
+                            <div className="upcoming-section">
+                                <h3><i className="fa-solid fa-clock"></i> Upcoming Time Off</h3>
+                                <div className="empty-state">
                                     <i className="fa-solid fa-calendar-xmark" style={{ fontSize: '3rem', color: '#e2e8f0' }}></i>
+                                    <p>No upcoming time off.</p>
+                                    <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Do you need to get away?</span>
                                 </div>
-                                <p>No upcoming time off.</p>
-                                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Do you need to get away?</span>
                             </div>
-                        </div>
 
-                        <div className="history-section">
-                            <div className="history-header">
-                                <span className="history-title"><i className="fa-solid fa-clock-rotate-left"></i> History</span>
-                                <div className="history-filters">
-                                    <div className="custom-dropdown-container">
-                                        <div 
-                                            className={`custom-dropdown-header ${openDropdown === 'type' ? 'active' : ''}`}
-                                            onClick={() => setOpenDropdown(openDropdown === 'type' ? null : 'type')}
-                                        >
-                                            Paid Time Off (PTO) <i className="fa-solid fa-chevron-down"></i>
-                                        </div>
-                                        {openDropdown === 'type' && (
-                                            <div className="dropdown-menu">
-                                                <div className="dropdown-item selected">Paid Time Off (PTO)</div>
-                                                <div className="dropdown-item">Sick Time</div>
+                            {/* History */}
+                            <div className="history-section">
+                                <div className="history-header">
+                                    <span className="history-title"><i className="fa-solid fa-clock-rotate-left"></i> History</span>
+                                    <div className="history-filters">
+                                        <div className="custom-dropdown-container">
+                                            <div
+                                                className={`custom-dropdown-header ${openDropdown === 'type' ? 'active' : ''}`}
+                                                onClick={() => setOpenDropdown(openDropdown === 'type' ? null : 'type')}
+                                            >
+                                                {accrualHistoryType === 'pto' ? 'Paid Time Off (PTO)' : 'Sick Time'}
+                                                <i className="fa-solid fa-chevron-down"></i>
                                             </div>
-                                        )}
-                                    </div>
-
-                                    <div className="custom-dropdown-container">
-                                        <div 
-                                            className={`custom-dropdown-header small ${openDropdown === 'year' ? 'active' : ''}`}
-                                            onClick={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
-                                        >
-                                            All <i className="fa-solid fa-chevron-down"></i>
-                                        </div>
-                                        {openDropdown === 'year' && (
-                                            <div className="dropdown-menu has-search">
-                                                <div className="dropdown-search">
-                                                    <i className="fa-solid fa-magnifying-glass"></i>
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="Search..." 
-                                                        value={historySearch}
-                                                        onChange={(e) => setHistorySearch(e.target.value)}
-                                                        autoFocus
-                                                    />
+                                            {openDropdown === 'type' && (
+                                                <div className="dropdown-menu">
+                                                    <div
+                                                        className={`dropdown-item ${accrualHistoryType === 'pto' ? 'selected' : ''}`}
+                                                        onClick={() => { setAccrualHistoryType('pto'); setOpenDropdown(null); }}
+                                                    >Paid Time Off (PTO)</div>
+                                                    <div
+                                                        className={`dropdown-item ${accrualHistoryType === 'sick' ? 'selected' : ''}`}
+                                                        onClick={() => { setAccrualHistoryType('sick'); setOpenDropdown(null); }}
+                                                    >Sick Time</div>
                                                 </div>
-                                                <div className="dropdown-item">2026</div>
-                                                <div className="dropdown-item">2025</div>
-                                                <div className="dropdown-item selected">All</div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="custom-dropdown-container">
-                                        <div 
-                                            className={`custom-dropdown-header ${openDropdown === 'view' ? 'active' : ''}`}
-                                            onClick={() => setOpenDropdown(openDropdown === 'view' ? null : 'view')}
-                                        >
-                                            Balance History <i className="fa-solid fa-chevron-down"></i>
+                                            )}
                                         </div>
-                                        {openDropdown === 'view' && (
-                                            <div className="dropdown-menu">
-                                                <div className="dropdown-item">Requests</div>
-                                                <div className="dropdown-item selected">Balance History</div>
+
+                                        <div className="custom-dropdown-container">
+                                            <div
+                                                className={`custom-dropdown-header small ${openDropdown === 'year' ? 'active' : ''}`}
+                                                onClick={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
+                                            >
+                                                All <i className="fa-solid fa-chevron-down"></i>
                                             </div>
-                                        )}
+                                            {openDropdown === 'year' && (
+                                                <div className="dropdown-menu has-search">
+                                                    <div className="dropdown-search">
+                                                        <i className="fa-solid fa-magnifying-glass"></i>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search..."
+                                                            value={historySearch}
+                                                            onChange={(e) => setHistorySearch(e.target.value)}
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    <div className="dropdown-item">2026</div>
+                                                    <div className="dropdown-item">2025</div>
+                                                    <div className="dropdown-item selected">All</div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="custom-dropdown-container">
+                                            <div
+                                                className={`custom-dropdown-header ${openDropdown === 'view' ? 'active' : ''}`}
+                                                onClick={() => setOpenDropdown(openDropdown === 'view' ? null : 'view')}
+                                            >
+                                                Balance History <i className="fa-solid fa-chevron-down"></i>
+                                            </div>
+                                            {openDropdown === 'view' && (
+                                                <div className="dropdown-menu">
+                                                    <div className="dropdown-item">Requests</div>
+                                                    <div className="dropdown-item selected">Balance History</div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <table className="history-table">
-                                <thead>
-                                    <tr>
-                                        <th>Date <i className="fa-solid fa-arrow-up"></i></th>
-                                        <th>Description</th>
-                                        <th>Used Hours (-)</th>
-                                        <th>Earned Hours (+)</th>
-                                        <th>Balance</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {historyData.map((item, index) => (
-                                        <tr key={index}>
-                                            <td>{item.date}</td>
-                                            <td>{item.description}</td>
-                                            <td className="used-cell">{item.used || ''}</td>
-                                            <td className="earned-cell">{item.earned || ''}</td>
-                                            <td className="balance-cell">{item.balance}</td>
+
+                                {displayRows.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                                        <i className="fa-solid fa-inbox" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }}></i>
+                                        No history entries yet.
+                                    </div>
+                                ) : (
+                                <table className="history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date <i className="fa-solid fa-arrow-up"></i></th>
+                                            <th>Description</th>
+                                            <th>Used Hours (−)</th>
+                                            <th>Earned Hours (+)</th>
+                                            <th>Balance</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {displayRows.map((item) => (
+                                            <tr key={item.id}>
+                                                <td>{new Date(item.entry_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</td>
+                                                <td>{item.description}</td>
+                                                <td className="used-cell">{item.used_hours != null ? item.used_hours.toFixed(2) : ''}</td>
+                                                <td className="earned-cell">{item.earned_hours != null ? item.earned_hours.toFixed(2) : ''}</td>
+                                                <td className="balance-cell">{Number(item.balance).toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                )}
+                            </div>
                         </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {activeTab === 'Personal' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div className="section-title-row">
                                 <i className="fa-solid fa-user-gear"></i>
                                 <h2>Personal</h2>
-                                <button className="settings-btn"><i className="fa-solid fa-wand-magic-sparkles"></i> Customize Layout</button>
                             </div>
 
                             {/* Basic Information */}
@@ -679,7 +866,6 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="section-title-row">
                                 <i className="fa-solid fa-briefcase"></i>
                                 <h2>Job</h2>
-                                <button className="settings-btn"><i className="fa-solid fa-wand-magic-sparkles"></i> Customize Layout</button>
                             </div>
 
                             <div className="info-card">
@@ -1102,7 +1288,6 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="section-title-row">
                                 <i className="fa-solid fa-life-ring"></i>
                                 <h2>Emergency</h2>
-                                <button className="settings-btn"><i className="fa-solid fa-wand-magic-sparkles"></i> Customize Layout</button>
                             </div>
 
                             <div className="info-card">
@@ -1943,28 +2128,29 @@ export const EmployeeDetailView: React.FC = () => {
                     border: 1px solid #e2e8f0;
                     margin-bottom: 2rem;
                 }
-                .progress-circle-large {
+                .progress-circle-mid {
                     width: 100px;
                     height: 100px;
+                    margin: 0 auto;
                 }
-                .progress-circle-large svg {
+                .progress-circle-mid svg {
                     transform: rotate(-90deg);
                 }
                 .circle-bg {
                     fill: none;
                     stroke: #f1f5f9;
-                    stroke-width: 3.8;
+                    stroke-width: 3.5;
                 }
                 .circle {
                     fill: none;
-                    stroke: var(--accent, #f59e0b);
-                    stroke-width: 3.8;
+                    stroke-width: 3.5;
                     stroke-linecap: round;
+                    transition: stroke-dasharray 0.5s ease;
                 }
-                .progress-percentage {
-                    fill: var(--primary, #1e1b4b);
-                    font-size: 8px;
-                    font-weight: 800;
+                .progress-percentage-mid {
+                    fill: #1e1b4b;
+                    font-size: 9px;
+                    font-weight: 900;
                     text-anchor: middle;
                     transform: rotate(90deg);
                 }
@@ -2644,6 +2830,97 @@ export const EmployeeDetailView: React.FC = () => {
                 .bonus-input-wrapper .suffix {
                     color: #94a3b8;
                     font-weight: 500;
+                }
+
+                /* --- Responsive Media Queries --- */
+                @media (max-width: 1024px) {
+                    .profile-content {
+                        grid-template-columns: 1fr;
+                    }
+                    .profile-sidebar {
+                        order: 2;
+                    }
+                    .main-details {
+                        order: 1;
+                    }
+                    .card-grid {
+                        grid-template-columns: repeat(2, 1fr);
+                    }
+                }
+
+                @media (max-width: 768px) {
+                    .profile-container {
+                        padding: 1rem;
+                    }
+                    .header-main {
+                        flex-direction: column;
+                        text-align: center;
+                        padding: 1.5rem;
+                        gap: 1rem;
+                    }
+                    .profile-photo-container {
+                        width: 80px;
+                        height: 80px;
+                    }
+                    .profile-title-info h1 {
+                        font-size: 1.5rem;
+                    }
+                    .header-actions {
+                        margin-left: 0;
+                        width: 100%;
+                        display: flex;
+                        justify-content: center;
+                    }
+                    .profile-nav {
+                        padding: 0 1rem;
+                        gap: 1.5rem;
+                        overflow-x: auto;
+                        -webkit-overflow-scrolling: touch;
+                    }
+                    .nav-tab {
+                        white-space: nowrap;
+                    }
+                    .time-off-grid {
+                        grid-template-columns: 1fr;
+                    }
+                    .card-grid {
+                        grid-template-columns: 1fr;
+                    }
+                    .info-field.half-width {
+                        grid-column: span 4;
+                    }
+                    .section-title-row h2 {
+                        font-size: 1.25rem;
+                    }
+                    .training-summary-card {
+                        flex-direction: column;
+                        text-align: center;
+                        padding: 1.5rem;
+                    }
+                    .history-header {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 1rem;
+                    }
+                    .history-filters {
+                        width: 100%;
+                        overflow-x: auto;
+                    }
+                }
+
+                @media (max-width: 480px) {
+                    .profile-header {
+                        border-radius: 12px;
+                    }
+                    .card-value {
+                        font-size: 1.75rem;
+                    }
+                    .modal-content.add-entry-modal {
+                        width: 100%;
+                        height: 100%;
+                        max-height: 100vh;
+                        border-radius: 0;
+                    }
                 }
 
                 .add-entry-btn {

@@ -218,7 +218,7 @@ export const ControlMatrixPage: React.FC = () => {
 
     return (
         <>
-            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                     <h1 className="page-title">Production Control Matrix</h1>
                     <p className="page-subtitle">Click any cell to assign workers and control timers</p>
@@ -310,7 +310,7 @@ export const ControlMatrixPage: React.FC = () => {
             {/* Assignments Modal */}
             < div className={`assign-modal ${isAssignOpen ? 'active' : ''}`
             } style={{
-                width: '640px', maxHeight: '85vh', position: 'fixed', left: '50%', top: '50%',
+                width: 'min(640px, 95%)', maxHeight: '85vh', position: 'fixed', left: '50%', top: '50%',
                 transform: `translate(-50%, -50%) scale(${isAssignOpen ? 1 : 0.9})`,
                 opacity: isAssignOpen ? 1 : 0, pointerEvents: isAssignOpen ? 'auto' : 'none',
                 background: '#ffffff', borderRadius: '20px', zIndex: 2600,
@@ -402,7 +402,7 @@ export const ControlMatrixPage: React.FC = () => {
                                         left: '50%',
                                         top: '50%',
                                         transform: 'translate(-50%, -50%)',
-                                        fontSize: '1.5rem',
+                                        fontSize: 'clamp(1rem, 4vw, 1.5rem)',
                                         fontWeight: 700,
                                         fontFamily: 'monospace',
                                         color: '#1E293B',
@@ -493,7 +493,7 @@ export const ControlMatrixPage: React.FC = () => {
             }}>
                 <div style={{
                     background: 'white',
-                    width: '400px',
+                    width: 'min(400px, 90%)',
                     borderRadius: '16px',
                     padding: '1.5rem',
                     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',

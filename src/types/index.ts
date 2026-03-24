@@ -90,6 +90,8 @@ export interface User {
     is_recently_separated_veteran?: boolean;
     pto_balance?: string;
     sick_balance?: string;
+    last_pto_accrual?: string;
+    processed_sick_seconds?: number;
     license_type?: string;
     license_effective?: string;
     license_expiration?: string;

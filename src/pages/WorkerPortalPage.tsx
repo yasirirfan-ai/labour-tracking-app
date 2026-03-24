@@ -5,6 +5,7 @@ import { logActivity, updateUserStatus } from '../lib/activityLogger';
 import { completeAllTasks, pauseAllActiveTasks } from '../lib/taskService';
 import { Navigate } from 'react-router-dom';
 import { LEVEL_2_SOPS } from '../data/sopData';
+import { LEVEL_1_TRAININGS } from '../data/trainingData';
 
 export const WorkerPortalPage: React.FC = () => {
     const { user, loading: authLoading, logout } = useAuth();
@@ -40,39 +41,6 @@ export const WorkerPortalPage: React.FC = () => {
         }
     }, [user?.id]);
 
-    const LEVEL_1_TRAININGS = [
-        {
-            name: 'GMP and Quality Awareness',
-            pdfs: [
-                { name: 'Training Presentation (Updated)', path: '/training_materials/GMP_presentation_short_updated_02202025.pdf' },
-                { name: 'Training Presentation (Original)', path: '/training_materials/GMP_presentation_updated_12162024.pdf' }
-            ]
-        },
-        {
-            name: 'Gowning, Hand Washing and Conduct',
-            pdfs: [{ name: 'Training Material', path: '/training_materials/Gowning, Hand washing and Conduct 3.5.2 - Training Material rev.112524.pdf' }]
-        },
-        {
-            name: 'Premises Cleaning and Sanitation',
-            pdfs: [{ name: 'Training Material', path: '/training_materials/Premises Cleaning and Sanitation - Training Material rev.030425.pdf' }]
-        },
-        {
-            name: 'Pest Control',
-            pdfs: [{ name: 'Training Material', path: '/training_materials/Pest Control 4.13 - Training Material rev101124.pdf' }]
-        },
-        {
-            name: 'Biohazard Response',
-            pdfs: [{ name: 'Training Material', path: '/training_materials/Biohazard Response - Training Material rev.101124.pdf' }]
-        },
-        {
-            name: 'Personnel and Training',
-            pdfs: [{ name: 'Training Material', path: '/training_materials/Personnel and Training 3.4-2 - Training Material rev.101024.pdf' }]
-        },
-        {
-            name: 'Visitor Policy',
-            pdfs: [{ name: 'Training Material', path: '/training_materials/Visitor Policy - Training Material rev.101124.pdf' }]
-        }
-    ];
 
     const handleSignIncident = async (incidentId: string) => {
         const data = signingData[incidentId];
@@ -588,153 +556,74 @@ export const WorkerPortalPage: React.FC = () => {
 
 
                 .worker-content {
-                    padding: 2.5rem 3.5rem;
+                    padding: var(--content-padding, 2.5rem 3.5rem);
                     width: 100%;
                     margin: 0;
                     display: flex;
                     flex-direction: column;
-                    gap: 2.5rem;
+                    gap: 1.5rem;
                 }
 
                 .status-card, .profile-section, .conduct-section {
                     background: white;
-                    border-radius: 24px;
-                    padding: 2.5rem;
-                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+                    border-radius: 20px;
+                    padding: 2rem;
+                    box-shadow: var(--shadow-sm);
                     border: 1px solid #f1f5f9;
-                    margin-bottom: 2rem;
-                }
-
-                .status-label {
-                    font-size: 0.75rem;
-                    font-weight: 800;
-                    color: #94a3b8;
-                    text-transform: uppercase;
-                    letter-spacing: 0.1em;
-                    margin-bottom: 1.25rem;
+                    margin-bottom: 1.5rem;
                 }
 
                 .status-value {
-                    font-size: 3rem;
+                    font-size: clamp(2rem, 8vw, 3rem);
                     font-weight: 800;
                     display: flex;
                     align-items: center;
-                    gap: 1.5rem;
+                    gap: 1rem;
                     margin-bottom: 0.5rem;
                     letter-spacing: -0.02em;
+                    flex-wrap: wrap;
                 }
-
-                .status-dot {
-                    width: 16px;
-                    height: 16px;
-                    border-radius: 50%;
-                }
-
-                .status-present { color: #10b981; }
-                .status-offline { color: #94a3b8; }
-                .dot-present { background: #10b981; box-shadow: 0 0 20px rgba(16, 185, 129, 0.6); }
-                .dot-offline { background: #94a3b8; }
 
                 .time-display {
-                    font-size: 2rem;
+                    font-size: clamp(1.25rem, 5vw, 2rem);
                     font-weight: 700;
                     color: #1e1b4b;
                     font-variant-numeric: tabular-nums;
                 }
 
-                .clock-btn {
-                    padding: 1.25rem 2rem;
-                    border-radius: 16px;
-                    font-size: 1.1rem;
-                    font-weight: 700;
-                    border: none;
-                    cursor: pointer;
-                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                    width: 100%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 0.75rem;
-                }
-
-                .clock-in-btn {
-                    background: #10b981;
-                    color: white;
-                    box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);
-                }
-
-                .clock-out-btn {
-                    background: #ef4444;
-                    color: white;
-                    box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.3);
-                }
-
-                .clock-btn:hover {
-                    transform: translateY(-2px);
-                    filter: brightness(1.1);
-                }
-
-                .worker-avatar {
-                    width: 44px;
-                    height: 44px;
-                    background: #1e1b4b;
-                    color: #f59e0b;
-                    border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-weight: 800;
-                    font-size: 1.2rem;
-                }
-
-                .form-group {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.5rem;
-                }
-
-                .form-group label {
-                    font-size: 0.85rem;
-                    font-weight: 800;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    letter-spacing: 0.025em;
-                }
-
-                .form-group input, .form-group textarea {
-                    padding: 1rem 1.25rem;
-                    border-radius: 12px;
-                    border: 1.5px solid #e2e8f0;
-                    background: #f8fafc;
-                    font-size: 1rem;
-                    transition: all 0.2s;
-                    font-weight: 500;
-                }
-
-                .form-group input:focus, .form-group textarea:focus {
-                    border-color: #f59e0b;
-                    background: white;
-                    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.1);
-                }
-
-                .nfc-status-bar {
-                    background: #ffffff;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 16px;
-                    padding: 1rem 1.5rem;
-                    font-weight: 700;
-                    display: flex;
-                    align-items: center;
-                    margin-bottom: 2.5rem;
-                    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
-                }
-
-                .nfc-status-error { color: #EF4444; border-color: #FEE2E2; background: #FFF7ED; }
-                .nfc-status-reading { color: #2563EB; border-color: #DBEAFE; background: #EFF6FF; }
-
                 @media (max-width: 900px) {
-                    .worker-sidebar { width: 80px; padding: 2.5rem 0.75rem; }
+                    .worker-sidebar { width: 80px; padding: 2rem 0.75rem; }
                     .sidebar-brand span, .nav-item span { display: none; }
+                }
+
+                @media (max-width: 768px) {
+                    .worker-main-wrapper {
+                        margin-left: 0 !important;
+                        padding-top: 4rem; /* For mobile menu button */
+                    }
+                    
+                    .status-card, .profile-section, .conduct-section {
+                        padding: 1.5rem;
+                        border-radius: 16px;
+                    }
+
+                    .on-duty-banner {
+                        flex-direction: column;
+                        padding: 1.5rem !important;
+                        align-items: flex-start !important;
+                        gap: 1.5rem !important;
+                    }
+
+                    .on-duty-banner .clock-btn {
+                        width: 100%;
+                    }
+                    
+                    .notification-popup {
+                        min-width: calc(100% - 2rem);
+                        right: 1rem;
+                        top: 1rem;
+                        padding: 1rem;
+                    }
                 }
 
                 .notification-popup {
@@ -744,7 +633,7 @@ export const WorkerPortalPage: React.FC = () => {
                     background: white;
                     border-radius: 20px;
                     padding: 1.5rem;
-                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                    box-shadow: var(--shadow-xl);
                     display: flex;
                     align-items: center;
                     gap: 1.5rem;
@@ -768,6 +657,13 @@ export const WorkerPortalPage: React.FC = () => {
                     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     min-width: 0;
                 }
+                
+                @media (max-width: 1024px) {
+                    .worker-main-wrapper {
+                        margin-left: 80px;
+                    }
+                }
+
                 .worker-main-wrapper.expanded {
                     margin-left: 80px;
                 }
@@ -775,10 +671,10 @@ export const WorkerPortalPage: React.FC = () => {
                 .on-duty-banner {
                     width: 100%;
                     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                    border-radius: 24px;
+                    border-radius: 20px;
                     padding: 2.5rem 3rem;
                     color: white;
-                    margin-bottom: 2.5rem;
+                    margin-bottom: 2rem;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;

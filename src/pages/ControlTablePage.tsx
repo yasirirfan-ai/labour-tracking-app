@@ -465,7 +465,7 @@ export const ControlTablePage: React.FC = () => {
 
     return (
         <>
-            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                     <h1 className="page-title">Control Table</h1>
                     <p className="page-subtitle">Real-time tracking of worker task activities (PST Timezone)</p>
@@ -624,7 +624,7 @@ export const ControlTablePage: React.FC = () => {
             {/* Edit Modal (Compact) */}
             <div className={`offcanvas ${isEditOpen ? 'show' : ''}`} style={{
                 right: 'auto', left: '50%', top: '50%', transform: `translate(-50%, -50%)`,
-                width: '700px', height: 'auto', maxHeight: '90vh', overflowY: 'auto',
+                width: 'min(700px, 95%)', height: 'auto', maxHeight: '90vh', overflowY: 'auto',
                 borderRadius: '12px', opacity: isEditOpen ? 1 : 0,
                 pointerEvents: isEditOpen ? 'all' : 'none',
                 transition: 'opacity 0.2s', zIndex: 3001, background: 'white', position: 'fixed',
@@ -755,7 +755,7 @@ export const ControlTablePage: React.FC = () => {
             {/* Create Manual Entry Modal */}
             < div className={`offcanvas ${isCreateOpen ? 'show' : ''}`} style={{
                 right: 'auto', left: '50%', top: '50%', transform: `translate(-50%, -50%)`,
-                width: '700px', height: 'auto',
+                width: 'min(700px, 95%)', height: 'auto', maxHeight: '90vh', overflowY: 'auto',
                 borderRadius: '12px', opacity: isCreateOpen ? 1 : 0,
                 pointerEvents: isCreateOpen ? 'all' : 'none',
                 transition: 'opacity 0.2s', zIndex: 3001, background: 'white', position: 'fixed',
@@ -771,7 +771,7 @@ export const ControlTablePage: React.FC = () => {
                     <div style={{ display: 'grid', gap: '1rem' }}>
 
                         {/* Row 1: Worker & MO */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="form-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                             <div>
                                 <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Worker</label>
                                 <select
@@ -801,7 +801,7 @@ export const ControlTablePage: React.FC = () => {
                         </div>
 
                         {/* Row 2: Operation, Status & Rate */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                        <div className="form-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                             <div>
                                 <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Operation</label>
                                 <select
@@ -842,7 +842,7 @@ export const ControlTablePage: React.FC = () => {
                         </div>
 
                         {/* Row 3: Times */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="form-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                             <div>
                                 <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Clock In</label>
                                 <input
