@@ -133,7 +133,6 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
     const alreadyProcessed   = user.processed_sick_seconds || 0;
     const newWorkedSeconds   = Math.max(0, totalWorkedSeconds - alreadyProcessed);
     const sickHoursToAdd     = Math.floor(newWorkedSeconds / SICK_SECONDS_PER_HOUR);
-    const leftoverSeconds    = newWorkedSeconds % SICK_SECONDS_PER_HOUR;
 
     const currentSickBalance = parseFloat(user.sick_balance || '0');
     let   newSickBalance     = currentSickBalance + sickHoursToAdd;
