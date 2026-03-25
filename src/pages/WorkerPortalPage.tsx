@@ -6,6 +6,7 @@ import { completeAllTasks, pauseAllActiveTasks } from '../lib/taskService';
 import { Navigate } from 'react-router-dom';
 import { LEVEL_2_SOPS } from '../data/sopData';
 import { LEVEL_1_TRAININGS } from '../data/trainingData';
+import type { User } from '../types';
 
 export const WorkerPortalPage: React.FC = () => {
     const { user, loading: authLoading, logout } = useAuth();
@@ -83,11 +84,39 @@ export const WorkerPortalPage: React.FC = () => {
     };
     const [notification, setNotification] = useState<{ show: boolean, message: string, severity: string } | null>(null);
     const [editMode, setEditMode] = useState(false);
-    const [formData, setFormData] = useState({
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+    const [formData, setFormData] = useState<Partial<User>>({
         name: user?.name || '',
-        phone: (user as any)?.phone || '',
-        email: (user as any)?.email || '',
-        address: (user as any)?.address || '',
+        worker_id: user?.worker_id || '',
+        first_name: (user as any)?.first_name || '',
+        middle_name: (user as any)?.middle_name || '',
+        last_name: (user as any)?.last_name || '',
+        preferred_name: (user as any)?.preferred_name || '',
+        birth_date: (user as any)?.birth_date || '',
+        ssn: (user as any)?.ssn || '',
+        gender: (user as any)?.gender || '',
+        marital_status: (user as any)?.marital_status || '',
+        shirt_size: (user as any)?.shirt_size || '',
+        address_street1: (user as any)?.address_street1 || '',
+        address_street2: (user as any)?.address_street2 || '',
+        address_city: (user as any)?.address_city || '',
+        address_state: (user as any)?.address_state || '',
+        address_zip: (user as any)?.address_zip || '',
+        address_country: (user as any)?.address_country || 'United States',
+        work_phone: (user as any)?.work_phone || '',
+        work_phone_ext: (user as any)?.work_phone_ext || '',
+        mobile_phone: (user as any)?.mobile_phone || '',
+        home_phone: (user as any)?.home_phone || '',
+        work_email: (user as any)?.work_email || '',
+        home_email: (user as any)?.home_email || '',
+        linkedin_url: (user as any)?.linkedin_url || '',
+        twitter_url: (user as any)?.twitter_url || '',
+        facebook_url: (user as any)?.facebook_url || '',
+        license_type: (user as any)?.license_type || '',
+        license_effective: (user as any)?.license_effective || '',
+        license_expiration: (user as any)?.license_expiration || '',
+        license_notes: (user as any)?.license_notes || '',
     });
 
     useEffect(() => {
@@ -95,12 +124,50 @@ export const WorkerPortalPage: React.FC = () => {
             setLocalUser(user);
             setFormData({
                 name: user.name || '',
-                phone: (user as any).phone || '',
-                email: (user as any).email || '',
-                address: (user as any).address || '',
+                worker_id: user.worker_id || '',
+                first_name: (user as any).first_name || '',
+                middle_name: (user as any).middle_name || '',
+                last_name: (user as any).last_name || '',
+                preferred_name: (user as any).preferred_name || '',
+                birth_date: (user as any).birth_date || '',
+                ssn: (user as any).ssn || '',
+                gender: (user as any).gender || '',
+                marital_status: (user as any).marital_status || '',
+                shirt_size: (user as any).shirt_size || '',
+                address_street1: (user as any).address_street1 || '',
+                address_street2: (user as any).address_street2 || '',
+                address_city: (user as any).address_city || '',
+                address_state: (user as any).address_state || '',
+                address_zip: (user as any).address_zip || '',
+                address_country: (user as any).address_country || 'United States',
+                work_phone: (user as any).work_phone || '',
+                work_phone_ext: (user as any).work_phone_ext || '',
+                mobile_phone: (user as any).mobile_phone || '',
+                home_phone: (user as any).home_phone || '',
+                work_email: (user as any).work_email || '',
+                home_email: (user as any).home_email || '',
+                linkedin_url: (user as any).linkedin_url || '',
+                twitter_url: (user as any).twitter_url || '',
+                facebook_url: (user as any).facebook_url || '',
+                license_type: (user as any).license_type || '',
+                license_effective: (user as any).license_effective || '',
+                license_expiration: (user as any).license_expiration || '',
+                license_notes: (user as any).license_notes || '',
             });
         }
     }, [user?.id, authLoading]);
+
+    const formatSSN = (value: string) => {
+        const val = value.replace(/\D/g, '');
+        let formatted = val;
+        if (val.length > 3) {
+            formatted = val.slice(0, 3) + '-' + val.slice(3);
+        }
+        if (val.length > 5) {
+            formatted = val.slice(0, 3) + '-' + val.slice(3, 5) + '-' + val.slice(5, 9);
+        }
+        return formatted;
+    };
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -122,28 +189,69 @@ export const WorkerPortalPage: React.FC = () => {
 
     const handleSaveProfile = async () => {
         if (!user) return;
+        setValidationErrors({});
+
+        // Validation
+        const errors: Record<string, string> = {};
+        if (!formData.worker_id?.trim()) errors.worker_id = "Employee # is required";
+        if (!formData.first_name?.trim()) errors.first_name = "First Name is required";
+
+        const validatePhone = (val?: string) => {
+            if (!val) return true;
+            return /^[0-9+() -]*$/.test(val);
+        };
+
+        if (!validatePhone((formData as any).phone)) errors.phone = "Phone must be numeric";
+        if (!validatePhone(formData.work_phone)) errors.work_phone = "Work Phone must be numeric";
+        if (!validatePhone(formData.mobile_phone)) errors.mobile_phone = "Mobile Phone must be numeric";
+        if (!validatePhone(formData.home_phone)) errors.home_phone = "Home Phone must be numeric";
+
+        if (Object.keys(errors).length > 0) {
+            setValidationErrors(errors);
+            return;
+        }
+
         setLoading(true);
         try {
+            // Safe Update Strategy: Only include fields that actually exist in the database.
+            // The 'user' object from AuthContext (select '*') contains all valid columns currently in the DB.
+            const validColumns = Object.keys(user);
+
+            // Transform empty strings to null for database compatibility (especially for DATE columns)
+            const cleanData = Object.entries(formData).reduce((acc, [key, value]) => {
+                // Only include the field if it's a valid column in the database
+                if (validColumns.includes(key)) {
+                    acc[key] = value === '' ? null : value;
+                }
+                return acc;
+            }, {} as any);
+
+            // Sync phone with mobile_phone for backward compatibility if needed
+            if (cleanData.mobile_phone && !cleanData.phone) {
+                cleanData.phone = cleanData.mobile_phone;
+            }
+
             const { error } = await (supabase as any)
                 .from('users')
-                .update({
-                    name: formData.name,
-                    phone: formData.phone,
-                    email: formData.email,
-                    address: formData.address
-                })
+                .update(cleanData)
                 .eq('id', user.id);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase Update Error:', error);
+                alert(`Update failed: ${error.message}`);
+                throw error;
+            }
 
             const updatedUser = { ...user, ...formData };
             localStorage.setItem('bt_user', JSON.stringify(updatedUser));
             setLocalUser(updatedUser as any);
             setEditMode(false);
             alert('Profile updated successfully!');
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            alert('Failed to update personal details');
+            if (!err.message?.includes('Update failed')) {
+                alert('An unexpected error occurred while saving.');
+            }
         } finally {
             setLoading(false);
         }
@@ -787,6 +895,169 @@ export const WorkerPortalPage: React.FC = () => {
                         padding: 0 1.5rem !important;
                     }
                 }
+
+                .info-card {
+                    background: white;
+                    border-radius: 16px;
+                    border: 1px solid #e2e8f0;
+                    overflow: hidden;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                    margin-bottom: 2rem;
+                }
+                .card-header {
+                    padding: 1.25rem 1.5rem;
+                    background: #fcfdfe;
+                    border-bottom: 1px solid #f1f5f9;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .card-header h3 {
+                    margin: 0;
+                    font-size: 1.1rem;
+                    font-weight: 800;
+                    color: #1e1b4b;
+                }
+                .card-header i {
+                    font-size: 1.1rem;
+                    color: #1e1b4b;
+                    opacity: 0.8;
+                }
+                .card-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                    gap: 1.5rem;
+                    padding: 1.5rem;
+                }
+                .info-field {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+                .info-field.full-width {
+                    grid-column: 1 / -1;
+                }
+                .info-field label {
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    color: #64748b;
+                    text-transform: capitalize;
+                }
+                .info-input {
+                    padding: 0.75rem 1rem;
+                    border-radius: 12px;
+                    border: 2px solid #e2e8f0;
+                    font-size: 0.95rem;
+                    color: #1e293b;
+                    background: #f8fafc;
+                    width: 100%;
+                    outline: none;
+                    transition: all 0.2s;
+                }
+                .info-input:focus { border-color: #1e1b4b; background: white; }
+                .info-input:disabled { background: #f1f5f9; cursor: not-allowed; border-color: #e2e8f0; }
+                .info-input.error { border-color: #ef4444; background: #fffcfc; }
+                .error-text { color: #ef4444; font-size: 0.75rem; font-weight: 600; margin-top: 4px; }
+                
+                .section-title-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    margin-bottom: 1.5rem;
+                }
+                .section-title-row i { font-size: 1.5rem; color: #1e1b4b; opacity: 0.4; }
+                .section-title-row h2 { margin: 0; font-size: 1.75rem; font-weight: 900; color: #0f172a; letter-spacing: -0.02em; }
+
+                .info-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .info-table th {
+                    text-align: left;
+                    padding: 1rem 1.5rem;
+                    background: #f8fafc;
+                    font-size: 0.75rem;
+                    font-weight: 800;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                .info-table td {
+                    padding: 1rem 1.5rem;
+                    font-size: 0.9rem;
+                    border-bottom: 1px solid #f1f5f9;
+                    color: #475569;
+                }
+                .table-input {
+                    width: 100%;
+                    border: none;
+                    background: transparent;
+                    font-size: inherit;
+                    font-family: inherit;
+                    color: inherit;
+                    padding: 4px 0;
+                    outline: none;
+                    transition: all 0.2s;
+                    border-bottom: 1px solid transparent;
+                }
+                .table-input:focus {
+                    border-bottom-color: #f59e0b;
+                    background: rgba(245, 158, 11, 0.03);
+                }
+                .small-action-btn {
+                    background: white;
+                    border: 1px solid #1e1b4b;
+                    color: #1e1b4b;
+                    padding: 6px 14px;
+                    border-radius: 20px;
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                .small-action-btn:hover { background: #1e1b4b; color: white; }
+
+                .custom-eeo-dropdown { position: relative; width: 100%; }
+                .eeo-select-trigger {
+                    display: flex;
+                    align-items: center;
+                    padding: 0 1rem;
+                    height: 48px;
+                    background: #f8fafc;
+                    border: 2px solid #e2e8f0;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-size: 0.95rem;
+                    color: #1e293b;
+                    justify-content: space-between;
+                }
+                .eeo-select-trigger.active { border-color: #1e1b4b; background: white; }
+                .eeo-dropdown-menu {
+                    position: absolute;
+                    top: calc(100% + 8px);
+                    left: 0;
+                    width: 100%;
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: var(--shadow-xl);
+                    border: 1px solid #e2e8f0;
+                    z-index: 1000;
+                    overflow: hidden;
+                }
+                .eeo-search-box {
+                    padding: 12px;
+                    border-bottom: 1px solid #f1f5f9;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+                .eeo-search-box input { border: none; outline: none; width: 100%; font-size: 0.9rem; }
+                .eeo-options-list { max-height: 250px; overflow-y: auto; padding: 8px 0; }
+                .eeo-option { padding: 10px 16px; font-size: 0.9rem; cursor: pointer; }
+                .eeo-option:hover { background: #f8fafc; }
+                .eeo-option.selected { background: #e0e7ff; color: #1e1b4b; font-weight: 700; }
             ` }} />
 
             {notification?.show && (
@@ -1067,24 +1338,238 @@ export const WorkerPortalPage: React.FC = () => {
                     )}
 
                     {activeTab === 'personal_info' && (
-                        <div className="profile-section" style={{ width: '100%' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3.5rem', alignItems: 'center' }}>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, color: '#1e1b4b' }}>Personal Information</h3>
-                                    <p style={{ color: '#94a3b8', marginTop: '0.5rem', fontWeight: 600 }}>Manage your contact and identification details</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                <div className="section-title-row" style={{ marginBottom: 0 }}>
+                                    <i className="fa-solid fa-user-gear"></i>
+                                    <h2 style={{ fontSize: '2rem' }}>Personal Details</h2>
                                 </div>
-                                <button className="edit-btn" onClick={() => setEditMode(!editMode)} style={{ padding: '0.9rem 1.75rem', borderRadius: '14px', border: 'none', background: editMode ? '#fee2e2' : '#f1f5f9', color: editMode ? '#ef4444' : '#1e1b4b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}>
+                                <button className="edit-btn" onClick={() => {
+                                    if (editMode) {
+                                        // Reset fields on cancel
+                                        setFormData(user as any);
+                                        setValidationErrors({});
+                                    }
+                                    setEditMode(!editMode);
+                                }} style={{ padding: '0.9rem 1.75rem', borderRadius: '14px', border: 'none', background: editMode ? '#fee2e2' : '#f1f5f9', color: editMode ? '#ef4444' : '#1e1b4b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}>
                                     {editMode ? 'Cancel Edit' : 'Edit Profile'}
                                 </button>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem' }}>
-                                <div className="form-group"><label>Full Name</label><input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={!editMode} /></div>
-                                <div className="form-group"><label>Worker ID</label><input value={user.worker_id} disabled /></div>
-                                <div className="form-group"><label>Phone Number</label><input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} disabled={!editMode} /></div>
-                                <div className="form-group"><label>Email Address</label><input value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} disabled={!editMode} /></div>
-                                <div className="form-group" style={{ gridColumn: '1 / -1' }}><label>Home Address</label><textarea rows={3} value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} disabled={!editMode} /></div>
+
+                            {/* Basic Information */}
+                            <div className="info-card">
+                                <div className="card-header">
+                                    <i className="fa-solid fa-id-card"></i>
+                                    <h3>Basic Information</h3>
+                                </div>
+                                <div className="card-grid">
+                                    <div className="info-field">
+                                        <label>Employee #</label>
+                                        <input type="text" className={`info-input ${validationErrors.worker_id ? 'error' : ''}`} value={formData.worker_id || ''} disabled />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Status</label>
+                                        <select className="info-input" value={formData.active === false ? "false" : "true"} disabled>
+                                            <option value="true">Active</option>
+                                            <option value="false">Archived</option>
+                                        </select>
+                                    </div>
+                                    <div className="info-field">
+                                        <label>First Name</label>
+                                        <input type="text" className={`info-input ${validationErrors.first_name ? 'error' : ''}`} value={formData.first_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))} disabled={!editMode} />
+                                        {validationErrors.first_name && <span className="error-text">{validationErrors.first_name}</span>}
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Middle Name</label>
+                                        <input type="text" className="info-input" value={formData.middle_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, middle_name: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Last Name</label>
+                                        <input type="text" className="info-input" value={formData.last_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Preferred Name</label>
+                                        <input type="text" className="info-input" value={formData.preferred_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, preferred_name: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Birth Date</label>
+                                        <input type="date" className="info-input" value={formData.birth_date || ''} onChange={(e) => setFormData(prev => ({ ...prev, birth_date: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>SSN</label>
+                                        <input type="text" className="info-input" value={formData.ssn || ''} onChange={(e) => setFormData(prev => ({ ...prev, ssn: formatSSN(e.target.value) }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Gender</label>
+                                        <select className="info-input" value={formData.gender || ""} onChange={(e) => setFormData(prev => ({ ...prev, gender: e.target.value }))} disabled={!editMode}>
+                                            <option value="">-Select-</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Marital Status</label>
+                                        <select className="info-input" value={formData.marital_status || ""} onChange={(e) => setFormData(prev => ({ ...prev, marital_status: e.target.value }))} disabled={!editMode}>
+                                            <option value="">-Select-</option>
+                                            <option value="Single">Single</option>
+                                            <option value="Married">Married</option>
+                                        </select>
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Shirt Size</label>
+                                        <select className="info-input" value={formData.shirt_size || ""} onChange={(e) => setFormData(prev => ({ ...prev, shirt_size: e.target.value }))} disabled={!editMode}>
+                                            <option value="">-Select-</option>
+                                            <option value="S">S</option>
+                                            <option value="M">M</option>
+                                            <option value="L">L</option>
+                                            <option value="XL">XL</option>
+                                            <option value="2XL">2XL</option>
+                                            <option value="3XL">3XL</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
-                            {editMode && <button className="clock-btn" style={{ background: '#1e1b4b', marginTop: '2rem', color: 'white' }} onClick={handleSaveProfile} disabled={loading}>Save Updated Details</button>}
+
+                            {/* Address */}
+                            <div className="info-card">
+                                <div className="card-header">
+                                    <i className="fa-solid fa-house"></i>
+                                    <h3>Address</h3>
+                                </div>
+                                <div className="card-grid">
+                                    <div className="info-field full-width">
+                                        <label>Street 1</label>
+                                        <input type="text" className="info-input" value={formData.address_street1 || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_street1: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field full-width">
+                                        <label>Street 2</label>
+                                        <input type="text" className="info-input" value={formData.address_street2 || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_street2: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>City</label>
+                                        <input type="text" className="info-input" value={formData.address_city || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_city: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>State</label>
+                                        <input type="text" className="info-input" value={formData.address_state || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_state: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>ZIP</label>
+                                        <input type="text" className="info-input" value={formData.address_zip || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_zip: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Country</label>
+                                        <input type="text" className="info-input" value={formData.address_country || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_country: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Contact */}
+                            <div className="info-card">
+                                <div className="card-header">
+                                    <i className="fa-solid fa-address-book"></i>
+                                    <h3>Contact</h3>
+                                </div>
+                                <div className="card-grid">
+                                    <div className="info-field">
+                                        <label>Work Phone</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.work_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_phone: e.target.value }))} disabled={!editMode} /></div>
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Ext</label>
+                                        <input type="text" className="info-input" value={formData.work_phone_ext || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_phone_ext: e.target.value }))} disabled={!editMode} />
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Mobile Phone</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-mobile-screen" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.mobile_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, mobile_phone: e.target.value }))} disabled={!editMode} /></div>
+                                    </div>
+                                    <div className="info-field">
+                                        <label>Home Phone</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.home_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_phone: e.target.value }))} disabled={!editMode} /></div>
+                                    </div>
+                                    <div className="info-field full-width">
+                                        <label>Work Email</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i><input type="email" className="info-input" style={{flex: 1}} value={formData.work_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_email: e.target.value }))} disabled={!editMode} /></div>
+                                    </div>
+                                    <div className="info-field full-width">
+                                        <label>Home Email</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i><input type="email" className="info-input" style={{flex: 1}} value={formData.home_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_email: e.target.value }))} disabled={!editMode} /></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Social Links */}
+                            <div className="info-card">
+                                <div className="card-header">
+                                    <i className="fa-solid fa-share-nodes"></i>
+                                    <h3>Social Links</h3>
+                                </div>
+                                <div className="card-grid">
+                                    <div className="info-field full-width">
+                                        <label>LinkedIn</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-linkedin" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.linkedin_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, linkedin_url: e.target.value }))} disabled={!editMode} /></div>
+                                    </div>
+                                    <div className="info-field full-width">
+                                        <label>Twitter Username</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-twitter" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.twitter_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, twitter_url: e.target.value }))} disabled={!editMode} /></div>
+                                    </div>
+                                    <div className="info-field full-width">
+                                        <label>Facebook</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-facebook" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.facebook_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, facebook_url: e.target.value }))} disabled={!editMode} /></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Education */}
+                            <div className="info-card">
+                                <div className="card-header">
+                                    <i className="fa-solid fa-graduation-cap"></i>
+                                    <h3>Education</h3>
+                                </div>
+                                <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+                                    <button className="text-link" style={{ color: '#1e1b4b', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }} disabled={!editMode}><i className="fa-solid fa-plus-circle"></i> Add Education</button>
+                                </div>
+                            </div>
+
+                            {/* Licenses */}
+                            <div className="info-card">
+                                <div className="card-header" style={{ justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <i className="fa-solid fa-file-certificate"></i>
+                                        <h3>Licenses/Passport/Visa Information</h3>
+                                    </div>
+                                    <button className="small-action-btn" disabled={!editMode}>Add Policy</button>
+                                </div>
+                                <div style={{ padding: '0' }}>
+                                    <table className="info-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Type</th>
+                                                <th>Effective Date</th>
+                                                <th>Expiration Date</th>
+                                                <th>Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><input type="text" className="table-input" value={formData.license_type || ''} onChange={(e) => setFormData(prev => ({ ...prev, license_type: e.target.value }))} placeholder="Type" disabled={!editMode} /></td>
+                                                <td><input type="date" className="table-input" value={formData.license_effective || ''} onChange={(e) => setFormData(prev => ({ ...prev, license_effective: e.target.value }))} disabled={!editMode} /></td>
+                                                <td><input type="date" className="table-input" value={formData.license_expiration || ''} onChange={(e) => setFormData(prev => ({ ...prev, license_expiration: e.target.value }))} disabled={!editMode} /></td>
+                                                <td><input type="text" className="table-input" value={formData.license_notes || ''} onChange={(e) => setFormData(prev => ({ ...prev, license_notes: e.target.value }))} placeholder="Notes" disabled={!editMode} /></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {editMode && (
+                                <div style={{ position: 'sticky', bottom: '2rem', display: 'flex', justifyContent: 'center', zIndex: 100 }}>
+                                    <button className="clock-btn" style={{ background: '#10b981', color: 'white', width: 'auto', padding: '1rem 3rem', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)' }} onClick={handleSaveProfile} disabled={loading}>
+                                        {loading ? 'Saving Changes...' : 'Save Updated Details'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 

@@ -141,7 +141,7 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
     if (newSickBalance > SICK_BALANCE_CAP_HOURS) newSickBalance = SICK_BALANCE_CAP_HOURS;
     newSickBalance = Math.round(newSickBalance * 100) / 100;
 
-    const newProcessedSickSeconds = alreadyProcessed + (sickHoursToAdd * SICK_SECONDS_PER_HOUR) + leftoverSeconds;
+    const newProcessedSickSeconds = alreadyProcessed + (sickHoursToAdd * SICK_SECONDS_PER_HOUR);
 
     return {
         newPtoBalance,

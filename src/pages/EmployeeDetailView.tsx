@@ -490,12 +490,6 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
                                     <div className="card-label">Paid Time Off (PTO) Available</div>
                                     <div className="card-sublabel">{ptoRate.toFixed(2)} hrs / pay period</div>
-                                    <div className="card-actions">
-                                        <button><i className="fa-solid fa-calendar-plus"></i></button>
-                                        <button><i className="fa-solid fa-list-check"></i></button>
-                                        <button><i className="fa-solid fa-plus-minus"></i></button>
-                                        <button className="more"><i className="fa-solid fa-gear"></i> <i className="fa-solid fa-chevron-down"></i></button>
-                                    </div>
                                 </div>
 
                                 {/* Sick Card */}
@@ -518,12 +512,6 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
                                     <div className="card-label">Sick Time Available</div>
                                     <div className="card-sublabel">48-hr cap · accrues from hours worked</div>
-                                    <div className="card-actions">
-                                        <button disabled={!sickUsable} style={{ opacity: sickUsable ? 1 : 0.4 }}><i className="fa-solid fa-calendar-plus"></i></button>
-                                        <button><i className="fa-solid fa-list-check"></i></button>
-                                        <button><i className="fa-solid fa-plus-minus"></i></button>
-                                        <button className="more"><i className="fa-solid fa-gear"></i> <i className="fa-solid fa-chevron-down"></i></button>
-                                    </div>
                                 </div>
                             </div>
 
