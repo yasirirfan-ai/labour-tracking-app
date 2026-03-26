@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Task, User, ManufacturingOrder, DisciplinaryPolicy, DisciplinaryIncident, DisciplinaryAction, PolicyAcknowledgment } from '../types';
+import type { Task, User, ManufacturingOrder, DisciplinaryPolicy, DisciplinaryIncident, DisciplinaryAction, PolicyAcknowledgment, LeaveRequest } from '../types';
 
 export interface Database {
   public: {
@@ -46,6 +46,16 @@ export interface Database {
       };
       appeal_cases: {
         Row: any; // Keeping any for appeal cases until the interface is more certain
+        Insert: any;
+        Update: any;
+      };
+      leave_requests: {
+        Row: LeaveRequest;
+        Insert: Omit<LeaveRequest, 'id' | 'created_at' | 'user'>;
+        Update: Partial<Omit<LeaveRequest, 'id' | 'created_at' | 'user'>>;
+      };
+      leave_history: {
+        Row: any;
         Insert: any;
         Update: any;
       };

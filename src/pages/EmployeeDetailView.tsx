@@ -31,7 +31,18 @@ export const EmployeeDetailView: React.FC = () => {
     const [isEquityModalOpen, setIsEquityModalOpen] = useState(false);
     const [accrualHistoryType, setAccrualHistoryType] = useState<'pto' | 'sick'>('pto');
     const [leaveHistory, setLeaveHistory] = useState<LeaveHistoryRow[]>([]);
+    const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+    const [isProcessingLeave, setIsProcessingLeave] = useState<string | null>(null);
     const [selectedTrainingRole, setSelectedTrainingRole] = useState<string | null>(null);
+
+    const fetchLeaveRequests = async (employeeId: string) => {
+        const { data } = await supabase
+            .from('leave_requests')
+            .select('*')
+            .eq('user_id', employeeId)
+            .order('created_at', { ascending: false });
+        if (data) setLeaveRequests(data);
+    };
 
     const fetchEmployee = async () => {
         setLoading(true);
@@ -68,6 +79,7 @@ export const EmployeeDetailView: React.FC = () => {
                 isSyncingRef.current = false;
             });
             fetchLeaveHistory(employee.id).then((rows: LeaveHistoryRow[]) => setLeaveHistory(rows));
+            fetchLeaveRequests(employee.id);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, !!employee]);
@@ -76,18 +88,6 @@ export const EmployeeDetailView: React.FC = () => {
     if (!employee || !initialEmployee) return <div>Employee not found</div>;
 
     const isDirty = JSON.stringify(employee) !== JSON.stringify(initialEmployee);
-
-    const formatSSN = (value: string) => {
-        const val = value.replace(/\D/g, '');
-        let formatted = val;
-        if (val.length > 3) {
-            formatted = val.slice(0, 3) + '-' + val.slice(3);
-        }
-        if (val.length > 5) {
-            formatted = val.slice(0, 3) + '-' + val.slice(3, 5) + '-' + val.slice(5, 9);
-        }
-        return formatted;
-    };
 
     const handleSave = async () => {
         if (!employee) return;
@@ -163,6 +163,64 @@ export const EmployeeDetailView: React.FC = () => {
             setTimeout(() => setToast(null), 3000);
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleLeaveAction = async (request: any, status: 'approved' | 'rejected') => {
+        const adminNotes = window.prompt(`Add a note for this ${status} (optional):`);
+        if (adminNotes === null) return;
+
+        setIsProcessingLeave(request.id);
+        
+        try {
+            // 1. Update request status
+            const { error: reqError } = await (supabase.from('leave_requests') as any)
+                .update({ 
+                    status, 
+                    admin_notes: adminNotes,
+                    processed_at: new Date().toISOString()
+                })
+                .eq('id', request.id);
+
+            if (reqError) throw reqError;
+
+            // 2. If approved, deduct balance
+            if (status === 'approved') {
+                const balanceField = request.type === 'pto' ? 'pto_balance' : 'sick_balance';
+                const currentBalance = parseFloat(employee![balanceField] || '0');
+                const newBalance = (currentBalance - request.hours_requested).toFixed(2);
+
+                // Update balance on user
+                const { error: balanceError } = await (supabase.from('users') as any)
+                    .update({ [balanceField]: newBalance })
+                    .eq('id', request.user_id);
+
+                if (balanceError) throw balanceError;
+
+                // 3. Add to leave_history
+                const { error: historyError } = await (supabase.from('leave_history') as any).insert([{
+                    user_id: request.user_id,
+                    type: request.type,
+                    used_hours: request.hours_requested,
+                    earned_hours: null,
+                    balance: parseFloat(newBalance),
+                    description: `Approved ${request.type.toUpperCase()} for ${request.start_date} - ${request.end_date}`,
+                    entry_date: request.start_date,
+                    created_at: new Date().toISOString()
+                }]);
+
+                if (historyError) throw historyError;
+            }
+
+            setToast({ message: `Request ${status} successfully.`, type: 'success' });
+            setTimeout(() => setToast(null), 3000);
+            fetchEmployee(); 
+            fetchLeaveRequests(employee!.id);
+        } catch (err: any) {
+            setToast({ message: err.message || "Failed to process request", type: 'error' });
+            setTimeout(() => setToast(null), 3000);
+        } finally {
+            setIsProcessingLeave(null);
         }
     };
 
@@ -515,14 +573,88 @@ export const EmployeeDetailView: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* No Upcoming */}
+                            {/* Upcoming & Pending Requests */}
                             <div className="upcoming-section">
-                                <h3><i className="fa-solid fa-clock"></i> Upcoming Time Off</h3>
-                                <div className="empty-state">
-                                    <i className="fa-solid fa-calendar-xmark" style={{ fontSize: '3rem', color: '#e2e8f0' }}></i>
-                                    <p>No upcoming time off.</p>
-                                    <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Do you need to get away?</span>
-                                </div>
+                                <h3><i className="fa-solid fa-clock"></i> Leave Requests</h3>
+                                {leaveRequests.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                                        {leaveRequests.map(req => (
+                                            <div key={req.id} style={{ 
+                                                background: 'white', 
+                                                padding: '1.25rem', 
+                                                borderRadius: '16px', 
+                                                border: '1px solid #e2e8f0',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                                                    <div style={{ 
+                                                        width: '45px', 
+                                                        height: '45px', 
+                                                        borderRadius: '12px', 
+                                                        background: req.type === 'pto' ? '#e0f2fe' : '#f0fdf4',
+                                                        color: req.type === 'pto' ? '#0369a1' : '#15803d',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: '1.2rem'
+                                                    }}>
+                                                        <i className={`fa-solid ${req.type === 'pto' ? 'fa-umbrella-beach' : 'fa-briefcase-medical'}`}></i>
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1rem' }}>
+                                                            {req.type.toUpperCase()} Request • {req.hours_requested} hrs
+                                                        </div>
+                                                        <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                                                            {new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}
+                                                        </div>
+                                                        {req.reason && <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '0.25rem' }}>"{req.reason}"</div>}
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <span style={{ 
+                                                        padding: '4px 10px', 
+                                                        borderRadius: '6px', 
+                                                        fontSize: '0.7rem', 
+                                                        fontWeight: 800,
+                                                        textTransform: 'uppercase',
+                                                        background: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                                                        color: req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#991b1b' : '#92400e'
+                                                    }}>
+                                                        {req.status}
+                                                    </span>
+                                                    {req.status === 'pending' && (
+                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            <button 
+                                                                onClick={() => handleLeaveAction(req, 'approved')}
+                                                                disabled={isProcessingLeave === req.id}
+                                                                className="small-action-btn"
+                                                                style={{ background: '#10b981', color: 'white', border: 'none' }}
+                                                            >
+                                                                Approve
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleLeaveAction(req, 'rejected')}
+                                                                disabled={isProcessingLeave === req.id}
+                                                                className="small-action-btn"
+                                                                style={{ background: '#ef4444', color: 'white', border: 'none' }}
+                                                            >
+                                                                Reject
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="empty-state">
+                                        <i className="fa-solid fa-calendar-xmark" style={{ fontSize: '3rem', color: '#e2e8f0' }}></i>
+                                        <p>No leave requests found.</p>
+                                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Do you need to get away?</span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* History */}
@@ -677,10 +809,6 @@ export const EmployeeDetailView: React.FC = () => {
                                         <input type="date" className="info-input" value={employee.birth_date || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, birth_date: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>SSN</label>
-                                        <input type="text" className="info-input" value={employee.ssn || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, ssn: formatSSN(e.target.value) } : null)} />
-                                    </div>
-                                    <div className="info-field">
                                         <label>Gender</label>
                                         <select className="info-input" value={employee.gender || ""} onChange={(e) => setEmployee(prev => prev ? { ...prev, gender: e.target.value } : null)}>
                                             <option value="">-Select-</option>
@@ -816,36 +944,6 @@ export const EmployeeDetailView: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Licenses */}
-                            <div className="info-card">
-                                <div className="card-header" style={{ justifyContent: 'space-between' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <i className="fa-solid fa-file-certificate"></i>
-                                        <h3>Licenses/Passport/Visa Information</h3>
-                                    </div>
-                                    <button className="small-action-btn">Add Policy</button>
-                                </div>
-                                <div style={{ padding: '0' }}>
-                                    <table className="info-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Type</th>
-                                                <th>Effective Date</th>
-                                                <th>Expiration Date</th>
-                                                <th>Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td><input type="text" className="table-input" value={employee.license_type || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, license_type: e.target.value } : null)} placeholder="Type" /></td>
-                                                <td><input type="date" className="table-input" value={employee.license_effective || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, license_effective: e.target.value } : null)} /></td>
-                                                <td><input type="date" className="table-input" value={employee.license_expiration || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, license_expiration: e.target.value } : null)} /></td>
-                                                <td><input type="text" className="table-input" value={employee.license_notes || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, license_notes: e.target.value } : null)} placeholder="Notes" /></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
                         </div>
                     )}
 

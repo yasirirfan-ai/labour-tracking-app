@@ -16,7 +16,6 @@ export const HireWorkerPage: React.FC = () => {
         last_name: '',
         preferred_name: '',
         birth_date: '',
-        ssn: '',
         gender: '',
         marital_status: '',
         hire_date: new Date().toISOString().split('T')[0],
@@ -154,10 +153,6 @@ export const HireWorkerPage: React.FC = () => {
                                 <div className="input-with-icon">
                                     <input type="date" value={formData.birth_date} onChange={e => setFormData(prev => ({...prev, birth_date: e.target.value}))} />
                                 </div>
-                            </div>
-                            <div className="form-field full-width">
-                                <label>SSN</label>
-                                <input type="text" value={formData.ssn} onChange={e => setFormData(prev => ({...prev, ssn: e.target.value}))} />
                             </div>
                             <div className="form-field">
                                 <label>Gender</label>

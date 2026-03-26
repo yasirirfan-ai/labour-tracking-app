@@ -19,7 +19,6 @@ export interface User {
     last_name?: string;
     preferred_name?: string;
     birth_date?: string;
-    ssn?: string;
     gender?: string;
     marital_status?: string;
     hire_date?: string;
@@ -92,10 +91,6 @@ export interface User {
     sick_balance?: string;
     last_pto_accrual?: string;
     processed_sick_seconds?: number;
-    license_type?: string;
-    license_effective?: string;
-    license_expiration?: string;
-    license_notes?: string;
     education?: {
         institution: string;
         degree: string;
@@ -206,4 +201,23 @@ export interface Operation {
     name: string;
     description: string;
     sort_order: number;
+}
+
+export interface LeaveRequest {
+    id: string;
+    user_id: string;
+    type: 'pto' | 'sick';
+    start_date: string;
+    end_date: string;
+    hours_requested: number;
+    status: 'pending' | 'approved' | 'rejected';
+    reason?: string;
+    admin_notes?: string;
+    created_at: string;
+    processed_at?: string;
+    // Joined field
+    user?: {
+        name: string;
+        worker_id: string;
+    };
 }

@@ -15,7 +15,16 @@ export const WorkerPortalPage: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [activeTasks, setActiveTasks] = useState<any[]>([]);
     const [disciplinaryIncidents, setDisciplinaryIncidents] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'personal_info' | 'conduct' | 'settings' | 'training'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'personal_info' | 'conduct' | 'settings' | 'training' | 'timeoff'>('dashboard');
+    const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+    const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
+    const [leaveFormData, setLeaveFormData] = useState({
+        type: 'pto' as 'pto' | 'sick',
+        start_date: '',
+        end_date: '',
+        hours_requested: 8,
+        reason: ''
+    });
     const [signingData, setSigningData] = useState<{ [key: string]: { explanation: string, signature: string } }>({});
     const [nfcStatus, setNfcStatus] = useState<'idle' | 'listening' | 'reading' | 'error'>('idle');
     const [pendingPolicies, setPendingPolicies] = useState<any[]>([]);
@@ -39,8 +48,44 @@ export const WorkerPortalPage: React.FC = () => {
             // Initial load from user object (synced via AuthContext/Supabase)
             const initialCompleted = (user as any).completed_trainings || ['GMP and Quality Awareness'];
             setCompletedTrainings(initialCompleted);
+            fetchLeaveRequests();
         }
     }, [user?.id]);
+
+    const fetchLeaveRequests = async () => {
+        if (!user) return;
+        const { data } = await supabase
+            .from('leave_requests')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+        if (data) setLeaveRequests(data);
+    };
+
+    const handleLeaveSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user) return;
+        if (!leaveFormData.start_date || !leaveFormData.end_date || leaveFormData.hours_requested <= 0) {
+            alert('Please fill in all required fields correctly.');
+            return;
+        }
+
+        setIsSubmittingLeave(true);
+        const { error } = await (supabase as any).from('leave_requests').insert([{
+            user_id: user.id,
+            ...leaveFormData,
+            status: 'pending'
+        }]);
+
+        if (error) {
+            alert('Error submitting request: ' + error.message);
+        } else {
+            alert('Request submitted successfully!');
+            setLeaveFormData({ type: 'pto', start_date: '', end_date: '', hours_requested: 8, reason: '' });
+            fetchLeaveRequests();
+        }
+        setIsSubmittingLeave(false);
+    };
 
 
     const handleSignIncident = async (incidentId: string) => {
@@ -94,7 +139,6 @@ export const WorkerPortalPage: React.FC = () => {
         last_name: (user as any)?.last_name || '',
         preferred_name: (user as any)?.preferred_name || '',
         birth_date: (user as any)?.birth_date || '',
-        ssn: (user as any)?.ssn || '',
         gender: (user as any)?.gender || '',
         marital_status: (user as any)?.marital_status || '',
         shirt_size: (user as any)?.shirt_size || '',
@@ -113,10 +157,6 @@ export const WorkerPortalPage: React.FC = () => {
         linkedin_url: (user as any)?.linkedin_url || '',
         twitter_url: (user as any)?.twitter_url || '',
         facebook_url: (user as any)?.facebook_url || '',
-        license_type: (user as any)?.license_type || '',
-        license_effective: (user as any)?.license_effective || '',
-        license_expiration: (user as any)?.license_expiration || '',
-        license_notes: (user as any)?.license_notes || '',
     });
 
     useEffect(() => {
@@ -130,7 +170,6 @@ export const WorkerPortalPage: React.FC = () => {
                 last_name: (user as any).last_name || '',
                 preferred_name: (user as any).preferred_name || '',
                 birth_date: (user as any).birth_date || '',
-                ssn: (user as any).ssn || '',
                 gender: (user as any).gender || '',
                 marital_status: (user as any).marital_status || '',
                 shirt_size: (user as any).shirt_size || '',
@@ -149,25 +188,10 @@ export const WorkerPortalPage: React.FC = () => {
                 linkedin_url: (user as any).linkedin_url || '',
                 twitter_url: (user as any).twitter_url || '',
                 facebook_url: (user as any).facebook_url || '',
-                license_type: (user as any).license_type || '',
-                license_effective: (user as any).license_effective || '',
-                license_expiration: (user as any).license_expiration || '',
-                license_notes: (user as any).license_notes || '',
             });
         }
     }, [user?.id, authLoading]);
 
-    const formatSSN = (value: string) => {
-        const val = value.replace(/\D/g, '');
-        let formatted = val;
-        if (val.length > 3) {
-            formatted = val.slice(0, 3) + '-' + val.slice(3);
-        }
-        if (val.length > 5) {
-            formatted = val.slice(0, 3) + '-' + val.slice(3, 5) + '-' + val.slice(5, 9);
-        }
-        return formatted;
-    };
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -1131,6 +1155,11 @@ export const WorkerPortalPage: React.FC = () => {
                         </div>
                     </li>
                     <li>
+                        <div className={`nav-item ${activeTab === 'timeoff' ? 'active' : ''}`} onClick={() => setActiveTab('timeoff')}>
+                            <i className="fa-solid fa-calendar-alt"></i> {!isCollapsed && <span>Time Off</span>}
+                        </div>
+                    </li>
+                    <li>
                         <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
                             <i className="fa-solid fa-gear"></i> {!isCollapsed && <span>Settings</span>}
                         </div>
@@ -1396,10 +1425,6 @@ export const WorkerPortalPage: React.FC = () => {
                                         <input type="date" className="info-input" value={formData.birth_date || ''} onChange={(e) => setFormData(prev => ({ ...prev, birth_date: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>SSN</label>
-                                        <input type="text" className="info-input" value={formData.ssn || ''} onChange={(e) => setFormData(prev => ({ ...prev, ssn: formatSSN(e.target.value) }))} disabled={!editMode} />
-                                    </div>
-                                    <div className="info-field">
                                         <label>Gender</label>
                                         <select className="info-input" value={formData.gender || ""} onChange={(e) => setFormData(prev => ({ ...prev, gender: e.target.value }))} disabled={!editMode}>
                                             <option value="">-Select-</option>
@@ -1532,36 +1557,6 @@ export const WorkerPortalPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Licenses */}
-                            <div className="info-card">
-                                <div className="card-header" style={{ justifyContent: 'space-between' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <i className="fa-solid fa-file-certificate"></i>
-                                        <h3>Licenses/Passport/Visa Information</h3>
-                                    </div>
-                                    <button className="small-action-btn" disabled={!editMode}>Add Policy</button>
-                                </div>
-                                <div style={{ padding: '0' }}>
-                                    <table className="info-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Type</th>
-                                                <th>Effective Date</th>
-                                                <th>Expiration Date</th>
-                                                <th>Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td><input type="text" className="table-input" value={formData.license_type || ''} onChange={(e) => setFormData(prev => ({ ...prev, license_type: e.target.value }))} placeholder="Type" disabled={!editMode} /></td>
-                                                <td><input type="date" className="table-input" value={formData.license_effective || ''} onChange={(e) => setFormData(prev => ({ ...prev, license_effective: e.target.value }))} disabled={!editMode} /></td>
-                                                <td><input type="date" className="table-input" value={formData.license_expiration || ''} onChange={(e) => setFormData(prev => ({ ...prev, license_expiration: e.target.value }))} disabled={!editMode} /></td>
-                                                <td><input type="text" className="table-input" value={formData.license_notes || ''} onChange={(e) => setFormData(prev => ({ ...prev, license_notes: e.target.value }))} placeholder="Notes" disabled={!editMode} /></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
 
                             {editMode && (
                                 <div style={{ position: 'sticky', bottom: '2rem', display: 'flex', justifyContent: 'center', zIndex: 100 }}>
@@ -1920,6 +1915,162 @@ export const WorkerPortalPage: React.FC = () => {
                                             <p style={{ color: '#64748b', fontWeight: 700, fontSize: '1.1rem', margin: 0 }}>No specific SOP materials found for this role.</p>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'timeoff' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%' }}>
+                            <div className="section-title-row">
+                                <i className="fa-solid fa-calendar-day"></i>
+                                <h2 style={{ fontSize: '2rem' }}>Time Off & Leave</h2>
+                            </div>
+
+                            {/* Balance Cards */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '1rem' }}>
+                                <div className="info-card" style={{ marginBottom: 0 }}>
+                                    <div className="card-header" style={{ background: '#f0f9ff' }}>
+                                        <i className="fa-solid fa-umbrella-beach" style={{ color: '#0369a1' }}></i>
+                                        <h3 style={{ color: '#0369a1' }}>PTO Balance</h3>
+                                    </div>
+                                    <div style={{ padding: '2rem', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '3.5rem', fontWeight: 900, color: '#0c4a6e', lineHeight: 1 }}>{user?.pto_balance || '0.00'}</div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0369a1', marginTop: '0.5rem', textTransform: 'uppercase' }}>Hours Available</div>
+                                    </div>
+                                </div>
+                                <div className="info-card" style={{ marginBottom: 0 }}>
+                                    <div className="card-header" style={{ background: '#f0fdf4' }}>
+                                        <i className="fa-solid fa-briefcase-medical" style={{ color: '#15803d' }}></i>
+                                        <h3 style={{ color: '#15803d' }}>Sick Leave</h3>
+                                    </div>
+                                    <div style={{ padding: '2rem', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '3.5rem', fontWeight: 900, color: '#064e3b', lineHeight: 1 }}>{user?.sick_balance || '0.00'}</div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#15803d', marginTop: '0.5rem', textTransform: 'uppercase' }}>Hours Available</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.5fr)', gap: '2rem' }}>
+                                {/* Request Form */}
+                                <div className="info-card" style={{ height: 'fit-content' }}>
+                                    <div className="card-header">
+                                        <i className="fa-solid fa-paper-plane"></i>
+                                        <h3>Request Time Off</h3>
+                                    </div>
+                                    <form onSubmit={handleLeaveSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                        <div className="info-field">
+                                            <label>Leave Type</label>
+                                            <select 
+                                                className="info-input"
+                                                value={leaveFormData.type}
+                                                onChange={e => setLeaveFormData(prev => ({ ...prev, type: e.target.value as 'pto' | 'sick' }))}
+                                            >
+                                                <option value="pto">Paid Time Off (PTO)</option>
+                                                <option value="sick">Sick Leave</option>
+                                            </select>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                            <div className="info-field">
+                                                <label>Start Date</label>
+                                                <input 
+                                                    type="date" 
+                                                    className="info-input"
+                                                    value={leaveFormData.start_date}
+                                                    onChange={e => setLeaveFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="info-field">
+                                                <label>End Date</label>
+                                                <input 
+                                                    type="date" 
+                                                    className="info-input"
+                                                    value={leaveFormData.end_date}
+                                                    onChange={e => setLeaveFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="info-field">
+                                            <label>Total Hours Requested</label>
+                                            <input 
+                                                type="number" 
+                                                className="info-input"
+                                                placeholder="e.g. 8"
+                                                value={leaveFormData.hours_requested || ''}
+                                                onChange={e => setLeaveFormData(prev => ({ ...prev, hours_requested: parseFloat(e.target.value) }))}
+                                            />
+                                        </div>
+                                        <div className="info-field">
+                                            <label>Reason / Notes</label>
+                                            <textarea 
+                                                className="info-input"
+                                                style={{ minHeight: '100px', resize: 'vertical' }}
+                                                placeholder="Briefly explain your request..."
+                                                value={leaveFormData.reason}
+                                                onChange={e => setLeaveFormData(prev => ({ ...prev, reason: e.target.value }))}
+                                            />
+                                        </div>
+                                        <button 
+                                            type="submit" 
+                                            className="clock-btn" 
+                                            disabled={isSubmittingLeave}
+                                            style={{ background: '#1e1b4b', color: 'white', marginTop: '0.5rem' }}
+                                        >
+                                            {isSubmittingLeave ? 'Submitting...' : 'Submit Request'}
+                                        </button>
+                                    </form>
+                                </div>
+
+                                {/* History */}
+                                <div className="info-card">
+                                    <div className="card-header">
+                                        <i className="fa-solid fa-history"></i>
+                                        <h3>Request History</h3>
+                                    </div>
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table className="info-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Type</th>
+                                                    <th>Dates</th>
+                                                    <th>Hours</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {leaveRequests.length > 0 ? leaveRequests.map(req => (
+                                                    <tr key={req.id}>
+                                                        <td style={{ fontWeight: 800, color: '#1e1b4b' }}>
+                                                            {req.type === 'pto' ? 'PTO' : 'Sick'}
+                                                        </td>
+                                                        <td>
+                                                            <div style={{ fontSize: '0.85rem' }}>{new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}</div>
+                                                        </td>
+                                                        <td style={{ fontWeight: 700 }}>{req.hours_requested} hrs</td>
+                                                        <td>
+                                                            <span style={{ 
+                                                                padding: '4px 8px', 
+                                                                borderRadius: '6px', 
+                                                                fontSize: '0.75rem', 
+                                                                fontWeight: 800,
+                                                                textTransform: 'uppercase',
+                                                                background: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                                                                color: req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#991b1b' : '#92400e'
+                                                            }}>
+                                                                {req.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                )) : (
+                                                    <tr>
+                                                        <td colSpan={4} style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                                            No leave requests found.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
