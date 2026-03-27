@@ -40,6 +40,10 @@ export const WorkerPortalPage: React.FC = () => {
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
     const [completedTrainings, setCompletedTrainings] = useState<string[]>([]);
     const [showBreakOverlay, setShowBreakOverlay] = useState(false);
+    const [readingTimer, setReadingTimer] = useState(0);
+    const [isTimerActive, setIsTimerActive] = useState(false);
+    const [unlockedHeight, setUnlockedHeight] = useState(4000);
+    const [isEndOfPdf, setIsEndOfPdf] = useState(false);
 
     const MAX_WORK_SECONDS = 5 * 60 * 60; // 5 hours in seconds
 
@@ -51,6 +55,45 @@ export const WorkerPortalPage: React.FC = () => {
             fetchLeaveRequests();
         }
     }, [user?.id]);
+
+    useEffect(() => {
+        let interval: any;
+        if (selectedPdf && readingTimer > 0) {
+            setIsTimerActive(true);
+            interval = setInterval(() => {
+                setReadingTimer(prev => {
+                    if (prev <= 1) {
+                        setIsTimerActive(false);
+                        clearInterval(interval);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } else if (!selectedPdf) {
+            setReadingTimer(0);
+            setIsTimerActive(false);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [selectedPdf, readingTimer > 0]);
+
+    useEffect(() => {
+        if (selectedPdf) {
+            setReadingTimer(30);
+            setIsTimerActive(true);
+            setUnlockedHeight(4000); // Reset height to first 4 pages
+            setIsEndOfPdf(false);
+        }
+    }, [selectedPdf]);
+
+    const handleUnlockNext = () => {
+        if (readingTimer > 0) return;
+        setUnlockedHeight(prev => prev + 4000);
+        setReadingTimer(30);
+        setIsTimerActive(true);
+    };
 
     const fetchLeaveRequests = async () => {
         if (!user) return;
@@ -2089,44 +2132,124 @@ export const WorkerPortalPage: React.FC = () => {
                             </div>
                             <button
                                 onClick={() => {
-                                    setSelectedPdf(null);
-                                    setCurrentTrainingName(null);
-                                }}
-                                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}
-                            >
-                                <i className="fa-solid fa-xmark"></i>
-                            </button>
-                        </div>
-                        <div style={{ flex: 1, background: '#f1f5f9', position: 'relative' }}>
-                            <iframe
-                                src={`${selectedPdf}#toolbar=0&navpanes=0&view=FitH`}
-                                style={{ width: '100%', height: '100%', border: 'none' }}
-                                title="Training Slide Viewer"
-                            />
-                        </div>
-                        <div style={{ padding: '1.25rem 2rem', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                            <button
-                                onClick={async () => {
-                                    if (currentTrainingName && user) {
-                                        const newCompleted = completedTrainings.includes(currentTrainingName)
-                                            ? completedTrainings
-                                            : [...completedTrainings, currentTrainingName];
-
-                                        setCompletedTrainings(newCompleted);
-
-                                        // Persist to Supabase
-                                        await ((supabase as any)
-                                            .from('users')
-                                            .update({ completed_trainings: newCompleted })
-                                            .eq('id', user.id));
+                                    if (isTimerActive) {
+                                        alert(`Please finish reading first. Remaining time: ${readingTimer} seconds.`);
+                                        return;
                                     }
                                     setSelectedPdf(null);
                                     setCurrentTrainingName(null);
                                 }}
-                                style={{ padding: '0.75rem 2rem', borderRadius: '12px', border: 'none', background: '#10b981', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)' }}
+                                style={{ 
+                                    background: isTimerActive ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)', 
+                                    border: 'none', 
+                                    color: 'white', 
+                                    cursor: isTimerActive ? 'not-allowed' : 'pointer', 
+                                    width: '40px', 
+                                    height: '40px', 
+                                    borderRadius: '12px', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    fontSize: '1.2rem',
+                                    opacity: isTimerActive ? 0.3 : 1
+                                }}
+                                disabled={isTimerActive}
                             >
-                                I have finished reading
+                                <i className="fa-solid fa-xmark"></i>
                             </button>
+                        </div>
+                        <div style={{ flex: 1, background: '#f1f5f9', position: 'relative', overflowY: 'auto', overflowX: 'hidden', maxHeight: '75vh' }}>
+                            <div style={{ width: '100%', height: `${unlockedHeight}px`, overflow: 'hidden', position: 'relative' }}>
+                                <div style={{ width: 'calc(100% + 40px)', height: '100%' }}>
+                                    <iframe
+                                        src={`${selectedPdf}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                                        style={{ 
+                                            width: '100%', 
+                                            height: '40000px', // Large height to ensure no internal scrollbar is needed
+                                            border: 'none',
+                                            pointerEvents: 'none', // DISABLE ALL INTERNAL INTERACTION (No scrolling inside iframe)
+                                            userSelect: 'none'
+                                        }}
+                                        title="Training Slide Viewer"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ padding: '1.25rem 2rem', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            {!isTimerActive && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-start', background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0', borderLeft: '4px solid #f59e0b' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: '#334155', fontSize: '0.95rem', fontWeight: 600 }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={isEndOfPdf} 
+                                            onChange={(e) => setIsEndOfPdf(e.target.checked)}
+                                            style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#10b981' }}
+                                        />
+                                        I confirm that I have scrolled to and reached the VERY END of this training document.
+                                    </label>
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {isTimerActive ? (
+                                    <div style={{ color: '#64748b', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <i className="fa-solid fa-clock-rotate-left fa-spin" style={{ color: '#10b981' }}></i>
+                                        Reading time required: {readingTimer}s remaining
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={handleUnlockNext}
+                                        style={{ 
+                                            padding: '0.75rem 1.5rem', 
+                                            borderRadius: '12px', 
+                                            border: '1.5px solid #10b981', 
+                                            background: 'white', 
+                                            color: '#10b981', 
+                                            fontWeight: 800, 
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem'
+                                        }}
+                                    >
+                                        <i className="fa-solid fa-arrow-down"></i>
+                                        Unlock Next Section
+                                    </button>
+                                )}
+                                <button
+                                    onClick={async () => {
+                                        if (isTimerActive || !isEndOfPdf) return;
+                                        if (currentTrainingName && user) {
+                                            const newCompleted = completedTrainings.includes(currentTrainingName)
+                                                ? completedTrainings
+                                                : [...completedTrainings, currentTrainingName];
+
+                                            setCompletedTrainings(newCompleted);
+
+                                            // Persist to Supabase
+                                            await ((supabase as any)
+                                                .from('users')
+                                                .update({ completed_trainings: newCompleted })
+                                                .eq('id', user.id));
+                                        }
+                                        setSelectedPdf(null);
+                                        setCurrentTrainingName(null);
+                                    }}
+                                    disabled={isTimerActive || !isEndOfPdf}
+                                    style={{ 
+                                        padding: '0.75rem 2rem', 
+                                        borderRadius: '12px', 
+                                        border: 'none', 
+                                        background: (isTimerActive || !isEndOfPdf) ? '#e2e8f0' : '#10b981', 
+                                        color: (isTimerActive || !isEndOfPdf) ? '#94a3b8' : 'white', 
+                                        fontWeight: 800, 
+                                        cursor: (isTimerActive || !isEndOfPdf) ? 'not-allowed' : 'pointer', 
+                                        boxShadow: (isTimerActive || !isEndOfPdf) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.4)',
+                                        transition: 'all 0.3s'
+                                    }}
+                                >
+                                    {isTimerActive ? `Reading... (${readingTimer}s)` : 'I have finished reading'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
