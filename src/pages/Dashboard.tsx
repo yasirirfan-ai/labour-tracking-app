@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export const Dashboard: React.FC = () => {
+    const { t } = useTranslation();
     const [stats, setStats] = useState({ activeWorkers: 0, totalWorkers: 0, runningTimers: 0, todayHours: 0, todayCost: 0 });
     const [activeMos, setActiveMos] = useState<any[]>([]);
     const [tasks, setTasks] = useState<any[]>([]);
@@ -53,7 +55,7 @@ export const Dashboard: React.FC = () => {
         }
     };
 
-    if (isLoading) return <div className="loading-screen">Loading Dashboard...</div>;
+    if (isLoading) return <div className="loading-screen">{t('common.loading')}</div>;
 
     const getActiveCountForMo = (moRef: string) => {
         return tasks.filter(t => t.mo_reference === moRef && t.status === 'active').length;
@@ -62,27 +64,27 @@ export const Dashboard: React.FC = () => {
     return (
         <>
             <div className="page-header">
-                <h1 className="page-title">Dashboard</h1>
-                <p className="page-subtitle">Manufacturing labor overview</p>
+                <h1 className="page-title">{t('dashboard.title')}</h1>
+                <p className="page-subtitle">{t('dashboard.subtitle')}</p>
             </div>
 
             <div className="stats-grid">
                 <Link to="/employee-activity" className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
                     <div>
-                        <div className="stat-label">Active Workers</div>
+                        <div className="stat-label">{t('dashboard.activeWorkers')}</div>
                         <div className="stat-value">{stats.activeWorkers}</div>
-                        <div className="stat-detail">{stats.totalWorkers} total workers</div>
+                        <div className="stat-detail">{stats.totalWorkers} {t('dashboard.totalWorkers')}</div>
                     </div>
-                    <div className="icon-box icon-blue">
+                    <div className="icon-box icon-blue" style={{ background: 'var(--primary-light)', color: 'white' }}>
                         <i className="fa-solid fa-user-group"></i>
                     </div>
                 </Link>
 
                 <Link to="/control-matrix" className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
                     <div>
-                        <div className="stat-label">Running Timers</div>
+                        <div className="stat-label">{t('dashboard.runningTimers')}</div>
                         <div className="stat-value">{stats.runningTimers}</div>
-                        <div className="stat-detail">Currently active</div>
+                        <div className="stat-detail">{t('dashboard.currentlyActive')}</div>
                     </div>
                     <div className="icon-box icon-green">
                         <i className="fa-regular fa-circle-play"></i>
@@ -91,9 +93,9 @@ export const Dashboard: React.FC = () => {
 
                 <Link to="/reports" className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
                     <div>
-                        <div className="stat-label">Today's Hours</div>
+                        <div className="stat-label">{t('dashboard.todayHours')}</div>
                         <div className="stat-value">{stats.todayHours}</div>
-                        <div className="stat-detail">Hours logged</div>
+                        <div className="stat-detail">{t('dashboard.hoursLogged')}</div>
                     </div>
                     <div className="icon-box icon-yellow">
                         <i className="fa-regular fa-clock"></i>
@@ -102,9 +104,9 @@ export const Dashboard: React.FC = () => {
 
                 <div className="stat-card">
                     <div>
-                        <div className="stat-label">Today's Labor Cost</div>
+                        <div className="stat-label">{t('dashboard.todayCost')}</div>
                         <div className="stat-value">${stats.todayCost}</div>
-                        <div className="stat-detail">Calculated from entries</div>
+                        <div className="stat-detail">{t('dashboard.calculatedFromEntries')}</div>
                     </div>
                     <div className="icon-box icon-red">
                         <i className="fa-solid fa-dollar-sign"></i>
@@ -115,8 +117,8 @@ export const Dashboard: React.FC = () => {
             <div className="content-grid" style={{ gridTemplateColumns: '1fr', gap: '1.5rem' }}>
                 <div className="section-card">
                     <div className="section-header">
-                        <h2 className="section-title">Active Orders</h2>
-                        <Link to="/manufacturing-orders" className="view-link">View All <i className="fa-solid fa-arrow-right"></i></Link>
+                        <h2 className="section-title">{t('dashboard.activeOrders')}</h2>
+                        <Link to="/manufacturing-orders" className="view-link">{t('dashboard.viewAll')} <i className="fa-solid fa-arrow-right"></i></Link>
                     </div>
 
                     <div className="list-container">
@@ -124,25 +126,25 @@ export const Dashboard: React.FC = () => {
                             activeMos.map(mo => (
                                 <Link key={mo.id} to={`/control-matrix#mo-${mo.mo_number}`} className="list-item" style={{ textDecoration: 'none', color: 'inherit' }}>
                                     <div className="item-main">
-                                        <div style={{ width: '40px', height: '40px', background: '#EEF2FF', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', fontWeight: 700, fontSize: '0.8rem' }}>
-                                            MO
+                                        <div style={{ width: '40px', height: '40px', background: 'var(--bg-main)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', fontWeight: 800, fontSize: '0.75rem', border: '1.5px solid var(--border)', flexShrink: 0 }}>
+                                            {t('common.mo')}
                                         </div>
-                                        <div>
-                                            <div className="item-title">{mo.mo_number} {mo.product_name ? `- ${mo.product_name}` : ''}</div>
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                            <div className="item-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mo.mo_number} {mo.product_name ? `- ${mo.product_name}` : ''}</div>
                                             <div style={{ marginTop: '4px' }}>
                                                 <span className={`badge badge-${(mo.current_status || 'draft').toLowerCase()}`} style={{ fontSize: '0.7rem' }}>
-                                                    {mo.current_status || 'In Progress'}
+                                                    {t(`mo.statuses.${(mo.current_status || 'draft').toLowerCase()}`)}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <span className={`status-badge ${getActiveCountForMo(mo.mo_number) > 0 ? 'badge-green' : 'badge-blue'}`}>
-                                        {getActiveCountForMo(mo.mo_number)} active operations
+                                    <span className={`status-badge ${getActiveCountForMo(mo.mo_number) > 0 ? 'badge-green' : 'badge-blue'}`} style={{ flexShrink: 0 }}>
+                                        {getActiveCountForMo(mo.mo_number)} {t('dashboard.activeOperations')}
                                     </span>
                                 </Link>
                             ))
                         ) : (
-                            <div style={{ textAlign: 'center', color: '#9ca3af', padding: '1rem' }}>No active orders</div>
+                            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem' }}>{t('dashboard.noActiveOrders')}</div>
                         )}
                     </div>
                 </div>

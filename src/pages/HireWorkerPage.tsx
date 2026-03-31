@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useTranslation } from 'react-i18next';
 
 export const HireWorkerPage: React.FC = () => {
+    const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const isEdit = !!id;
@@ -76,7 +78,7 @@ export const HireWorkerPage: React.FC = () => {
     };
 
     const handleSave = async () => {
-        if (!formData.name || !formData.username || !formData.pay_rate) return alert('Please fill required fields (Name, Username, Pay Rate)');
+        if (!formData.name || !formData.username || !formData.pay_rate) return alert(t('hire.fillingRequired'));
         
         setLoading(true);
         const payload = {
@@ -94,7 +96,7 @@ export const HireWorkerPage: React.FC = () => {
         if (!error) {
             navigate('/workers');
         } else {
-            alert('Error: ' + error.message);
+            alert(t('common.error') + ': ' + error.message);
         }
         setLoading(false);
     };
@@ -103,18 +105,18 @@ export const HireWorkerPage: React.FC = () => {
         <div className="hire-page">
             <header className="page-header">
                 <div className="header-left">
-                    <button className="back-btn" onClick={() => navigate('/workers')}>
+                    <button className="back-btn" onClick={() => navigate('/workers')} title={t('common.back')}>
                         <i className="fa-solid fa-arrow-left"></i>
                     </button>
                     <div>
-                        <h1>{isEdit ? 'Edit Employee' : 'Hire New Employee'}</h1>
-                        <p>{formData.name || 'Set up profile'}</p>
+                        <h1>{isEdit ? t('hire.titleEdit') : t('hire.titleNew')}</h1>
+                        <p>{formData.name || t('hire.subtitle')}</p>
                     </div>
                 </div>
                 <div className="header-actions">
-                    <button className="cancel-btn" onClick={() => navigate('/workers')}>Cancel</button>
+                    <button className="cancel-btn" onClick={() => navigate('/workers')}>{t('common.cancel')}</button>
                     <button className="save-btn" onClick={handleSave} disabled={loading}>
-                        {loading ? 'Saving...' : (isEdit ? 'Save Changes' : 'Hire Employee')}
+                        {loading ? t('common.saving') : (isEdit ? t('common.saveChanges') : t('hire.hireBtn'))}
                     </button>
                 </div>
             </header>
@@ -125,50 +127,50 @@ export const HireWorkerPage: React.FC = () => {
                     <section className="hire-section">
                         <div className="section-header">
                             <i className="fa-solid fa-user-gear"></i>
-                            <h3>Personal</h3>
+                            <h3>{t('hire.sections.personal')}</h3>
                         </div>
                         <div className="form-grid">
                             <div className="form-field full-width">
-                                <label>Employee ID</label>
+                                <label>{t('hire.fields.employeeId')}</label>
                                 <input type="text" value={formData.worker_id} readOnly className="read-only" />
                             </div>
                             <div className="form-field quarter-width">
-                                <label>First Name*</label>
-                                <input type="text" placeholder="First Name" value={formData.first_name} onChange={e => setFormData(prev => ({...prev, first_name: e.target.value, name: `${e.target.value} ${prev.last_name}`}))} />
+                                <label>{t('hire.fields.firstName')}</label>
+                                <input type="text" placeholder={t('hire.fields.firstName')} value={formData.first_name} onChange={e => setFormData(prev => ({...prev, first_name: e.target.value, name: `${e.target.value} ${prev.last_name}`}))} />
                             </div>
                             <div className="form-field quarter-width">
-                                <label>Middle Name</label>
-                                <input type="text" placeholder="Middle Name" value={formData.middle_name} onChange={e => setFormData(prev => ({...prev, middle_name: e.target.value}))} />
+                                <label>{t('hire.fields.middleName')}</label>
+                                <input type="text" placeholder={t('hire.fields.middleName')} value={formData.middle_name} onChange={e => setFormData(prev => ({...prev, middle_name: e.target.value}))} />
                             </div>
                             <div className="form-field quarter-width">
-                                <label>Last Name*</label>
-                                <input type="text" placeholder="Last Name" value={formData.last_name} onChange={e => setFormData(prev => ({...prev, last_name: e.target.value, name: `${prev.first_name} ${e.target.value}`}))} />
+                                <label>{t('hire.fields.lastName')}</label>
+                                <input type="text" placeholder={t('hire.fields.lastName')} value={formData.last_name} onChange={e => setFormData(prev => ({...prev, last_name: e.target.value, name: `${prev.first_name} ${e.target.value}`}))} />
                             </div>
                             <div className="form-field quarter-width">
-                                <label>Preferred Name</label>
-                                <input type="text" placeholder="Preferred Name" value={formData.preferred_name} onChange={e => setFormData(prev => ({...prev, preferred_name: e.target.value}))} />
+                                <label>{t('hire.fields.preferredName')}</label>
+                                <input type="text" placeholder={t('hire.fields.preferredName')} value={formData.preferred_name} onChange={e => setFormData(prev => ({...prev, preferred_name: e.target.value}))} />
                             </div>
                             <div className="form-field">
-                                <label>Birth Date</label>
+                                <label>{t('hire.fields.birthDate')}</label>
                                 <div className="input-with-icon">
                                     <input type="date" value={formData.birth_date} onChange={e => setFormData(prev => ({...prev, birth_date: e.target.value}))} />
                                 </div>
                             </div>
                             <div className="form-field">
-                                <label>Gender</label>
+                                <label>{t('hire.fields.gender')}</label>
                                 <select value={formData.gender} onChange={e => setFormData(prev => ({...prev, gender: e.target.value}))}>
-                                    <option value="">-Select-</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
+                                    <option value="">{t('common.select')}</option>
+                                    <option value="Male">{t('hire.options.gender.male')}</option>
+                                    <option value="Female">{t('hire.options.gender.female')}</option>
                                 </select>
                             </div>
                             <div className="form-field">
-                                <label>Marital Status</label>
+                                <label>{t('hire.fields.maritalStatus')}</label>
                                 <select value={formData.marital_status} onChange={e => setFormData(prev => ({...prev, marital_status: e.target.value}))}>
-                                    <option value="">-Select-</option>
-                                    <option value="Single">Single</option>
-                                    <option value="Married">Married</option>
-                                    <option value="Divorced">Divorced</option>
+                                    <option value="">{t('common.select')}</option>
+                                    <option value="Single">{t('hire.options.marital.single')}</option>
+                                    <option value="Married">{t('hire.options.marital.married')}</option>
+                                    <option value="Divorced">{t('hire.options.marital.divorced')}</option>
                                 </select>
                             </div>
                         </div>
@@ -178,14 +180,18 @@ export const HireWorkerPage: React.FC = () => {
                     <section className="hire-section">
                         <div className="section-header">
                             <i className="fa-solid fa-briefcase"></i>
-                            <h3>Job</h3>
+                            <h3>{t('hire.sections.job')}</h3>
                         </div>
                         <div className="form-grid">
                             <div className="form-field">
-                                <label>Hire Date</label>
+                                <label>{t('hire.fields.hireDate')}</label>
                                 <div className="input-with-icon">
                                     <input type="date" value={formData.hire_date} onChange={e => setFormData(prev => ({...prev, hire_date: e.target.value}))} />
                                 </div>
+                            </div>
+                            <div className="form-field half-width">
+                                <label>{t('hire.fields.jobTitle')}</label>
+                                <input type="text" value={formData.job_title} onChange={e => setFormData(prev => ({...prev, job_title: e.target.value}))} placeholder="e.g. Production Associate" />
                             </div>
                         </div>
                     </section>
@@ -194,39 +200,28 @@ export const HireWorkerPage: React.FC = () => {
                     <section className="hire-section">
                         <div className="section-header">
                             <i className="fa-solid fa-house-user"></i>
-                            <h3>Address</h3>
+                            <h3>{t('hire.sections.address')}</h3>
                         </div>
                         <div className="form-grid">
                             <div className="form-field full-width">
-                                <label>Street 1</label>
+                                <label>{t('hire.fields.street1')}</label>
                                 <input type="text" value={formData.address_street1} onChange={e => setFormData(prev => ({...prev, address_street1: e.target.value}))} />
                             </div>
                             <div className="form-field full-width">
-                                <label>Street 2</label>
+                                <label>{t('hire.fields.street2')}</label>
                                 <input type="text" value={formData.address_street2} onChange={e => setFormData(prev => ({...prev, address_street2: e.target.value}))} />
                             </div>
-                            <div className="form-field">
-                                <label>City</label>
+                            <div className="form-field half-width">
+                                <label>{t('hire.fields.city')}</label>
                                 <input type="text" value={formData.address_city} onChange={e => setFormData(prev => ({...prev, address_city: e.target.value}))} />
                             </div>
                             <div className="form-field quarter-width">
-                                <label>State</label>
-                                <select value={formData.address_state} onChange={e => setFormData(prev => ({...prev, address_state: e.target.value}))}>
-                                    <option value="">State</option>
-                                    <option value="NY">NY</option>
-                                    <option value="CA">CA</option>
-                                    {/* Add more states as needed */}
-                                </select>
+                                <label>{t('hire.fields.state')}</label>
+                                <input type="text" value={formData.address_state} onChange={e => setFormData(prev => ({...prev, address_state: e.target.value}))} />
                             </div>
                             <div className="form-field quarter-width">
-                                <label>ZIP</label>
+                                <label>{t('hire.fields.zip')}</label>
                                 <input type="text" value={formData.address_zip} onChange={e => setFormData(prev => ({...prev, address_zip: e.target.value}))} />
-                            </div>
-                            <div className="form-field full-width">
-                                <label>Country</label>
-                                <select value={formData.address_country} onChange={e => setFormData(prev => ({...prev, address_country: e.target.value}))}>
-                                    <option value="United States">United States</option>
-                                </select>
                             </div>
                         </div>
                     </section>
@@ -235,111 +230,26 @@ export const HireWorkerPage: React.FC = () => {
                     <section className="hire-section">
                         <div className="section-header">
                             <i className="fa-solid fa-address-book"></i>
-                            <h3>Contact</h3>
+                            <h3>{t('hire.sections.contact')}</h3>
                         </div>
                         <div className="form-grid">
-                            <div className="form-field quarter-width">
-                                <label>Work Phone</label>
-                                <div className="input-with-icon left">
-                                    <i className="fa-solid fa-phone"></i>
-                                    <input type="text" value={formData.work_phone} onChange={e => setFormData(prev => ({...prev, work_phone: e.target.value}))} />
-                                </div>
-                            </div>
-                            <div className="form-field eighth-width">
-                                <label>Ext</label>
-                                <input type="text" value={formData.work_phone_ext} onChange={e => setFormData(prev => ({...prev, work_phone_ext: e.target.value}))} />
-                            </div>
-                            <div className="form-field full-width">
-                                <label>Mobile Phone</label>
+                            <div className="form-field half-width">
+                                <label>{t('hire.fields.mobilePhone')}</label>
                                 <div className="input-with-icon left">
                                     <i className="fa-solid fa-mobile-screen"></i>
-                                    <input type="text" value={formData.mobile_phone} onChange={e => setFormData(prev => ({...prev, mobile_phone: e.target.value}))} />
+                                    <input type="text" value={formData.mobile_phone} onChange={e => setFormData(prev => ({...prev, mobile_phone: e.target.value, phone: e.target.value}))} />
                                 </div>
                             </div>
-                            <div className="form-field full-width">
-                                <label>Home Phone</label>
-                                <div className="input-with-icon left">
-                                    <i className="fa-solid fa-phone"></i>
-                                    <input type="text" value={formData.home_phone} onChange={e => setFormData(prev => ({...prev, home_phone: e.target.value}))} />
-                                </div>
+                            <div className="form-field half-width">
+                                <label>{t('common.username')}</label>
+                                <input type="text" value={formData.username} onChange={e => setFormData(prev => ({...prev, username: e.target.value}))} />
                             </div>
                             <div className="form-field full-width">
-                                <label>Work Email</label>
+                                <label>{t('common.email')}</label>
                                 <div className="input-with-icon left">
                                     <i className="fa-solid fa-envelope"></i>
-                                    <input type="text" value={formData.work_email} onChange={e => setFormData(prev => ({...prev, work_email: e.target.value, username: e.target.value}))} />
+                                    <input type="text" value={formData.work_email} onChange={e => setFormData(prev => ({...prev, work_email: e.target.value, email: e.target.value}))} />
                                 </div>
-                            </div>
-                            <div className="form-field full-width">
-                                <label>Home Email</label>
-                                <div className="input-with-icon left">
-                                    <i className="fa-solid fa-envelope"></i>
-                                    <input type="text" value={formData.home_email} onChange={e => setFormData(prev => ({...prev, home_email: e.target.value}))} />
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Employment Status */}
-                    <section className="hire-section">
-                        <div className="section-header">
-                            <i className="fa-solid fa-user-clock"></i>
-                            <h3>Employment Status</h3>
-                        </div>
-                        <div className="form-grid">
-                            <div className="form-field full-width">
-                                <label>Employment Status</label>
-                                <select value={formData.employment_status} onChange={e => setFormData(prev => ({...prev, employment_status: e.target.value}))}>
-                                    <option value="">-Select-</option>
-                                    <option value="Full Time">Full Time</option>
-                                    <option value="Part Time">Part Time</option>
-                                    <option value="Contract">Contract</option>
-                                </select>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Job Information */}
-                    <section className="hire-section">
-                        <div className="section-header">
-                            <i className="fa-solid fa-briefcase"></i>
-                            <h3>Job Information</h3>
-                        </div>
-                        <div className="form-grid">
-                            <div className="form-field">
-                                <label>Job Title</label>
-                                <select value={formData.job_title} onChange={e => setFormData(prev => ({...prev, job_title: e.target.value}))}>
-                                    <option value="">-Select-</option>
-                                    <option value="Manufacturing Associate">Manufacturing Associate</option>
-                                    <option value="Operator">Operator</option>
-                                    <option value="Supervisor">Supervisor</option>
-                                </select>
-                            </div>
-                            <div className="form-field">
-                                <label>Reports To</label>
-                                <select value={formData.reporting_to} onChange={e => setFormData(prev => ({...prev, reporting_to: e.target.value}))}>
-                                    <option value="">-Select-</option>
-                                    <option value="Cody Chalker">Cody Chalker</option>
-                                </select>
-                            </div>
-                            <div className="form-field">
-                                <label>Department</label>
-                                <select value={formData.department} onChange={e => setFormData(prev => ({...prev, department: e.target.value}))}>
-                                    <option value="">-Select-</option>
-                                    <option value="Our Babylon">Our Babylon</option>
-                                </select>
-                            </div>
-                            <div className="form-field">
-                                <label>Division</label>
-                                <select value={formData.division} onChange={e => setFormData(prev => ({...prev, division: e.target.value}))}>
-                                    <option value="">-Select-</option>
-                                </select>
-                            </div>
-                            <div className="form-field">
-                                <label>Location</label>
-                                <select value={formData.location} onChange={e => setFormData(prev => ({...prev, location: e.target.value}))}>
-                                    <option value="">-Select-</option>
-                                </select>
                             </div>
                         </div>
                     </section>
@@ -348,35 +258,34 @@ export const HireWorkerPage: React.FC = () => {
                     <section className="hire-section">
                         <div className="section-header">
                             <i className="fa-solid fa-money-bill-wave"></i>
-                            <h3>Compensation</h3>
+                            <h3>{t('hire.sections.compensation')}</h3>
                         </div>
                         <div className="form-grid">
-                            <div className="form-field full-width">
-                                <label>Pay Schedule</label>
+                            <div className="form-field half-width">
+                                <label>{t('hire.fields.paySchedule')}</label>
                                 <select value={formData.pay_schedule} onChange={e => setFormData(prev => ({...prev, pay_schedule: e.target.value}))}>
-                                    <option value="">-Select-</option>
-                                    <option value="Twice a month">Twice a month</option>
-                                    <option value="Weekly">Weekly</option>
+                                    <option value="">{t('common.select')}</option>
+                                    <option value="Twice a month">{t('hire.options.paySchedule.twiceMonth')}</option>
+                                    <option value="Weekly">{t('hire.options.paySchedule.weekly')}</option>
                                 </select>
                             </div>
-                            <div className="form-field">
-                                <label>Pay Type</label>
+                            <div className="form-field half-width">
+                                <label>{t('hire.fields.payType')}</label>
                                 <select value={formData.pay_type} onChange={e => setFormData(prev => ({...prev, pay_type: e.target.value}))}>
-                                    <option value="Hourly">Hourly</option>
-                                    <option value="Salary">Salary</option>
+                                    <option value="Hourly">{t('hire.options.payType.hourly')}</option>
+                                    <option value="Salary">{t('hire.options.payType.salary')}</option>
                                 </select>
                             </div>
                             <div className="form-field full-width">
-                                <label>Pay Rate</label>
+                                <label>{t('hire.fields.payRate')}</label>
                                 <div className="rate-row">
                                     <span className="currency-symbol">$</span>
                                     <input type="number" step="0.01" value={formData.pay_rate} onChange={e => setFormData(prev => ({...prev, pay_rate: e.target.value}))} />
                                     <span className="currency-label">USD</span>
                                     <span className="per-label">per</span>
                                     <select value={formData.pay_period} onChange={e => setFormData(prev => ({...prev, pay_period: e.target.value}))}>
-                                        <option value="Hour">-Select-</option>
-                                        <option value="Hour">Hour</option>
-                                        <option value="Year">Year</option>
+                                        <option value="Hour">{t('hire.options.payPeriod.hour')}</option>
+                                        <option value="Year">{t('hire.options.payPeriod.year')}</option>
                                     </select>
                                 </div>
                             </div>
@@ -388,18 +297,18 @@ export const HireWorkerPage: React.FC = () => {
             <style>{`
                 .hire-page {
                     min-height: 100vh;
-                    background: #fcfdfe;
+                    background: var(--bg-main);
                     display: flex;
                     flex-direction: column;
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    font-family: var(--font-main);
                 }
                 .page-header {
-                    background: white;
-                    padding: 1.25rem 2.5rem;
+                    background: var(--bg-card);
+                    padding: 1.25rem 2rem;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    border-bottom: 1px solid #eef2f6;
+                    border-bottom: 1px solid var(--border);
                     position: sticky;
                     top: 0;
                     z-index: 100;
@@ -413,60 +322,53 @@ export const HireWorkerPage: React.FC = () => {
                 .header-left h1 {
                     font-size: 1.5rem;
                     margin: 0;
-                    color: #0f172a;
+                    color: var(--text-main);
                     font-weight: 800;
-                    letter-spacing: -0.02em;
                 }
                 .header-left p {
                     margin: 2px 0 0;
                     font-size: 0.9rem;
-                    color: #64748b;
+                    color: var(--text-muted);
                 }
                 .back-btn {
-                    width: 44px;
-                    height: 44px;
-                    border-radius: 12px;
-                    border: 1px solid #eef2f6;
-                    background: white;
-                    color: #64748b;
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 10px;
+                    border: 1px solid var(--border);
+                    background: var(--bg-main);
+                    color: var(--text-muted);
                     cursor: pointer;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     transition: all 0.2s;
-                    font-size: 1rem;
                 }
-                .back-btn:hover { background: #f8fafc; color: #0f172a; border-color: #e2e8f0; }
+                .back-btn:hover { background: var(--bg-card); color: var(--text-main); }
                 
                 .header-actions { display: flex; gap: 1rem; }
                 .cancel-btn {
-                    padding: 0.75rem 1.75rem;
+                    padding: 0.75rem 1.5rem;
                     border-radius: 10px;
-                    border: 1px solid #eef2f6;
-                    background: white;
-                    color: #64748b;
+                    border: 1px solid var(--border);
+                    background: var(--bg-main);
+                    color: var(--text-muted);
                     font-weight: 700;
                     cursor: pointer;
-                    transition: all 0.2s;
                 }
-                .cancel-btn:hover { background: #f8fafc; color: #0f172a; }
+                .cancel-btn:hover { background: var(--bg-card); color: var(--text-main); }
                 .save-btn {
-                    padding: 0.75rem 2rem;
+                    padding: 0.75rem 1.75rem;
                     border-radius: 10px;
-                    background: #1e1b4b;
+                    background: var(--primary);
                     color: white;
                     border: none;
                     font-weight: 700;
                     cursor: pointer;
-                    box-shadow: 0 4px 12px rgba(30, 27, 75, 0.15);
-                    transition: all 0.2s;
                 }
-                .save-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(30, 27, 75, 0.2); }
-                .save-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
                 
                 .hire-container {
                     flex: 1;
-                    padding: 3rem 2rem;
+                    padding: 2rem;
                     max-width: 1000px;
                     margin: 0 auto;
                     width: 100%;
@@ -474,69 +376,72 @@ export const HireWorkerPage: React.FC = () => {
                 .hire-form-layout {
                     display: flex;
                     flex-direction: column;
-                    gap: 2.5rem;
+                    gap: 2rem;
                 }
                 .hire-section {
-                    background: white;
-                    border-radius: 20px;
-                    border: 1px solid #eef2f6;
+                    background: var(--bg-card);
+                    border-radius: 16px;
+                    border: 1px solid var(--border);
                     overflow: hidden;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
                 }
                 .section-header {
-                    padding: 1.25rem 2.5rem;
+                    padding: 1rem 1.5rem;
                     display: flex;
                     align-items: center;
-                    gap: 12px;
-                    background: #f0fdf4;
-                    border-bottom: 1px solid #dcfce7;
+                    gap: 10px;
+                    background: var(--bg-main);
+                    border-bottom: 1px solid var(--border);
                 }
-                .section-header i { color: #166534; font-size: 1.1rem; }
-                .section-header h3 { margin: 0; font-size: 1.1rem; font-weight: 800; color: #166534; letter-spacing: -0.01em; }
+                .section-header i { color: var(--primary); }
+                .section-header h3 { margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-main); }
                 
-                .form-grid { padding: 2.5rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; }
-                .form-field { display: flex; flex-direction: column; gap: 8px; }
+                .form-grid { padding: 1.5rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+                .form-field { display: flex; flex-direction: column; gap: 6px; }
                 .full-width { grid-column: span 4; }
                 .half-width { grid-column: span 2; }
                 .quarter-width { grid-column: span 1; }
                 .eighth-width { grid-column: span 0.5; }
 
-                .form-field label { font-size: 0.8rem; font-weight: 800; color: #2d6a4f; margin-bottom: 2px; }
+                @media (max-width: 768px) {
+                    .form-grid { grid-template-columns: 1fr 1fr; }
+                    .quarter-width, .eighth-width { grid-column: span 1; }
+                    .full-width, .half-width { grid-column: span 2; }
+                }
+
+                .form-field label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
                 .form-field input, .form-field select {
-                    padding: 0.85rem 1.25rem;
-                    border: 1px solid #eef2f6;
-                    border-radius: 12px;
-                    font-size: 1rem;
+                    padding: 0.75rem 1rem;
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                    font-size: 0.95rem;
                     outline: none;
-                    background: #f8fafc;
-                    color: #1e293b;
+                    background: var(--bg-main);
+                    color: var(--text-main);
                     transition: all 0.2s;
                 }
                 .form-field input:focus, .form-field select:focus { 
-                    border-color: #166534; 
-                    background: white; 
-                    box-shadow: 0 0 0 4px rgba(22, 101, 52, 0.05);
+                    border-color: var(--primary); 
+                    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
                 }
-                .form-field input::placeholder { color: #94a3b8; }
-                .read-only { background: #f1f5f9 !important; color: #64748b !important; cursor: not-allowed; border-color: #e2e8f0 !important; }
+                .read-only { background: var(--bg-main) !important; color: var(--text-muted) !important; opacity: 0.7; }
                 
                 .input-with-icon { position: relative; }
-                .input-with-icon.left i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.9rem; }
-                .input-with-icon.left input { padding-left: 3rem; }
+                .input-with-icon.left i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+                .input-with-icon.left input { padding-left: 2.5rem; }
                 
                 .rate-row {
                     display: flex;
                     align-items: center;
                     gap: 10px;
-                    background: #f8fafc;
-                    border: 1px solid #eef2f6;
-                    border-radius: 12px;
-                    padding: 0 1.25rem;
+                    background: var(--bg-main);
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                    padding: 0 1rem;
                 }
-                .rate-row input { border: none !important; background: transparent !important; padding: 0.85rem 0; width: 80px; box-shadow: none !important; }
-                .currency-symbol { color: #64748b; font-weight: 600; }
-                .currency-label, .per-label { color: #94a3b8; font-size: 0.85rem; font-weight: 700; }
-                .rate-row select { border: none !important; background: transparent !important; width: auto; padding: 0.85rem 0; font-weight: 600; }
+                .rate-row input { border: none !important; background: transparent !important; padding: 0.75rem 0; width: 80px; box-shadow: none !important; }
+                .currency-symbol { color: var(--text-muted); font-weight: 600; }
+                .currency-label, .per-label { color: var(--text-muted); font-size: 0.8rem; font-weight: 600; }
+                .rate-row select { border: none !important; background: transparent !important; width: auto; padding: 0.75rem 0; }
             `}</style>
         </div>
     );

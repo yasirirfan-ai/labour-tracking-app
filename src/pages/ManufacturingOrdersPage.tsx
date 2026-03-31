@@ -3,22 +3,18 @@ import { supabase } from '../lib/supabase';
 import type { ManufacturingOrder } from '../types';
 import { Link } from 'react-router-dom';
 import { sortManufacturingOrders } from '../utils/moSorting';
-
-
+import { useTranslation } from 'react-i18next';
 
 export const ManufacturingOrdersPage: React.FC = () => {
-    // Explicitly typed state
+    const { t } = useTranslation();
     const [orders, setOrders] = useState<ManufacturingOrder[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState('');
-
     const [isAddOpen, setIsAddOpen] = useState(false);
 
-    // Drag and Drop Refs
     const dragItem = useRef<number | null>(null);
     const dragOverItem = useRef<number | null>(null);
 
-    // Updated formData structure
     const [formData, setFormData] = useState({
         mo_number: '',
         quantity: 0,
@@ -37,10 +33,7 @@ export const ManufacturingOrdersPage: React.FC = () => {
         try {
             const { data } = await supabase.from('manufacturing_orders').select('*');
             if (data) {
-                // Filter out Greenlit orders immediately
                 const activeOnly = (data as ManufacturingOrder[]).filter(o => (o.current_status || '').toLowerCase() !== 'greenlit');
-
-                // Sort using unified utility
                 const sorted = sortManufacturingOrders(activeOnly);
                 setOrders(sorted);
             }
@@ -52,7 +45,7 @@ export const ManufacturingOrdersPage: React.FC = () => {
     };
 
     const handleSync = async () => {
-        if (!confirm('Fetch latest orders? This will update existing records.')) return;
+        if (!confirm(t('mo.syncConfirm'))) return;
         setIsLoading(true);
         try {
             const response = await fetch('/api/sync-odoo');
@@ -62,13 +55,11 @@ export const ManufacturingOrdersPage: React.FC = () => {
                 let count = 0;
                 let newIndex = 1;
 
-                // Bulk fetch existing existing PO numbers
                 const newItemPOs = result.items.map((i: any) => i.po_number).filter(Boolean);
                 const { data: existingData } = await supabase.from('manufacturing_orders')
                     .select('id, po_number')
                     .in('po_number', newItemPOs);
 
-                // Map PO number -> Order ID for quick lookup
                 const existingMap = new Map();
                 existingData?.forEach((row: any) => {
                     existingMap.set(row.po_number, row.id);
@@ -79,14 +70,9 @@ export const ManufacturingOrdersPage: React.FC = () => {
                 for (const item of result.items) {
                     const po = item.po_number || '';
                     if (!po) continue;
-
-                    // USER REQUEST: Skip orders with status 'Greenlit'
                     if (item.current_status && item.current_status.toLowerCase() === 'greenlit') continue;
 
-                    // USER REQUEST: Force Strict Sequencing (1, 2, 3...)
-                    // Ignore API MO number, use our counter
                     const mo = newIndex.toString();
-
                     const existingId = existingMap.get(po);
 
                     const payload = {
@@ -98,10 +84,9 @@ export const ManufacturingOrdersPage: React.FC = () => {
                         event_id: item.event_id,
                         scheduled_date: item.scheduled_date || null,
                         current_status: item.current_status,
-                        sort_order: newIndex * 1000 // Force sort order to match API sequence
+                        sort_order: newIndex * 1000
                     };
 
-                    // Add operation to promises array for parallel execution
                     if (existingId) {
                         promises.push((supabase.from('manufacturing_orders') as any).update(payload).eq('id', existingId));
                     } else {
@@ -111,24 +96,21 @@ export const ManufacturingOrdersPage: React.FC = () => {
                     newIndex++;
                 }
 
-                // Execute all updates/inserts in parallel
                 await Promise.all(promises);
-
-                alert(`Sync Complete. Processed ${count} orders.`);
+                alert(t('mo.syncComplete', { count }));
                 await fetchOrders(false);
             }
         } catch (e: any) {
             console.error(e);
-            alert('Sync Failed: ' + e.message);
+            alert(t('mo.syncFailed', { message: e.message }));
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleCreate = async () => {
-        if (!formData.mo_number || !formData.product_name) return alert('MO Number and Product Name are required');
+        if (!formData.mo_number || !formData.product_name) return alert(t('mo.requiredError'));
 
-        // Get max sort order to append to bottom
         const maxSort = orders.length > 0 ? Math.max(...orders.map(o => o.sort_order || 0)) : 0;
 
         const { error } = await (supabase.from('manufacturing_orders') as any).insert({
@@ -140,7 +122,7 @@ export const ManufacturingOrdersPage: React.FC = () => {
             event_id: formData.event_id,
             scheduled_date: formData.scheduled_date || null,
             current_status: formData.current_status,
-            sort_order: maxSort + 1000 // Add to end with spacing
+            sort_order: maxSort + 1000
         });
 
         if (!error) {
@@ -148,20 +130,18 @@ export const ManufacturingOrdersPage: React.FC = () => {
             resetForm();
             fetchOrders(false);
         } else {
-            alert('Error creating order: ' + error.message);
+            alert(t('mo.syncFailed', { message: error.message }));
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this order?')) return;
+        if (!confirm(t('mo.deleteConfirm'))) return;
         const { error } = await supabase.from('manufacturing_orders').delete().eq('id', id);
         if (!error) fetchOrders(false);
     };
 
     const togglePin = async (order: ManufacturingOrder) => {
         const newVal = !order.is_pinned;
-        // Optimistic update
-        // Optimistic update with unified sorting
         const updatedOrders = sortManufacturingOrders(orders.map(o => o.id === order.id ? { ...o, is_pinned: newVal } : o));
         setOrders(updatedOrders);
 
@@ -170,9 +150,7 @@ export const ManufacturingOrdersPage: React.FC = () => {
             if (error) throw error;
         } catch (err) {
             console.error('Error pinning order:', err);
-            // Revert on error without full reload
             fetchOrders(false);
-            alert('Failed to update pin status. Ensure database schema includes "is_pinned" column.');
         }
     };
 
@@ -189,11 +167,9 @@ export const ManufacturingOrdersPage: React.FC = () => {
         });
     };
 
-    // --- Drag and Drop Handlers ---
     const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, index: number) => {
         dragItem.current = index;
         e.dataTransfer.effectAllowed = "move";
-        // e.target.classList.add('dragging'); // Optional styling
     };
 
     const handleDragEnter = (_: React.DragEvent<HTMLTableRowElement>, index: number) => {
@@ -207,7 +183,6 @@ export const ManufacturingOrdersPage: React.FC = () => {
             return;
         }
 
-        // Logic: Clone list, remove item, insert at new pos
         const _orders = [...orders];
         const draggedItemContent = _orders[dragItem.current];
         _orders.splice(dragItem.current, 1);
@@ -215,31 +190,19 @@ export const ManufacturingOrdersPage: React.FC = () => {
 
         dragItem.current = null;
         dragOverItem.current = null;
-
-        // Optimistic Update
         setOrders(_orders);
 
-        // Calculate new sort orders and Upsert
-        // We re-index everything to be clean: index * 1000
-        // This is safe for < 100 items per page. If list is huge, this is heavy, but fine for now.
         const updates = _orders.map((order, index) => ({
             id: order.id,
             sort_order: (index + 1) * 1000
         }));
 
         try {
-            const { error } = await (supabase.from('manufacturing_orders') as any).upsert(updates, { onConflict: 'id' });
-            if (error) throw error;
+            await (supabase.from('manufacturing_orders') as any).upsert(updates, { onConflict: 'id' });
         } catch (err: any) {
             console.error('Error reordering:', err);
-            // Only alert if it's not the specific 'column missing' error we just fixed, 
-            // or better, show the real error to debug.
-            // User asked not to see error, but we need to know why it fails.
-            // For now, let's log to console and suppressing the alert to satisfy "I don't want to see any [error]".
-            // If functionality breaks, they will tell us.
         }
     };
-
 
     const filteredOrders = orders.filter(o => {
         const term = search.toLowerCase();
@@ -249,36 +212,36 @@ export const ManufacturingOrdersPage: React.FC = () => {
             o.sku?.toLowerCase().includes(term));
     });
 
-    if (isLoading) return <div className="loading-screen">Loading Orders...</div>;
+    if (isLoading) return <div className="loading-screen">{t('mo.loading')}</div>;
 
     return (
         <>
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
                 <div>
-                    <h1 className="page-title">Manufacturing Orders</h1>
-                    <p className="page-subtitle">Track production orders</p>
+                    <h1 className="page-title">{t('mo.title')}</h1>
+                    <p className="page-subtitle">{t('mo.subtitle')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button className="btn btn-secondary" onClick={handleSync}
-                        style={{ width: 'auto', padding: '0.75rem 1.0rem', background: '#F1F5F9', color: '#0F172A', border: '1px solid #E2E8F0', borderRadius: '8px', fontWeight: 600 }}>
-                        <i className="fa-solid fa-arrows-rotate" style={{ marginRight: '8px' }}></i> Sync Orders
+                        style={{ width: 'auto', padding: '0.75rem 1.0rem', background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '8px', fontWeight: 600 }}>
+                        <i className="fa-solid fa-arrows-rotate" style={{ marginRight: '8px' }}></i> {t('mo.sync')}
                     </button>
                     <button className="btn btn-primary" onClick={() => setIsAddOpen(true)}
                         style={{ width: 'auto', padding: '0.75rem 1.0rem' }}>
-                        <i className="fa-solid fa-plus" style={{ marginRight: '8px' }}></i> New Order
+                        <i className="fa-solid fa-plus" style={{ marginRight: '8px' }}></i> {t('mo.new')}
                     </button>
                 </div>
             </div>
 
             <div style={{ marginBottom: '2rem' }}>
                 <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
-                    <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '15px', top: '12px', color: '#9CA3AF' }}></i>
+                    <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '15px', top: '12px', color: 'var(--text-muted)' }}></i>
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search MO, Product, PO..."
-                        style={{ width: '100%', padding: '0.7rem 1rem 0.7rem 2.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
+                        placeholder={t('mo.searchPlaceholder')}
+                        style={{ width: '100%', padding: '0.7rem 1rem 0.7rem 2.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
                     />
                 </div>
             </div>
@@ -286,18 +249,18 @@ export const ManufacturingOrdersPage: React.FC = () => {
             <div className="table-responsive-container">
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
-                        <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', textAlign: 'left' }}>
-                            <th style={{ padding: '0.75rem 1rem', width: '40px' }}></th> {/* Grip */}
-                            <th style={{ padding: '0.75rem 1rem', width: '50px', textAlign: 'center' }}><i className="fa-solid fa-thumbtack" style={{ color: '#94A3B8' }}></i></th>
-                            <th className="sticky-column" style={{ padding: '0.75rem 1rem' }}>MO Number</th>
-                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', left: '100px' }}>Product Name</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>SKU</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Qty</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>PO Number</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Event ID</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Scheduled</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
+                        <tr style={{ background: 'var(--bg-main)', borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+                            <th style={{ padding: '0.75rem 1rem', width: '40px' }}></th>
+                            <th style={{ padding: '0.75rem 1rem', width: '50px', textAlign: 'center' }}><i className="fa-solid fa-thumbtack" style={{ color: 'var(--text-muted)' }}></i></th>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', color: 'var(--text-main)' }}>{t('mo.moNumber')}</th>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', left: '100px', color: 'var(--text-main)' }}>{t('mo.productName')}</th>
+                            <th style={{ padding: '0.75rem 1rem', color: 'var(--text-main)' }}>{t('mo.sku')}</th>
+                            <th style={{ padding: '0.75rem 1rem', color: 'var(--text-main)' }}>{t('mo.qty')}</th>
+                            <th style={{ padding: '0.75rem 1rem', color: 'var(--text-main)' }}>{t('mo.poNumber')}</th>
+                            <th style={{ padding: '0.75rem 1rem', color: 'var(--text-main)' }}>{t('mo.eventId')}</th>
+                            <th style={{ padding: '0.75rem 1rem', color: 'var(--text-main)' }}>{t('mo.scheduled')}</th>
+                            <th style={{ padding: '0.75rem 1rem', color: 'var(--text-main)' }}>{t('mo.status')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-main)' }}>{t('mo.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -308,14 +271,14 @@ export const ManufacturingOrdersPage: React.FC = () => {
                                 onDragStart={(e) => handleDragStart(e, index)}
                                 onDragEnter={(e) => handleDragEnter(e, index)}
                                 onDragEnd={handleDragEnd}
-                                onDragOver={(e) => e.preventDefault()} // Necessary to allow drop
+                                onDragOver={(e) => e.preventDefault()}
                                 style={{
-                                    borderBottom: '1px solid #F1F5F9',
-                                    background: order.is_pinned ? '#FFFBEB' : 'transparent',
+                                    borderBottom: '1px solid var(--border)',
+                                    background: order.is_pinned ? 'var(--bg-main)' : 'transparent',
                                     cursor: 'grab'
                                 }}
                             >
-                                <td style={{ padding: '0.75rem 1rem', color: '#CBD5E1', cursor: 'grab' }}>
+                                <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', cursor: 'grab' }}>
                                     <i className="fa-solid fa-grip-vertical"></i>
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
@@ -326,35 +289,35 @@ export const ManufacturingOrdersPage: React.FC = () => {
                                             border: 'none',
                                             background: 'transparent',
                                             cursor: 'pointer',
-                                            color: order.is_pinned ? '#F59E0B' : '#CBD5E1',
+                                            color: order.is_pinned ? '#F59E0B' : 'var(--text-muted)',
                                             fontSize: '1rem',
                                             transition: 'transform 0.2s',
                                             transform: order.is_pinned ? 'scale(1.1)' : 'scale(1)'
                                         }}
-                                        title={order.is_pinned ? "Unpin Order" : "Pin Order"}
+                                        title={order.is_pinned ? t('mo.viewMatrix') : t('mo.viewMatrix')}
                                     >
                                         <i className="fa-solid fa-thumbtack"></i>
                                     </button>
                                 </td>
                                 <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--primary)' }}>{index + 1}</td>
-                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, left: '100px' }}>{order.product_name}</td>
-                                <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', color: '#64748B' }}>{order.sku}</td>
-                                <td style={{ padding: '0.75rem 1rem' }}>{order.quantity}</td>
-                                <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{order.po_number}</td>
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#94A3B8' }}>{order.event_id}</td>
+                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, left: '100px', color: 'var(--text-main)' }}>{order.product_name}</td>
+                                <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{order.sku}</td>
+                                <td style={{ padding: '0.75rem 1rem', color: 'var(--text-main)' }}>{order.quantity}</td>
+                                <td style={{ padding: '0.75rem 1rem', color: 'var(--text-main)' }}>{order.po_number}</td>
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.event_id}</td>
                                 <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                                     {order.scheduled_date}
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem' }}>
                                     <span className={`badge badge-${(order.current_status || 'draft').toLowerCase()}`} style={{ textTransform: 'capitalize' }}>
-                                        {order.current_status}
+                                        {t(`mo.statuses.${(order.current_status || 'draft').toLowerCase()}`)}
                                     </span>
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                                    <Link to={`/control-matrix#mo-${order.mo_number}`} className="icon-btn" title="View Matrix" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Link to={`/control-matrix#mo-${order.mo_number}`} className="icon-btn" title={t('mo.viewMatrix')} style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <i className="fa-solid fa-table-cells"></i>
                                     </Link>
-                                    <button className="icon-btn delete" title="Delete" onClick={() => handleDelete(order.id)}><i className="fa-regular fa-trash-can"></i></button>
+                                    <button className="icon-btn delete" title={t('common.delete')} onClick={() => handleDelete(order.id)}><i className="fa-regular fa-trash-can"></i></button>
                                 </td>
                             </tr>
                         ))}
@@ -362,97 +325,96 @@ export const ManufacturingOrdersPage: React.FC = () => {
                 </table>
             </div>
 
-            {/* Add/Edit Modal */}
-            <div className={`offcanvas ${isAddOpen ? 'show' : ''}`} style={{
-                right: 'auto', left: '50%', top: '50%', transform: `translate(-50%, -50%)`,
-                width: '600px', height: 'auto', maxHeight: '90vh', overflowY: 'auto',
-                borderRadius: '12px', opacity: (isAddOpen) ? 1 : 0,
-                pointerEvents: (isAddOpen) ? 'all' : 'none',
-                transition: 'opacity 0.2s', zIndex: 3001, background: 'white', position: 'fixed'
-            }}>
-                <div className="offcanvas-header" style={{ marginBottom: '1rem', padding: '2rem 2rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 className="offcanvas-title" style={{ fontSize: '1.25rem', fontWeight: 700 }}>Create New Order</h3>
-                    <button className="close-btn" onClick={() => { setIsAddOpen(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>
-                        <i className="fa-solid fa-xmark"></i>
-                    </button>
-                </div>
-                <div className="offcanvas-body" style={{ padding: '0 2rem 2rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <div style={{ gridColumn: 'span 2' }}>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#475569' }}>MO Number</label>
-                            <input type="text" value={formData.mo_number} onChange={e => setFormData({ ...formData, mo_number: e.target.value })}
-                                disabled={false}
-                                placeholder="e.g. WH/MO/001"
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'white' }}
-                            />
-                        </div>
-                        <div style={{ gridColumn: 'span 2' }}>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#475569' }}>Product Name</label>
-                            <input type="text" value={formData.product_name} onChange={e => setFormData({ ...formData, product_name: e.target.value })}
-                                placeholder="e.g. Eucalyptus Shower Gel 16oz"
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)' }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#475569' }}>SKU</label>
-                            <input type="text" value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })}
-                                placeholder="e.g. 1BSGE16OZ"
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)' }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#475569' }}>Quantity</label>
-                            <input type="number" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
-                                placeholder="0"
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)' }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#475569' }}>PO Number</label>
-                            <input type="text" value={formData.po_number} onChange={e => setFormData({ ...formData, po_number: e.target.value })}
-                                placeholder="e.g. PO10202"
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)' }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#475569' }}>Event ID</label>
-                            <input type="text" value={formData.event_id} onChange={e => setFormData({ ...formData, event_id: e.target.value })}
-                                placeholder="e.g. jkv0u..."
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)' }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#475569' }}>Scheduled Date</label>
-                            <input type="date" value={formData.scheduled_date} onChange={e => setFormData({ ...formData, scheduled_date: e.target.value })}
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)' }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#475569' }}>Status</label>
-                            <select value={formData.current_status} onChange={e => setFormData({ ...formData, current_status: e.target.value })}
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'white' }}
-                            >
-                                <option value="Draft">Draft</option>
-                                <option value="Scheduled">Scheduled</option>
-                                <option value="Staged">Staged</option>
-                                <option value="Weighed">Weighed</option>
-                                <option value="Batched">Batched</option>
-                                <option value="Filled">Filled</option>
-                                <option value="Packed">Packed</option>
-                                <option value="Putback">Putback</option>
-                                <option value="Done">Done</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '2rem' }}>
-                        <button className="btn btn-secondary" onClick={() => { setIsAddOpen(false); }}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleCreate}>
-                            Create Order
+            {isAddOpen && (
+                <div className={`offcanvas show`} style={{
+                    right: 'auto', left: '50%', top: '50%', transform: `translate(-50%, -50%)`,
+                    width: '600px', height: 'auto', maxHeight: '90vh', overflowY: 'auto',
+                    borderRadius: '12px', opacity: 1, zIndex: 3001, background: 'var(--bg-card)', position: 'fixed',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid var(--border)'
+                }}>
+                    <div className="offcanvas-header" style={{ marginBottom: '1rem', padding: '2rem 2rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 className="offcanvas-title" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>{t('mo.createTitle')}</h3>
+                        <button className="close-btn" onClick={() => { setIsAddOpen(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-main)' }}>
+                            <i className="fa-solid fa-xmark"></i>
                         </button>
                     </div>
+                    <div className="offcanvas-body" style={{ padding: '0 2rem 2rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ gridColumn: 'span 2' }}>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>{t('mo.moNumber')}</label>
+                                <input type="text" value={formData.mo_number} onChange={e => setFormData({ ...formData, mo_number: e.target.value })}
+                                    placeholder={t('mo.moPlaceholder')}
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                />
+                            </div>
+                            <div style={{ gridColumn: 'span 2' }}>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>{t('mo.productName')}</label>
+                                <input type="text" value={formData.product_name} onChange={e => setFormData({ ...formData, product_name: e.target.value })}
+                                    placeholder={t('mo.productPlaceholder')}
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>{t('mo.sku')}</label>
+                                <input type="text" value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })}
+                                    placeholder={t('mo.skuPlaceholder')}
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>{t('mo.qty')}</label>
+                                <input type="number" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
+                                    placeholder="0"
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>{t('mo.poNumber')}</label>
+                                <input type="text" value={formData.po_number} onChange={e => setFormData({ ...formData, po_number: e.target.value })}
+                                    placeholder={t('mo.poPlaceholder')}
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>{t('mo.eventId')}</label>
+                                <input type="text" value={formData.event_id} onChange={e => setFormData({ ...formData, event_id: e.target.value })}
+                                    placeholder={t('mo.eventPlaceholder')}
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>{t('mo.scheduled')}</label>
+                                <input type="date" value={formData.scheduled_date} onChange={e => setFormData({ ...formData, scheduled_date: e.target.value })}
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>{t('mo.status')}</label>
+                                <select value={formData.current_status} onChange={e => setFormData({ ...formData, current_status: e.target.value })}
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                >
+                                    <option value="Draft">{t('mo.statuses.draft')}</option>
+                                    <option value="Scheduled">{t('mo.statuses.scheduled')}</option>
+                                    <option value="Staged">{t('mo.statuses.staged')}</option>
+                                    <option value="Weighed">{t('mo.statuses.weighed')}</option>
+                                    <option value="Batched">{t('mo.statuses.batched')}</option>
+                                    <option value="Filled">{t('mo.statuses.filled')}</option>
+                                    <option value="Packed">{t('mo.statuses.packed')}</option>
+                                    <option value="Putback">{t('mo.statuses.putback')}</option>
+                                    <option value="Done">{t('mo.statuses.done')}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '2rem' }}>
+                            <button className="btn btn-secondary" onClick={() => { setIsAddOpen(false); }}>{t('common.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleCreate}>
+                                {t('mo.createOrder')}
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {(isAddOpen) && <div className="overlay active" style={{ zIndex: 1000 }} onClick={() => { setIsAddOpen(false); }}></div>}
         </>

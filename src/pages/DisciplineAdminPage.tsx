@@ -3,8 +3,10 @@ import { supabase } from '../lib/supabase';
 import { DisciplinaryService } from '../lib/disciplinaryService';
 import type { SeverityType, ActionStepType } from '../lib/disciplinaryService';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export const DisciplineAdminPage: React.FC = () => {
+    const { t } = useTranslation();
     const { user: currentUser } = useAuth();
     const [incidents, setIncidents] = useState<any[]>([]);
     const [workers, setWorkers] = useState<any[]>([]);
@@ -53,7 +55,7 @@ export const DisciplineAdminPage: React.FC = () => {
 
                     setNotification({
                         show: true,
-                        message: `Worker ${(workerData as any)?.name || 'ID: ' + payload.new.worker_id} has signed their incident report.`
+                        message: t('discipline.notifications.signed', { name: (workerData as any)?.name || 'ID: ' + payload.new.worker_id })
                     });
 
                     fetchIncidents(); // Refresh list
@@ -72,7 +74,7 @@ export const DisciplineAdminPage: React.FC = () => {
         const testTimer = setTimeout(() => {
             setNotification({
                 show: true,
-                message: "System Monitor: Real-time incident tracking is active."
+                message: t('discipline.notifications.active')
             });
             setTimeout(() => setNotification(null), 5000);
         }, 1000);
@@ -189,13 +191,13 @@ export const DisciplineAdminPage: React.FC = () => {
                 throw new Error(`Action Error: ${actError.message}`);
             }
 
-            alert('Incident reported successfully');
+            alert(t('common.success'));
             setShowModal(false);
             setAttachment(null);
             fetchIncidents();
         } catch (err: any) {
             console.error(err);
-            alert(`Failed: ${err.message || 'Unknown error'}`);
+            alert(t('common.error') + `: ${err.message || ''}`);
         } finally {
             setLoading(false);
         }
@@ -315,7 +317,7 @@ export const DisciplineAdminPage: React.FC = () => {
                         <i className="fa-solid fa-file-signature" style={{ color: '#166534', fontSize: '1.5rem' }}></i>
                     </div>
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b', marginBottom: '0.25rem' }}>VERIFICATION COMPLETED</div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b', marginBottom: '0.25rem' }}>{t('common.success').toUpperCase()}</div>
                         <div style={{ fontSize: '0.85rem', color: '#64748B', lineHeight: '1.4' }}>{notification.message}</div>
                     </div>
                     <button onClick={() => setNotification(null)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '0.5rem' }}>
@@ -326,11 +328,11 @@ export const DisciplineAdminPage: React.FC = () => {
 
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Discipline & Conduct</h1>
-                    <p className="page-subtitle">SOP 3.7 Incident Tracking & Compliance Management</p>
+                    <h1 className="page-title">{t('discipline.title')}</h1>
+                    <p className="page-subtitle">{t('discipline.subtitle')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-                    <i className="fa-solid fa-plus"></i> Report Incident
+                    <i className="fa-solid fa-plus"></i> {t('discipline.reportIncident')}
                 </button>
             </div>
 
@@ -341,16 +343,16 @@ export const DisciplineAdminPage: React.FC = () => {
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
                                     <span className={`severity-badge sev-${inc.severity}`}>
-                                        {(inc.severity || 'Minor').replace('_', ' ')}
+                                        {t(`discipline.severity.${inc.severity}`, inc.severity?.replace('_', ' '))}
                                     </span>
                                     <span style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 700 }}>
                                         {inc.incident_date ? new Date(inc.incident_date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}
                                     </span>
                                 </div>
                                 <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#1e1b4b', fontWeight: 900, marginBottom: '0.4rem' }}>
-                                    {inc.worker?.name || 'Unknown Worker'}
+                                    {inc.worker?.name || t('common.notFound')}
                                     <span style={{ fontWeight: 700, color: '#94a3b8', fontSize: '0.9rem', marginLeft: '0.75rem' }}>
-                                        ID: {inc.worker?.worker_id || 'No ID'}
+                                        ID: {inc.worker?.worker_id || 'N/A'}
                                     </span>
                                 </h3>
                                 <p style={{ margin: '0', color: '#64748b', fontSize: '0.95rem', fontWeight: 500, lineHeight: '1.4' }}>
@@ -362,16 +364,16 @@ export const DisciplineAdminPage: React.FC = () => {
                                         <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700 }}>{inc.reporter?.name || 'System'}</span>
                                     </div>
                                     <span style={{ color: '#f59e0b', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase' }}>
-                                        {inc.category}
+                                        {t(`discipline.modals.categories.${inc.category}`, inc.category)}
                                     </span>
                                 </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
                                 <div className={`status-badge-premium ${inc.status === 'acknowledged' ? 'status-signed' : 'status-pending'}`}>
-                                    {inc.status === 'acknowledged' ? <><i className="fa-solid fa-signature"></i> SIGNED</> : <><i className="fa-regular fa-clock"></i> PENDING</>}
+                                    {inc.status === 'acknowledged' ? <><i className="fa-solid fa-signature"></i> {t('discipline.status.signed')}</> : <><i className="fa-regular fa-clock"></i> {t('discipline.status.pending')}</>}
                                 </div>
                                 <div style={{ marginTop: '1rem', color: '#f59e0b', fontSize: '0.8rem', fontWeight: 800 }}>
-                                    VIEW DETAILS <i className="fa-solid fa-chevron-right" style={{ marginLeft: '4px' }}></i>
+                                    {t('discipline.viewDetails')} <i className="fa-solid fa-chevron-right" style={{ marginLeft: '4px' }}></i>
                                 </div>
                             </div>
                         </div>
@@ -379,7 +381,7 @@ export const DisciplineAdminPage: React.FC = () => {
                 ) : (
                     <div style={{ textAlign: 'center', padding: '4rem', background: 'white', borderRadius: '16px', border: '1px dashed var(--border)', color: 'var(--text-muted)' }}>
                         <i className="fa-solid fa-shield-heart" style={{ fontSize: '2.5rem', marginBottom: '1rem', opacity: 0.5, display: 'block' }}></i>
-                        No incidents recorded yet. Ensuring a high standard of conduct.
+                        {t('discipline.noIncidents')}
                     </div>
                 )}
             </div>
@@ -390,9 +392,9 @@ export const DisciplineAdminPage: React.FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
                             <div>
                                 <span className={`severity-badge sev-${selectedIncident.severity}`} style={{ marginBottom: '0.5rem', display: 'inline-block' }}>
-                                    {selectedIncident.severity.toUpperCase().replace('_', ' ')}
+                                    {t(`discipline.severity.${selectedIncident.severity}`, selectedIncident.severity.toUpperCase().replace('_', ' '))}
                                 </span>
-                                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e1b4b', margin: 0 }}>Incident Report Detail</h2>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e1b4b', margin: 0 }}>{t('discipline.modals.detailTitle')}</h2>
                             </div>
                             <button onClick={() => setShowDetailModal(false)} style={{ background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', color: '#64748b' }}>
                                 <i className="fa-solid fa-xmark"></i>
@@ -401,32 +403,32 @@ export const DisciplineAdminPage: React.FC = () => {
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
                             <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
-                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Employee Involved</div>
+                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>{t('discipline.modals.employeeInvolved')}</div>
                                 <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e1b4b', marginBottom: '0.25rem' }}>{selectedIncident.worker?.name}</div>
                                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>W-ID: {selectedIncident.worker?.worker_id}</div>
                             </div>
                             <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
-                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Incident Type</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e1b4b', marginBottom: '0.25rem' }}>{selectedIncident.category.toUpperCase().replace('_', ' ')}</div>
+                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>{t('discipline.modals.incidentType')}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e1b4b', marginBottom: '0.25rem' }}>{t(`discipline.modals.categories.${selectedIncident.category}`, selectedIncident.category.toUpperCase().replace('_', ' '))}</div>
                                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>{new Date(selectedIncident.incident_date).toLocaleDateString(undefined, { dateStyle: 'medium' })}</div>
                             </div>
                             <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
-                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Severity & Reference</div>
+                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>{t('discipline.modals.severityRef')}</div>
                                 <span className={`severity-badge sev-${selectedIncident.severity}`} style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem', borderRadius: '6px', marginBottom: '0.5rem', display: 'inline-block' }}>
-                                    {selectedIncident.severity.toUpperCase().replace('_', ' ')}
+                                    {t(`discipline.severity.${selectedIncident.severity}`, selectedIncident.severity.toUpperCase().replace('_', ' '))}
                                 </span>
                                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e1b4b' }}>REF: {selectedIncident.documentation || 'N/A'}</div>
                             </div>
                         </div>
 
-                        <div className="status-label" style={{ marginBottom: '1rem' }}>Formal Description</div>
+                        <div className="status-label" style={{ marginBottom: '1rem' }}>{t('discipline.modals.formalDescription')}</div>
                         <p style={{ fontSize: '1.1rem', color: '#334155', lineHeight: '1.7', background: '#fff', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                             {selectedIncident.description}
                         </p>
 
                         {selectedIncident.attachment_url && (
                             <div style={{ marginTop: '2.5rem' }}>
-                                <div className="status-label" style={{ marginBottom: '1rem' }}>Recorded Evidence</div>
+                                <div className="status-label" style={{ marginBottom: '1rem' }}>{t('discipline.modals.recordedEvidence')}</div>
                                 <div className="evidence-box">
                                     {selectedIncident.attachment_url.match(/\.(mp4|webm|ogg)$/) ? (
                                         <video src={selectedIncident.attachment_url} controls className="evidence-preview" />
@@ -435,7 +437,7 @@ export const DisciplineAdminPage: React.FC = () => {
                                     )}
                                     <div style={{ marginTop: '1rem' }}>
                                         <a href={selectedIncident.attachment_url} target="_blank" rel="noreferrer" style={{ color: '#f59e0b', fontWeight: 800, textDecoration: 'none', fontSize: '0.9rem' }}>
-                                            <i className="fa-solid fa-download"></i> DOWNLOAD ORIGINAL EVIDENCE
+                                            <i className="fa-solid fa-download"></i> {t('discipline.modals.downloadEvidence')}
                                         </a>
                                     </div>
                                 </div>
@@ -443,18 +445,18 @@ export const DisciplineAdminPage: React.FC = () => {
                         )}
 
                         <div style={{ marginTop: '3rem', paddingTop: '2.5rem', borderTop: '2px dashed #e2e8f0' }}>
-                            <div className="status-label" style={{ marginBottom: '1.5rem' }}>Acknowledgement Tracking</div>
+                            <div className="status-label" style={{ marginBottom: '1.5rem' }}>{t('discipline.modals.acknowledgement')}</div>
                             {selectedIncident.status === 'acknowledged' ? (
                                 <div style={{ background: '#dcfce7', padding: '2rem', borderRadius: '24px', border: '1px solid #bbf7d0' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#166534', fontWeight: 900 }}>
                                             <i className="fa-solid fa-certificate" style={{ fontSize: '1.5rem' }}></i>
-                                            VERIFIED EMPLOYEE SIGNATURE
+                                            {t('discipline.modals.signatureVerified')}
                                         </div>
                                         <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 800 }}>{new Date(selectedIncident.signed_at).toLocaleString()}</div>
                                     </div>
                                     <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.6)', borderRadius: '16px', marginBottom: '1.5rem' }}>
-                                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Worker's Official Explanation</div>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{t('discipline.modals.workerExplanation')}</div>
                                         <p style={{ margin: 0, fontStyle: 'italic', color: '#166534' }}>"{selectedIncident.worker_explanation || 'No verbal explanation provided.'}"</p>
                                     </div>
                                     <div style={{ fontSize: '1.25rem', fontFamily: "'Dancing Script', cursive", fontWeight: 'bold', color: '#166534', textAlign: 'center', padding: '1rem', border: '1px solid #bbf7d0', borderRadius: '12px', background: 'white' }}>
@@ -464,8 +466,8 @@ export const DisciplineAdminPage: React.FC = () => {
                             ) : (
                                 <div style={{ background: '#f1f5f9', padding: '2.5rem', borderRadius: '24px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
                                     <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⏳</div>
-                                    <h4 style={{ margin: 0, fontWeight: 900, color: '#475569' }}>Signature Pending</h4>
-                                    <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.5rem' }}>The worker has been notified but has not yet reviewed or signed this report.</p>
+                                    <h4 style={{ margin: 0, fontWeight: 900, color: '#475569' }}>{t('discipline.modals.signaturePending')}</h4>
+                                    <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.5rem' }}>{t('discipline.modals.pendingSub')}</p>
                                 </div>
                             )}
                         </div>
@@ -477,7 +479,7 @@ export const DisciplineAdminPage: React.FC = () => {
                 <div className="modal-overlay">
                     <div className="modal-content">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e1b4b', margin: 0 }}>Record Misconduct</h2>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e1b4b', margin: 0 }}>{t('discipline.modals.recordTitle')}</h2>
                             <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: '#64748b' }}>
                                 <i className="fa-solid fa-xmark"></i>
                             </button>
@@ -485,14 +487,14 @@ export const DisciplineAdminPage: React.FC = () => {
 
                         <form onSubmit={handleSubmit}>
                             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Select Employee</label>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>{t('discipline.modals.selectEmployee')}</label>
                                 <select
                                     style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1.5px solid var(--border)', background: '#F8FAFC' }}
                                     required
                                     value={formData.worker_id}
                                     onChange={e => setFormData({ ...formData, worker_id: e.target.value })}
                                 >
-                                    <option value="">Choose worker...</option>
+                                    <option value="">{t('discipline.modals.chooseWorker')}</option>
                                     {workers.filter(w => w.name).map(w => (
                                         <option key={w.id} value={w.id}>{w.name} (ID: {w.worker_id || 'N/A'})</option>
                                     ))}
@@ -501,7 +503,7 @@ export const DisciplineAdminPage: React.FC = () => {
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                                 <div className="form-group">
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Incident Date</label>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>{t('discipline.modals.incidentDate')}</label>
                                     <input
                                         type="date"
                                         style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1.5px solid var(--border)' }}
@@ -511,63 +513,63 @@ export const DisciplineAdminPage: React.FC = () => {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Incident Category</label>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>{t('discipline.modals.incidentCategory')}</label>
                                     <select
                                         style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1.5px solid var(--border)', background: '#F8FAFC' }}
                                         required
                                         value={formData.category}
                                         onChange={e => setFormData({ ...formData, category: e.target.value })}
                                     >
-                                        <option value="attendance">Attendance</option>
-                                        <option value="performance">Performance</option>
-                                        <option value="conduct">Conduct / Behavior</option>
-                                        <option value="safety">Safety Violation</option>
-                                        <option value="other">Other</option>
+                                        <option value="attendance">{t('discipline.modals.categories.attendance')}</option>
+                                        <option value="performance">{t('discipline.modals.categories.performance')}</option>
+                                        <option value="conduct">{t('discipline.modals.categories.conduct')}</option>
+                                        <option value="safety">{t('discipline.modals.categories.safety')}</option>
+                                        <option value="other">{t('discipline.modals.categories.other')}</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                                 <div className="form-group">
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Severity Level</label>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>{t('discipline.modals.severityLevel')}</label>
                                     <select
                                         style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1.5px solid var(--border)', background: '#F8FAFC' }}
                                         required
                                         value={formData.severity}
                                         onChange={e => setFormData({ ...formData, severity: e.target.value as SeverityType })}
                                     >
-                                        <option value="minor">Minor Infraction</option>
-                                        <option value="major">Major Infraction</option>
-                                        <option value="gross_misconduct">Gross Misconduct</option>
+                                        <option value="minor">{t('discipline.severity.minor')}</option>
+                                        <option value="major">{t('discipline.severity.major')}</option>
+                                        <option value="gross_misconduct">{t('discipline.severity.gross_misconduct')}</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Documentation Ref</label>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>{t('discipline.modals.docRef')}</label>
                                     <input
                                         type="text"
                                         style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1.5px solid var(--border)' }}
                                         value={formData.documentation}
                                         onChange={e => setFormData({ ...formData, documentation: e.target.value })}
-                                        placeholder="Case # or SOP Ref"
+                                        placeholder="e.g. SOP 3.7.A"
                                         required
                                     />
                                 </div>
                             </div>
 
                             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Description</label>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>{t('discipline.modals.description')}</label>
                                 <textarea
                                     style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)', resize: 'none', fontFamily: 'inherit' }}
                                     rows={3}
                                     required
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                    placeholder="Describe the incident objectively..."
+                                    placeholder={t('discipline.modals.descriptionPlaceholder')}
                                 />
                             </div>
 
                             <div className="form-group" style={{ marginBottom: '2rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Attachment (Image or Video)</label>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>{t('discipline.modals.attachment')}</label>
                                 <input
                                     type="file"
                                     accept="image/*,video/*"
@@ -577,9 +579,9 @@ export const DisciplineAdminPage: React.FC = () => {
                             </div>
 
                             <div style={{ display: 'flex', gap: '1rem' }}>
-                                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowModal(false)}>Cancel</button>
+                                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
                                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={loading}>
-                                    {loading ? 'Processing...' : 'Report'}
+                                    {loading ? t('common.processing') : t('discipline.modals.report')}
                                 </button>
                             </div>
                         </form>

@@ -4,11 +4,15 @@ import { supabase } from '../lib/supabase';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
 import { completeAllTasks, pauseAllActiveTasks } from '../lib/taskService';
 import { Navigate } from 'react-router-dom';
-import { LEVEL_2_SOPS } from '../data/sopData';
-import { LEVEL_1_TRAININGS } from '../data/trainingData';
+import { trainingService } from '../lib/trainingService';
+import type { TrainingMaterial } from '../lib/trainingService';
 import type { User } from '../types';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../context/ThemeContext';
 
 export const WorkerPortalPage: React.FC = () => {
+    const { t, i18n } = useTranslation();
+    const { toggleTheme, setLanguage, currentTheme } = useTheme();
     const { user, loading: authLoading, logout } = useAuth();
     const [localUser, setLocalUser] = useState(user);
     const [loading, setLoading] = useState(false);
@@ -31,11 +35,9 @@ export const WorkerPortalPage: React.FC = () => {
     const [policySignature, setPolicySignature] = useState('');
     const [isSigningPolicy, setIsSigningPolicy] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>([]);
     const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Compounder I' | 'Quality Assurance' | 'Shipping & Recieving' | 'Purchase'>(user?.role === 'manager' ? 'Quality Assurance' : 'Production');
-    const [selectedSOPSection, setSelectedSOPSection] = useState<string>(() => {
-        const initialRole = user?.role === 'manager' ? 'Quality Assurance' : 'Production';
-        return LEVEL_2_SOPS[initialRole] ? LEVEL_2_SOPS[initialRole][0].name : '';
-    });
+    const [selectedSOPSection, setSelectedSOPSection] = useState<string>('');
     const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
     const [completedTrainings, setCompletedTrainings] = useState<string[]>([]);
@@ -46,6 +48,21 @@ export const WorkerPortalPage: React.FC = () => {
     const [isEndOfPdf, setIsEndOfPdf] = useState(false);
 
     const MAX_WORK_SECONDS = 5 * 60 * 60; // 5 hours in seconds
+
+    useEffect(() => {
+        const fetchTrainings = async () => {
+            const materials = await trainingService.getAllMaterials();
+            setTrainingMaterials(materials);
+            
+            // Set initial selected section for SOPs if available
+            const initialRole = user?.role === 'manager' ? 'Quality Assurance' : 'Production';
+            const initialMaterials = materials.filter(m => m.level === 2 && m.department === initialRole);
+            if (initialMaterials.length > 0) {
+                setSelectedSOPSection(initialMaterials[0].category);
+            }
+        };
+        fetchTrainings();
+    }, [user?.id]);
 
     useEffect(() => {
         if (user) {
@@ -485,14 +502,14 @@ export const WorkerPortalPage: React.FC = () => {
         }
     };
 
-    if (authLoading) return <div className="loading-screen">Authenticating...</div>;
+    if (authLoading) return <div className="loading-screen">{t('common.authenticating')}</div>;
     if (!user) return <Navigate to="/login" replace />;
 
     if (pendingPolicies.length > 0) {
         return (
             <div style={{ position: 'fixed', inset: 0, background: '#0f172a', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
                 <div style={{ background: 'white', width: '100%', maxWidth: '900px', borderRadius: '32px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', height: '95vh', maxHeight: '1000px' }}>
-                    <div style={{ background: '#1e1b4b', padding: '1.5rem 2rem', color: 'white' }}>
+                    <div style={{ background: 'var(--primary)', padding: '1.5rem 2rem', color: 'white' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                                 <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900 }}>Standard Operating Procedure & Disciplinary Standards</h1>
@@ -527,7 +544,7 @@ export const WorkerPortalPage: React.FC = () => {
                                 width: '100%',
                                 padding: '1.25rem',
                                 borderRadius: '12px',
-                                background: policySignature ? '#1e1b4b' : '#94a3b8',
+                                background: policySignature ? 'var(--primary)' : 'var(--text-muted)',
                                 color: 'white',
                                 border: 'none',
                                 fontSize: '1.1rem',
@@ -740,11 +757,11 @@ export const WorkerPortalPage: React.FC = () => {
                 }
 
                 .status-card, .profile-section, .conduct-section {
-                    background: white;
+                    background: var(--bg-card);
                     border-radius: 20px;
                     padding: 2rem;
                     box-shadow: var(--shadow-sm);
-                    border: 1px solid #f1f5f9;
+                    border: 1px solid var(--border);
                     margin-bottom: 1.5rem;
                 }
 
@@ -762,7 +779,7 @@ export const WorkerPortalPage: React.FC = () => {
                 .time-display {
                     font-size: clamp(1.25rem, 5vw, 2rem);
                     font-weight: 700;
-                    color: #1e1b4b;
+                    color: var(--text-main);
                     font-variant-numeric: tabular-nums;
                 }
 
@@ -872,8 +889,8 @@ export const WorkerPortalPage: React.FC = () => {
                 }
 
                 .off-duty-banner {
-                    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
-                    box-shadow: 0 20px 40px -10px rgba(30, 27, 75, 0.3);
+                    background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+                    box-shadow: 0 20px 40px -10px rgba(30, 64, 175, 0.3);
                 }
 
                 .banner-content {
@@ -983,11 +1000,11 @@ export const WorkerPortalPage: React.FC = () => {
                     margin: 0;
                     font-size: 1.1rem;
                     font-weight: 800;
-                    color: #1e1b4b;
+                    color: var(--primary);
                 }
                 .card-header i {
                     font-size: 1.1rem;
-                    color: #1e1b4b;
+                    color: var(--primary);
                     opacity: 0.8;
                 }
                 .card-grid {
@@ -1007,24 +1024,24 @@ export const WorkerPortalPage: React.FC = () => {
                 .info-field label {
                     font-size: 0.75rem;
                     font-weight: 700;
-                    color: #64748b;
+                    color: var(--text-muted);
                     text-transform: capitalize;
                 }
                 .info-input {
                     padding: 0.75rem 1rem;
                     border-radius: 12px;
-                    border: 2px solid #e2e8f0;
+                    border: 2px solid var(--border);
                     font-size: 0.95rem;
-                    color: #1e293b;
-                    background: #f8fafc;
+                    color: var(--text-main);
+                    background: var(--bg-main);
                     width: 100%;
                     outline: none;
                     transition: all 0.2s;
                 }
-                .info-input:focus { border-color: #1e1b4b; background: white; }
-                .info-input:disabled { background: #f1f5f9; cursor: not-allowed; border-color: #e2e8f0; }
-                .info-input.error { border-color: #ef4444; background: #fffcfc; }
-                .error-text { color: #ef4444; font-size: 0.75rem; font-weight: 600; margin-top: 4px; }
+                .info-input:focus { border-color: var(--primary); background: var(--bg-card); }
+                .info-input:disabled { background: var(--border); cursor: not-allowed; border-color: var(--border); opacity: 0.7; }
+                .info-input.error { border-color: var(--danger); background: var(--danger-bg); }
+                .error-text { color: var(--danger); font-size: 0.75rem; font-weight: 600; margin-top: 4px; }
                 
                 .section-title-row {
                     display: flex;
@@ -1032,8 +1049,8 @@ export const WorkerPortalPage: React.FC = () => {
                     gap: 12px;
                     margin-bottom: 1.5rem;
                 }
-                .section-title-row i { font-size: 1.5rem; color: #1e1b4b; opacity: 0.4; }
-                .section-title-row h2 { margin: 0; font-size: 1.75rem; font-weight: 900; color: #0f172a; letter-spacing: -0.02em; }
+                .section-title-row i { font-size: 1.5rem; color: var(--primary); opacity: 0.4; }
+                .section-title-row h2 { margin: 0; font-size: 1.75rem; font-weight: 900; color: var(--text-main); letter-spacing: -0.02em; }
 
                 .info-table {
                     width: 100%;
@@ -1042,19 +1059,19 @@ export const WorkerPortalPage: React.FC = () => {
                 .info-table th {
                     text-align: left;
                     padding: 1rem 1.5rem;
-                    background: #f8fafc;
+                    background: var(--bg-main);
                     font-size: 0.75rem;
                     font-weight: 800;
-                    color: #64748b;
+                    color: var(--text-muted);
                     text-transform: uppercase;
                     letter-spacing: 0.05em;
-                    border-bottom: 1px solid #e2e8f0;
+                    border-bottom: 1px solid var(--border);
                 }
                 .info-table td {
                     padding: 1rem 1.5rem;
                     font-size: 0.9rem;
-                    border-bottom: 1px solid #f1f5f9;
-                    color: #475569;
+                    border-bottom: 1px solid var(--border);
+                    color: var(--text-main);
                 }
                 .table-input {
                     width: 100%;
@@ -1069,13 +1086,13 @@ export const WorkerPortalPage: React.FC = () => {
                     border-bottom: 1px solid transparent;
                 }
                 .table-input:focus {
-                    border-bottom-color: #f59e0b;
-                    background: rgba(245, 158, 11, 0.03);
+                    border-bottom-color: var(--primary);
+                    background: var(--primary-bg);
                 }
                 .small-action-btn {
-                    background: white;
-                    border: 1px solid #1e1b4b;
-                    color: #1e1b4b;
+                    background: var(--bg-card);
+                    border: 1px solid var(--primary);
+                    color: var(--primary);
                     padding: 6px 14px;
                     border-radius: 20px;
                     font-size: 0.75rem;
@@ -1083,7 +1100,7 @@ export const WorkerPortalPage: React.FC = () => {
                     cursor: pointer;
                     transition: all 0.2s;
                 }
-                .small-action-btn:hover { background: #1e1b4b; color: white; }
+                .small-action-btn:hover { background: var(--primary); color: white; }
 
                 .custom-eeo-dropdown { position: relative; width: 100%; }
                 .eeo-select-trigger {
@@ -1091,40 +1108,102 @@ export const WorkerPortalPage: React.FC = () => {
                     align-items: center;
                     padding: 0 1rem;
                     height: 48px;
-                    background: #f8fafc;
-                    border: 2px solid #e2e8f0;
+                    background: var(--bg-main);
+                    border: 2px solid var(--border);
                     border-radius: 12px;
                     cursor: pointer;
                     transition: all 0.2s;
                     font-size: 0.95rem;
-                    color: #1e293b;
+                    color: var(--text-main);
                     justify-content: space-between;
                 }
-                .eeo-select-trigger.active { border-color: #1e1b4b; background: white; }
+                .eeo-select-trigger.active { border-color: var(--primary); background: var(--bg-card); }
                 .eeo-dropdown-menu {
                     position: absolute;
                     top: calc(100% + 8px);
                     left: 0;
                     width: 100%;
-                    background: white;
+                    background: var(--bg-card);
                     border-radius: 12px;
                     box-shadow: var(--shadow-xl);
-                    border: 1px solid #e2e8f0;
+                    border: 1px solid var(--border);
                     z-index: 1000;
                     overflow: hidden;
                 }
                 .eeo-search-box {
                     padding: 12px;
-                    border-bottom: 1px solid #f1f5f9;
+                    border-bottom: 1px solid var(--border);
                     display: flex;
                     align-items: center;
                     gap: 10px;
                 }
-                .eeo-search-box input { border: none; outline: none; width: 100%; font-size: 0.9rem; }
+                .eeo-search-box input { border: none; outline: none; width: 100%; font-size: 0.9rem; background: transparent; color: var(--text-main); }
                 .eeo-options-list { max-height: 250px; overflow-y: auto; padding: 8px 0; }
-                .eeo-option { padding: 10px 16px; font-size: 0.9rem; cursor: pointer; }
-                .eeo-option:hover { background: #f8fafc; }
-                .eeo-option.selected { background: #e0e7ff; color: #1e1b4b; font-weight: 700; }
+                .eeo-option { padding: 10px 16px; font-size: 0.9rem; cursor: pointer; color: var(--text-main); }
+                .eeo-option:hover { background: var(--bg-main); }
+                .eeo-option.selected { background: var(--primary-bg); color: var(--primary); font-weight: 700; }
+
+                /* Sidebar & Nav Restoration */
+                .sidebar {
+                    background: var(--primary);
+                    color: white;
+                    display: flex;
+                    flex-direction: column;
+                    padding: 1.5rem 1rem;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                .sidebar .brand {
+                    color: white;
+                    margin-bottom: 2.5rem;
+                }
+                .portal-nav-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    padding: 0.85rem 1.25rem;
+                    border-radius: 14px;
+                    color: rgba(255, 255, 255, 0.8);
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-weight: 600;
+                    margin-bottom: 0.25rem;
+                }
+                .portal-nav-item i {
+                    font-size: 1.2rem;
+                    width: 24px;
+                    text-align: center;
+                    color: rgba(255, 255, 255, 0.8);
+                }
+                .portal-nav-item:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                    color: white;
+                }
+                .portal-nav-item:hover i {
+                    color: white;
+                }
+                .portal-nav-item.active {
+                    background: white;
+                    color: var(--primary);
+                    box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1);
+                }
+                .portal-nav-item.active i {
+                    color: var(--primary);
+                }
+                .sidebar-toggle {
+                    background: rgba(255, 255, 255, 0.1);
+                    border: none;
+                    color: white;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .sidebar-toggle:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                }
             ` }} />
 
             {notification?.show && (
@@ -1152,12 +1231,12 @@ export const WorkerPortalPage: React.FC = () => {
                             }}></i>
                     </div>
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
-                            {notification.severity === 'success' ? 'Success' : 'Attention Required'}
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
+                            {notification.severity === 'success' ? t('common.success') : t('common.attentionRequired')}
                         </div>
-                        <div style={{ fontSize: '0.85rem', color: '#64748B', lineHeight: '1.4' }}>{notification.message}</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>{notification.message}</div>
                     </div>
-                    <button onClick={() => setNotification(null)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '0.5rem' }}>
+                    <button onClick={() => setNotification(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.5rem' }}>
                         <i className="fa-solid fa-xmark"></i>
                     </button>
                 </div>
@@ -1178,33 +1257,33 @@ export const WorkerPortalPage: React.FC = () => {
 
                 <ul className="nav-menu">
                     <li>
-                        <div className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-                            <i className="fa-solid fa-house"></i> {!isCollapsed && <span>Dashboard</span>}
+                        <div className={`portal-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+                            <i className="fa-solid fa-gauge-high"></i> <span>{t('workerPortal.tabs.dashboard')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`nav-item ${activeTab === 'personal_info' ? 'active' : ''}`} onClick={() => setActiveTab('personal_info')}>
-                            <i className="fa-solid fa-user"></i> {!isCollapsed && <span>Personal Info</span>}
+                        <div className={`portal-nav-item ${activeTab === 'personal_info' ? 'active' : ''}`} onClick={() => setActiveTab('personal_info')}>
+                            <i className="fa-solid fa-user-gear"></i> <span>{t('workerPortal.tabs.personalInfo')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`nav-item ${activeTab === 'conduct' ? 'active' : ''}`} onClick={() => setActiveTab('conduct')}>
-                            <i className="fa-solid fa-shield-halved"></i> {!isCollapsed && <span>Conduct Record</span>}
+                        <div className={`portal-nav-item ${activeTab === 'conduct' ? 'active' : ''}`} onClick={() => setActiveTab('conduct')}>
+                            <i className="fa-solid fa-shield-halved"></i> <span>{t('workerPortal.tabs.conduct')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`nav-item ${activeTab === 'training' ? 'active' : ''}`} onClick={() => setActiveTab('training')}>
-                            <i className="fa-solid fa-graduation-cap"></i> {!isCollapsed && <span>Training</span>}
+                        <div className={`portal-nav-item ${activeTab === 'training' ? 'active' : ''}`} onClick={() => setActiveTab('training')}>
+                            <i className="fa-solid fa-graduation-cap"></i> <span>{t('workerPortal.tabs.training')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`nav-item ${activeTab === 'timeoff' ? 'active' : ''}`} onClick={() => setActiveTab('timeoff')}>
-                            <i className="fa-solid fa-calendar-alt"></i> {!isCollapsed && <span>Time Off</span>}
+                        <div className={`portal-nav-item ${activeTab === 'timeoff' ? 'active' : ''}`} onClick={() => setActiveTab('timeoff')}>
+                            <i className="fa-solid fa-calendar-day"></i> <span>{t('workerPortal.tabs.timeOff')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-                            <i className="fa-solid fa-gear"></i> {!isCollapsed && <span>Settings</span>}
+                        <div className={`portal-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+                            <i className="fa-solid fa-sliders"></i> <span>{t('workerPortal.tabs.settings')}</span>
                         </div>
                     </li>
                 </ul>
@@ -1213,7 +1292,7 @@ export const WorkerPortalPage: React.FC = () => {
                     <ul className="nav-menu">
                         <li>
                             <div className="nav-item" onClick={logout} style={{ color: '#ef4444' }}>
-                                <i className="fa-solid fa-right-from-bracket"></i> {!isCollapsed && <span>Logout</span>}
+                                <i className="fa-solid fa-right-from-bracket"></i> {!isCollapsed && <span>{t('sidebar.logout')}</span>}
                             </div>
                         </li>
                     </ul>
@@ -1223,8 +1302,8 @@ export const WorkerPortalPage: React.FC = () => {
             <main className={`worker-main-wrapper ${isCollapsed ? 'expanded' : ''}`}>
                 <header className="worker-topbar" style={{
                     height: '80px',
-                    background: 'white',
-                    borderBottom: '1px solid #e2e8f0',
+                    background: 'var(--bg-card)',
+                    borderBottom: '1px solid var(--border)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -1234,22 +1313,52 @@ export const WorkerPortalPage: React.FC = () => {
                     zIndex: 100
                 }}>
                     <div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Member Portal</div>
-                        <h2 style={{ margin: 0, fontWeight: 900, color: '#1e1b4b', fontSize: '1.75rem' }}>
-                            {activeTab === 'dashboard' ? 'Overview' : activeTab === 'personal_info' ? 'Update Details' : activeTab === 'conduct' ? 'Compliance' : activeTab === 'settings' ? 'Preferences' : activeTab === 'training' ? 'Training Progress' : 'Guides'}
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('workerPortal.title')}</div>
+                        <h2 style={{ margin: 0, fontWeight: 900, color: 'var(--text-main)', fontSize: '1.75rem' }}>
+                            {activeTab === 'dashboard' ? t('workerPortal.overview') : 
+                             activeTab === 'personal_info' ? t('workerPortal.tabs.personalInfo') : 
+                             activeTab === 'conduct' ? t('workerPortal.conduct.title') : 
+                             activeTab === 'settings' ? t('workerPortal.settings.title') : 
+                             activeTab === 'training' ? t('workerPortal.tabs.training') : t('workerPortal.tabs.timeOff')}
                         </h2>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                        {/* Quick Access Settings */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.4rem', background: 'var(--bg-main)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                                <button 
+                                    onClick={() => setLanguage('en')}
+                                    style={{ padding: '0.4rem 0.8rem', borderRadius: '10px', border: 'none', background: i18n.language === 'en' ? 'var(--primary)' : 'transparent', color: i18n.language === 'en' ? 'white' : 'var(--text-muted)', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem' }}
+                                >
+                                    EN
+                                </button>
+                                <button 
+                                    onClick={() => setLanguage('es')}
+                                    style={{ padding: '0.4rem 0.8rem', borderRadius: '10px', border: 'none', background: i18n.language === 'es' ? 'var(--primary)' : 'transparent', color: i18n.language === 'es' ? 'white' : 'var(--text-muted)', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem' }}
+                                >
+                                    ES
+                                </button>
+                            </div>
+                            <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
+                            <button 
+                                onClick={toggleTheme}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '1rem', padding: '0 0.5rem' }}
+                                title={t('workerPortal.settings.theme')}
+                            >
+                                {currentTheme === 'light' ? <i className="fa-solid fa-moon"></i> : <i className="fa-solid fa-sun"></i>}
+                            </button>
+                        </div>
+
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
                             <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontWeight: 800, color: '#1e1b4b' }}>{user?.name}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700 }}>ID: {user?.worker_id}</div>
+                                <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{user?.name}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>ID: {user?.worker_id}</div>
                             </div>
                             <div style={{
                                 width: '44px',
                                 height: '44px',
-                                background: '#1e1b4b',
-                                color: '#f59e0b',
+                                background: 'var(--primary)',
+                                color: 'white',
                                 borderRadius: '12px',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1258,7 +1367,7 @@ export const WorkerPortalPage: React.FC = () => {
                                 fontSize: '1.2rem'
                             }}>{user.name?.[0]}</div>
                         </div>
-                        <button onClick={logout} title="Logout" style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', background: '#F1F5F9', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>
+                        <button onClick={logout} title={t('sidebar.logout')} style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', background: 'var(--bg-main)', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>
                             <i className="fa-solid fa-right-from-bracket"></i>
                         </button>
                     </div>
@@ -1272,16 +1381,16 @@ export const WorkerPortalPage: React.FC = () => {
                         >
                             <div style={{ display: 'flex', alignItems: 'center', width: '100%', cursor: (nfcStatus === 'error') ? 'pointer' : 'default' }} onClick={() => (nfcStatus === 'error') && startNfcListening()}>
                                 {nfcStatus === 'listening' && <div className="nfc-heartbeat" style={{ marginRight: '10px' }}></div>}
-                                {nfcStatus === 'listening' ? "NFC Active: Tap card to clock in/out" :
-                                    nfcStatus === 'reading' ? "Reading Tag..." :
-                                        nfcStatus === 'error' ? "NFC Error: Web NFC Not Supported. Use Simulator Below." : "NFC Offline"}
+                                {nfcStatus === 'listening' ? t('workerPortal.nfcActive') :
+                                    nfcStatus === 'reading' ? t('workerPortal.nfcReading') :
+                                        nfcStatus === 'error' ? t('workerPortal.nfcError') : t('workerPortal.nfcOffline')}
                             </div>
 
                             <div style={{ width: '100%', display: 'flex', gap: '1rem' }} onClick={e => e.stopPropagation()}>
                                 <input
                                     type="text"
-                                    placeholder="Simulate NFC Scan (Enter Tag ID)"
-                                    style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #ccc' }}
+                                    placeholder={t('workerPortal.simulateNfc')}
+                                    style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && e.currentTarget.value) {
                                             processNfcTap(e.currentTarget.value);
@@ -1297,17 +1406,18 @@ export const WorkerPortalPage: React.FC = () => {
                                             input.value = '';
                                         }
                                     }}
-                                    style={{ padding: '0.75rem 1.5rem', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+                                    className="btn btn-primary"
+                                    style={{ padding: '0.75rem 2rem' }}
                                 >
-                                    Scan
+                                    {t('workerPortal.scan')}
                                 </button>
                             </div>
                         </div>
                     )}
                     {activeTab === 'dashboard' && nfcStatus === 'idle' && (
-                        <div className="nfc-status-bar" onClick={startNfcListening} style={{ cursor: 'pointer', background: '#FEF3C7', borderColor: '#FDE68A', color: '#92400E' }}>
+                        <div className="nfc-status-bar" onClick={startNfcListening} style={{ cursor: 'pointer', background: 'rgba(245, 158, 11, 0.1)', borderColor: 'var(--accent)', color: 'var(--accent)', borderRadius: '12px' }}>
                             <i className="fa-solid fa-hand-pointer" style={{ marginRight: '10px' }}></i>
-                            NFC Pending: Tap here to enable scanner
+                            {t('workerPortal.nfcPending')}
                         </div>
                     )}
 
@@ -1317,10 +1427,10 @@ export const WorkerPortalPage: React.FC = () => {
                                 <div className={`on-duty-banner ${!isClockedIn ? 'off-duty-banner' : ''}`}>
                                     <div className="banner-content">
                                         <div className="banner-status">
-                                            <div style={{ width: '12px', height: '12px', background: isClockedIn ? '#34d399' : '#94a3b8', borderRadius: '50%', boxShadow: isClockedIn ? '0 0 15px #34d399' : 'none' }}></div>
-                                            {isClockedIn ? 'Operational Status: On Duty' : 'Current Status: Off Duty'}
+                                            <div style={{ width: '12px', height: '12px', background: isClockedIn ? 'var(--success)' : 'var(--text-muted)', borderRadius: '50%', boxShadow: isClockedIn ? '0 0 15px var(--success)' : 'none' }}></div>
+                                            {isClockedIn ? t('workerPortal.onDuty') : t('workerPortal.offDuty')}
                                         </div>
-                                        <h1 className="banner-title">{isClockedIn ? 'Worker Logged In' : 'Shift Not Started'}</h1>
+                                        <h1 className="banner-title">{isClockedIn ? t('workerPortal.workerLoggedIn') : t('workerPortal.shiftNotStarted')}</h1>
                                         <div className="banner-time">
                                             <i className="fa-regular fa-clock" style={{ marginRight: '10px' }}></i>
                                             {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
@@ -1328,79 +1438,79 @@ export const WorkerPortalPage: React.FC = () => {
                                     </div>
                                     <div className="banner-actions">
                                         {!isClockedIn ? (
-                                            <button className="clock-btn-premium btn-in" onClick={handleClockIn} disabled={loading}>
-                                                <i className="fa-solid fa-play"></i> {loading ? 'Clocking in...' : 'Clock In Now'}
+                                            <button onClick={handleClockIn} className="clock-btn clock-in">
+                                                <i className="fa-solid fa-play"></i> {t('workerPortal.clockIn')}
                                             </button>
                                         ) : (
-                                            <div style={{ display: 'flex', gap: '1rem' }}>
-                                                {localUser?.availability === 'available' ? (
-                                                    <button className="clock-btn-premium" style={{ color: '#f59e0b' }} onClick={() => handleTakeBreak(false)} disabled={loading}>
-                                                        <i className="fa-solid fa-mug-hot"></i> {loading ? 'Starting...' : 'Take Break'}
+                                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                                {localUser?.availability === 'break' ? (
+                                                    <button onClick={handleEndBreak} className="clock-btn break-btn" style={{ background: '#10b981' }}>
+                                                        <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.endBreak')}
                                                     </button>
                                                 ) : (
-                                                    <button className="clock-btn-premium" style={{ color: '#10b981' }} onClick={handleEndBreak} disabled={loading}>
-                                                        <i className="fa-solid fa-play"></i> {loading ? 'Ending...' : 'End Break'}
+                                                    <button onClick={() => handleTakeBreak()} className="clock-btn break-btn">
+                                                        <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.takeBreak')}
                                                     </button>
                                                 )}
-                                                <button className="clock-btn-premium btn-out" onClick={handleClockOut} disabled={loading}>
-                                                    <i className="fa-solid fa-stop"></i> {loading ? 'Clocking out...' : 'Clock Out Now'}
+                                                <button onClick={handleClockOut} className="clock-btn clock-out">
+                                                    <i className="fa-solid fa-stop"></i> {t('workerPortal.clockOut')}
                                                 </button>
                                             </div>
                                         )}
                                     </div>
                                 </div>
 
-                                <div className="status-card" style={{ display: 'flex', flexDirection: 'column', width: '100%', margin: 0 }}>
-                                    <div className="status-label">Active Assignments</div>
+                                <div className="status-card" style={{ display: 'flex', flexDirection: 'column', width: '100%', margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                    <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>{t('workerPortal.activeTasks')}</div>
                                     {activeTasks.length > 0 ? (
                                         <ul style={{ listStyle: 'none', padding: 0, margin: 0, flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
                                             {activeTasks.map(task => (
-                                                <li key={task.id} style={{ padding: '1.5rem', border: '1px solid #E2E8F0', borderRadius: '20px', background: '#F8FAFC', transition: 'transform 0.2s' }}>
-                                                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#1e1b4b' }}>{task.description}</div>
-                                                    <div style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '0.5rem', fontWeight: 600 }}>Ref: {task.mo_reference}</div>
+                                                <li key={task.id} style={{ padding: '1.5rem', border: '1px solid var(--border)', borderRadius: '20px', background: 'var(--bg-main)', transition: 'transform 0.2s' }}>
+                                                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>{task.description}</div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontWeight: 600 }}>Ref: {task.mo_reference}</div>
                                                 </li>
                                             ))}
                                         </ul>
                                     ) : (
-                                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem', color: '#94A3B8', fontStyle: 'italic', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #e2e8f0' }}>Waiting for assignments...</div>
+                                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem', color: 'var(--text-muted)', fontStyle: 'italic', background: 'var(--bg-main)', borderRadius: '20px', border: '1.5px dashed var(--border)' }}>{t('workerPortal.noActiveTasks')}</div>
                                     )}
                                 </div>
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                                <div className="status-card" style={{ margin: 0 }}>
-                                    <div className="status-label">Today's Summary</div>
+                                <div className="status-card" style={{ margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                    <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>{t('workerPortal.todaySummary')}</div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                        <div style={{ padding: '1.5rem', background: '#F0F9FF', borderRadius: '20px', border: '1px solid #BAE6FD' }}>
-                                            <div style={{ fontSize: '0.75rem', color: '#0369A1', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem' }}>Total Hours</div>
-                                            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0C4A6E' }}>8.5</div>
+                                        <div style={{ padding: '1.5rem', background: 'var(--primary-bg)', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem' }}>{t('workerPortal.totalHours')}</div>
+                                            <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>8.5</div>
                                         </div>
-                                        <div style={{ padding: '1.5rem', background: '#F0FDF4', borderRadius: '20px', border: '1px solid #BBF7D0' }}>
-                                            <div style={{ fontSize: '0.75rem', color: '#15803D', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem' }}>Efficiency</div>
-                                            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#064E3B' }}>94%</div>
+                                        <div style={{ padding: '1.5rem', background: 'var(--success-bg)', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem' }}>{t('workerPortal.efficiency')}</div>
+                                            <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>94%</div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="status-card" style={{ margin: 0, flex: 1 }}>
-                                    <div className="status-label">Notifications & Alerts</div>
+                                <div className="status-card" style={{ margin: 0, flex: 1, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                    <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>{t('workerPortal.notifications')}</div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                        <div style={{ padding: '1.25rem', background: '#FFF7ED', borderRadius: '16px', border: '1px solid #FFEDD5', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                            <div style={{ width: '40px', height: '40px', background: '#FFEDD5', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <i className="fa-solid fa-bullhorn" style={{ color: '#C2410C' }}></i>
+                                        <div style={{ padding: '1.25rem', background: 'var(--warning-bg)', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                            <div style={{ width: '40px', height: '40px', background: 'var(--accent)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                                                <i className="fa-solid fa-bullhorn"></i>
                                             </div>
                                             <div>
-                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#7C2D12' }}>New Policy Added</div>
-                                                <div style={{ fontSize: '0.75rem', color: '#9A3412', fontWeight: 600 }}>Update SOP 3.7</div>
+                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' }}>{t('workerPortal.newPolicy')}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t('workerPortal.updateSop')}</div>
                                             </div>
                                         </div>
-                                        <div style={{ padding: '1.25rem', background: '#EEF2FF', borderRadius: '16px', border: '1px solid #E0E7FF', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                            <div style={{ width: '40px', height: '40px', background: '#E0E7FF', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <i className="fa-solid fa-calendar-check" style={{ color: '#4338CA' }}></i>
+                                        <div style={{ padding: '1.25rem', background: 'var(--primary-bg)', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                            <div style={{ width: '40px', height: '40px', background: 'var(--primary)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                                                <i className="fa-solid fa-calendar-check"></i>
                                             </div>
                                             <div>
-                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#312E81' }}>Monthly Review</div>
-                                                <div style={{ fontSize: '0.75rem', color: '#3730A3', fontWeight: 600 }}>Scheduled for Friday</div>
+                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' }}>{t('workerPortal.monthlyReview')}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t('workerPortal.scheduledFriday')}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -1414,7 +1524,7 @@ export const WorkerPortalPage: React.FC = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                 <div className="section-title-row" style={{ marginBottom: 0 }}>
                                     <i className="fa-solid fa-user-gear"></i>
-                                    <h2 style={{ fontSize: '2rem' }}>Personal Details</h2>
+                                    <h2 style={{ fontSize: '2rem' }}>{t('workerPortal.tabs.personalInfo')}</h2>
                                 </div>
                                 <button className="edit-btn" onClick={() => {
                                     if (editMode) {
@@ -1423,8 +1533,8 @@ export const WorkerPortalPage: React.FC = () => {
                                         setValidationErrors({});
                                     }
                                     setEditMode(!editMode);
-                                }} style={{ padding: '0.9rem 1.75rem', borderRadius: '14px', border: 'none', background: editMode ? '#fee2e2' : '#f1f5f9', color: editMode ? '#ef4444' : '#1e1b4b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}>
-                                    {editMode ? 'Cancel Edit' : 'Edit Profile'}
+                                }} style={{ padding: '0.9rem 1.75rem', borderRadius: '14px', border: 'none', background: editMode ? 'var(--danger-bg)' : 'var(--bg-main)', color: editMode ? 'var(--danger)' : 'var(--primary)', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}>
+                                    {editMode ? t('common.cancel') : t('common.edit')}
                                 </button>
                             </div>
 
@@ -1432,62 +1542,62 @@ export const WorkerPortalPage: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-id-card"></i>
-                                    <h3>Basic Information</h3>
+                                    <h3>{t('employeeDetail.personal.basicInfo')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field">
-                                        <label>Employee #</label>
+                                        <label>{t('employeeDetail.personal.employeeNum')}</label>
                                         <input type="text" className={`info-input ${validationErrors.worker_id ? 'error' : ''}`} value={formData.worker_id || ''} disabled />
                                     </div>
                                     <div className="info-field">
-                                        <label>Status</label>
+                                        <label>{t('employeeDetail.personal.status')}</label>
                                         <select className="info-input" value={formData.active === false ? "false" : "true"} disabled>
-                                            <option value="true">Active</option>
-                                            <option value="false">Archived</option>
+                                            <option value="true">{t('common.active')}</option>
+                                            <option value="false">{t('common.archived')}</option>
                                         </select>
                                     </div>
                                     <div className="info-field">
-                                        <label>First Name</label>
+                                        <label>{t('employeeDetail.personal.firstName')}</label>
                                         <input type="text" className={`info-input ${validationErrors.first_name ? 'error' : ''}`} value={formData.first_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))} disabled={!editMode} />
                                         {validationErrors.first_name && <span className="error-text">{validationErrors.first_name}</span>}
                                     </div>
                                     <div className="info-field">
-                                        <label>Middle Name</label>
+                                        <label>{t('employeeDetail.personal.middleName')}</label>
                                         <input type="text" className="info-input" value={formData.middle_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, middle_name: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Last Name</label>
+                                        <label>{t('employeeDetail.personal.lastName')}</label>
                                         <input type="text" className="info-input" value={formData.last_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Preferred Name</label>
+                                        <label>{t('employeeDetail.personal.preferredName')}</label>
                                         <input type="text" className="info-input" value={formData.preferred_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, preferred_name: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Birth Date</label>
+                                        <label>{t('employeeDetail.personal.birthDate')}</label>
                                         <input type="date" className="info-input" value={formData.birth_date || ''} onChange={(e) => setFormData(prev => ({ ...prev, birth_date: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Gender</label>
+                                        <label>{t('employeeDetail.personal.gender')}</label>
                                         <select className="info-input" value={formData.gender || ""} onChange={(e) => setFormData(prev => ({ ...prev, gender: e.target.value }))} disabled={!editMode}>
-                                            <option value="">-Select-</option>
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                            <option value="Other">Other</option>
+                                            <option value="">{t('common.select')}</option>
+                                            <option value="Male">{t('common.male')}</option>
+                                            <option value="Female">{t('common.female')}</option>
+                                            <option value="Other">{t('common.other')}</option>
                                         </select>
                                     </div>
                                     <div className="info-field">
-                                        <label>Marital Status</label>
+                                        <label>{t('employeeDetail.personal.maritalStatus')}</label>
                                         <select className="info-input" value={formData.marital_status || ""} onChange={(e) => setFormData(prev => ({ ...prev, marital_status: e.target.value }))} disabled={!editMode}>
-                                            <option value="">-Select-</option>
-                                            <option value="Single">Single</option>
-                                            <option value="Married">Married</option>
+                                            <option value="">{t('common.select')}</option>
+                                            <option value="Single">{t('common.single')}</option>
+                                            <option value="Married">{t('common.married')}</option>
                                         </select>
                                     </div>
                                     <div className="info-field">
-                                        <label>Shirt Size</label>
+                                        <label>{t('employeeDetail.personal.shirtSize')}</label>
                                         <select className="info-input" value={formData.shirt_size || ""} onChange={(e) => setFormData(prev => ({ ...prev, shirt_size: e.target.value }))} disabled={!editMode}>
-                                            <option value="">-Select-</option>
+                                            <option value="">{t('common.select')}</option>
                                             <option value="S">S</option>
                                             <option value="M">M</option>
                                             <option value="L">L</option>
@@ -1503,31 +1613,31 @@ export const WorkerPortalPage: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-house"></i>
-                                    <h3>Address</h3>
+                                    <h3>{t('employeeDetail.personal.address')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field full-width">
-                                        <label>Street 1</label>
+                                        <label>{t('employeeDetail.personal.street1')}</label>
                                         <input type="text" className="info-input" value={formData.address_street1 || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_street1: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Street 2</label>
+                                        <label>{t('employeeDetail.personal.street2')}</label>
                                         <input type="text" className="info-input" value={formData.address_street2 || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_street2: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>City</label>
+                                        <label>{t('employeeDetail.personal.city')}</label>
                                         <input type="text" className="info-input" value={formData.address_city || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_city: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>State</label>
+                                        <label>{t('employeeDetail.personal.state')}</label>
                                         <input type="text" className="info-input" value={formData.address_state || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_state: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>ZIP</label>
+                                        <label>{t('employeeDetail.personal.zip')}</label>
                                         <input type="text" className="info-input" value={formData.address_zip || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_zip: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Country</label>
+                                        <label>{t('employeeDetail.personal.country')}</label>
                                         <input type="text" className="info-input" value={formData.address_country || ''} onChange={(e) => setFormData(prev => ({ ...prev, address_country: e.target.value }))} disabled={!editMode} />
                                     </div>
                                 </div>
@@ -1537,32 +1647,32 @@ export const WorkerPortalPage: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-address-book"></i>
-                                    <h3>Contact</h3>
+                                    <h3>{t('hire.sections.contact')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field">
-                                        <label>Work Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.work_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_phone: e.target.value }))} disabled={!editMode} /></div>
+                                        <label>{t('hire.fields.workPhone')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.work_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_phone: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field">
-                                        <label>Ext</label>
+                                        <label>{t('hire.fields.ext')}</label>
                                         <input type="text" className="info-input" value={formData.work_phone_ext || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_phone_ext: e.target.value }))} disabled={!editMode} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Mobile Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-mobile-screen" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.mobile_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, mobile_phone: e.target.value }))} disabled={!editMode} /></div>
+                                        <label>{t('hire.fields.mobilePhone')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-mobile-screen" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.mobile_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, mobile_phone: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field">
-                                        <label>Home Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.home_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_phone: e.target.value }))} disabled={!editMode} /></div>
+                                        <label>{t('hire.fields.homePhone')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.home_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_phone: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Work Email</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i><input type="email" className="info-input" style={{flex: 1}} value={formData.work_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_email: e.target.value }))} disabled={!editMode} /></div>
+                                        <label>{t('hire.fields.workEmail')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "var(--text-muted)"}}></i><input type="email" className="info-input" style={{flex: 1}} value={formData.work_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_email: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Home Email</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i><input type="email" className="info-input" style={{flex: 1}} value={formData.home_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_email: e.target.value }))} disabled={!editMode} /></div>
+                                        <label>{t('hire.fields.homeEmail')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "var(--text-muted)"}}></i><input type="email" className="info-input" style={{flex: 1}} value={formData.home_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_email: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                 </div>
                             </div>
@@ -1571,20 +1681,20 @@ export const WorkerPortalPage: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-share-nodes"></i>
-                                    <h3>Social Links</h3>
+                                    <h3>{t('common.socialLinks')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field full-width">
-                                        <label>LinkedIn</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-linkedin" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.linkedin_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, linkedin_url: e.target.value }))} disabled={!editMode} /></div>
+                                        <label>{t('common.linkedin')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-linkedin" style={{color: "var(--text-muted)"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.linkedin_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, linkedin_url: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Twitter Username</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-twitter" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.twitter_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, twitter_url: e.target.value }))} disabled={!editMode} /></div>
+                                        <label>{t('common.twitter')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-twitter" style={{color: "var(--text-muted)"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.twitter_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, twitter_url: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Facebook</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-facebook" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.facebook_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, facebook_url: e.target.value }))} disabled={!editMode} /></div>
+                                        <label>{t('common.facebook')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-facebook" style={{color: "var(--text-muted)"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.facebook_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, facebook_url: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                 </div>
                             </div>
@@ -1593,18 +1703,18 @@ export const WorkerPortalPage: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-graduation-cap"></i>
-                                    <h3>Education</h3>
+                                    <h3>{t('employeeDetail.education.title')}</h3>
                                 </div>
                                 <div style={{ padding: '1.5rem', textAlign: 'center' }}>
-                                    <button className="text-link" style={{ color: '#1e1b4b', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }} disabled={!editMode}><i className="fa-solid fa-plus-circle"></i> Add Education</button>
+                                    <button className="text-link" style={{ color: 'var(--primary)', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }} disabled={!editMode}><i className="fa-solid fa-plus-circle"></i> {t('employeeDetail.education.add')}</button>
                                 </div>
                             </div>
 
 
                             {editMode && (
                                 <div style={{ position: 'sticky', bottom: '2rem', display: 'flex', justifyContent: 'center', zIndex: 100 }}>
-                                    <button className="clock-btn" style={{ background: '#10b981', color: 'white', width: 'auto', padding: '1rem 3rem', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)' }} onClick={handleSaveProfile} disabled={loading}>
-                                        {loading ? 'Saving Changes...' : 'Save Updated Details'}
+                                    <button className="clock-btn" style={{ background: 'var(--success)', color: 'white', width: 'auto', padding: '1rem 3rem', boxShadow: 'var(--shadow-lg)' }} onClick={handleSaveProfile} disabled={loading}>
+                                        {loading ? t('common.saving') : t('common.saveChanges')}
                                     </button>
                                 </div>
                             )}
@@ -1612,118 +1722,90 @@ export const WorkerPortalPage: React.FC = () => {
                     )}
 
                     {activeTab === 'conduct' && (
-                        <div className="conduct-section" style={{ width: '100%' }}>
-                            <div style={{ marginBottom: '4rem' }}>
-                                <h3 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: '#1e1b4b', letterSpacing: '-0.03em' }}>Conduct Record</h3>
-                                <p style={{ color: '#94a3b8', marginTop: '0.5rem', fontWeight: 600, fontSize: '1.1rem' }}>Review your compliance status and official acknowledgments</p>
+                        <div className="profile-section" style={{ width: '100%' }}>
+                            <div className="section-title-row">
+                                <i className="fa-solid fa-shield-halved"></i>
+                                <h2 style={{ fontSize: '2rem', color: 'var(--text-main)' }}>{t('workerPortal.conduct.title')}</h2>
                             </div>
-                            <div style={{ backgroundColor: '#f8fafc', padding: '2rem', borderRadius: '24px', marginBottom: '4rem', border: '1px solid #e2e8f0' }}>
-                                <div className="status-label" style={{ marginBottom: '1.5rem' }}>Active Policies</div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.1rem' }}>Employee Disciplinary Standards (SOP 3.7)</div>
-                                        <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.4rem', fontWeight: 700 }}>v1.0 • Effective March 2024</div>
-                                    </div>
-                                    <div className="pilled-badge" style={{ backgroundColor: '#dcfce7', color: '#065f46', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}>
-                                        <i className="fa-solid fa-circle-check"></i> SIGNED
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="status-label" style={{ marginBottom: '2rem' }}>History of Incidents</div>
+
                             {disciplinaryIncidents.length > 0 ? (
-                                <div style={{
-                                    background: '#ebedf0',
-                                    padding: '2rem',
-                                    borderRadius: '20px',
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(3, 1fr)',
-                                    gap: '1.25rem',
-                                    minHeight: '400px'
-                                }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
                                     {disciplinaryIncidents.map(incident => (
                                         <div key={incident.id} style={{
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            padding: '1rem 1.25rem',
-                                            borderRadius: '8px',
-                                            background: '#ffffff',
-                                            boxShadow: '0 1px 0 rgba(9, 30, 66, .25)',
-                                            border: 'none',
+                                            padding: '1.5rem',
+                                            borderRadius: '20px',
+                                            background: 'var(--bg-card)',
+                                            border: '1px solid var(--border)',
+                                            boxShadow: 'var(--shadow-sm)',
                                             height: 'fit-content',
-                                            cursor: 'pointer',
-                                            transition: 'background 0.2s',
+                                            transition: 'transform 0.2s',
                                         }}>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
                                                 <div style={{
                                                     height: '8px',
                                                     width: '40px',
                                                     borderRadius: '4px',
-                                                    background: incident.severity === 'gross_misconduct' ? '#ef4444' : incident.severity === 'major' ? '#f59e0b' : '#fbbf24'
+                                                    background: incident.severity === 'gross_misconduct' ? 'var(--danger)' : incident.severity === 'major' ? 'var(--warning)' : 'var(--accent)'
                                                 }}></div>
                                                 <div style={{
                                                     fontSize: '0.7rem',
                                                     fontWeight: 800,
-                                                    color: incident.severity === 'gross_misconduct' ? '#991b1b' : '#92400e',
+                                                    color: incident.severity === 'gross_misconduct' ? 'var(--danger)' : 'var(--accent)',
                                                     textTransform: 'uppercase',
-                                                    letterSpacing: '0.02em'
+                                                    letterSpacing: '0.05em'
                                                 }}>
                                                     {incident.severity.replace('_', ' ')}
                                                 </div>
                                             </div>
 
-                                            <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 600, color: '#172b4d' }}>
+                                            <h4 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
                                                 {incident.category.toUpperCase().replace('_', ' ')}
                                             </h4>
 
-                                            <div style={{ fontSize: '0.75rem', color: '#5e6c84', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <i className="fa-solid fa-file-lines" style={{ fontSize: '0.7rem' }}></i>
-                                                {incident.documentation || 'No Reference'}
-                                            </div>
-
-                                            <p style={{ margin: '0 0 16px 0', color: '#172b4d', lineHeight: '1.5', fontSize: '0.9rem' }}>
+                                            <p style={{ margin: '0 0 16px 0', color: 'var(--text-main)', lineHeight: '1.6', fontSize: '0.95rem', opacity: 0.8 }}>
                                                 {incident.description}
                                             </p>
 
-                                            <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid #ebedf0' }}>
+                                            <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <div title="Date Occurred" style={{ fontSize: '0.75rem', color: '#5e6c84', background: '#f4f5f7', padding: '2px 6px', borderRadius: '3px', fontWeight: 600 }}>
-                                                            <i className="fa-regular fa-calendar" style={{ marginRight: '4px' }}></i>
-                                                            {new Date(incident.incident_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-main)', padding: '4px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                                                            <i className="fa-regular fa-calendar" style={{ marginRight: '6px' }}></i>
+                                                            {new Date(incident.incident_date).toLocaleDateString()}
                                                         </div>
                                                         {incident.signed_at && (
-                                                            <div title="Signed & Verified" style={{ fontSize: '0.75rem', color: '#ffffff', background: '#61bd4f', padding: '2px 6px', borderRadius: '3px', fontWeight: 700 }}>
+                                                            <div title={t('workerPortal.conduct.signedAt', { date: new Date(incident.signed_at).toLocaleDateString() })} style={{ fontSize: '0.75rem', color: 'white', background: 'var(--success)', padding: '4px 8px', borderRadius: '6px', fontWeight: 800 }}>
                                                                 <i className="fa-solid fa-check-double"></i>
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#dfe1e6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800, color: '#172b4d' }}>
-                                                        {user.name?.[0]}
-                                                    </div>
                                                 </div>
 
                                                 {!incident.signed_at ? (
-                                                    <div style={{ marginTop: '1rem', padding: '1rem', background: '#fff7ed', borderRadius: '8px', border: '1px solid #ffedd5' }}>
-                                                        <div style={{ fontWeight: 900, color: '#9a3412', fontSize: '0.65rem', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Awaiting Signature</div>
+                                                    <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'rgba(245, 158, 11, 0.05)', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                                                        <div style={{ fontWeight: 900, color: 'var(--accent)', fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: '1rem' }}>{t('workerPortal.conduct.signIncident')}</div>
                                                         <input
                                                             type="text"
-                                                            placeholder="Type Name to Sign"
-                                                            style={{ background: 'white', border: '1px solid #fed7aa', padding: '0.5rem', fontSize: '0.85rem', width: '100%', borderRadius: '4px', marginBottom: '0.5rem' }}
+                                                            placeholder={t('workerPortal.conduct.signature')}
+                                                            style={{ background: 'var(--bg-main)', border: '1px solid var(--border)', padding: '0.75rem', fontSize: '0.9rem', width: '100%', borderRadius: '12px', marginBottom: '1rem', color: 'var(--text-main)' }}
                                                             value={signingData[incident.id]?.signature || ''}
                                                             onChange={e => updateSigningLocal(incident.id, 'signature', e.target.value)}
                                                         />
                                                         <button
-                                                            className="clock-btn"
-                                                            style={{ background: '#0079bf', color: 'white', padding: '0.5rem', fontSize: '0.85rem', height: 'auto', borderRadius: '4px' }}
+                                                            className="btn btn-primary"
+                                                            style={{ width: '100%', height: '44px' }}
                                                             onClick={() => handleSignIncident(incident.id)}
                                                             disabled={loading}
                                                         >
-                                                            Sign Now
+                                                            {t('workerPortal.conduct.signIncident')}
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#5e6c84', fontStyle: 'italic' }}>
-                                                        "Resolved & Acknowledged"
+                                                    <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--success)', fontStyle: 'italic', fontWeight: 700 }}>
+                                                        <i className="fa-solid fa-circle-check" style={{ marginRight: '6px' }}></i>
+                                                        {t('workerPortal.conduct.signedAt', { date: new Date(incident.signed_at).toLocaleDateString() })}
                                                     </div>
                                                 )}
                                             </div>
@@ -1731,233 +1813,325 @@ export const WorkerPortalPage: React.FC = () => {
                                     ))}
                                 </div>
                             ) : (
-                                <div style={{ textAlign: 'center', padding: '4rem 2rem', background: 'white', borderRadius: '24px', border: '1px dashed #CBD5E1' }}>
-                                    <div style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>🏆</div>
-                                    <h4 style={{ margin: 0, fontWeight: 900, color: '#262661' }}>Exemplary Employee</h4>
-                                    <p style={{ color: '#64748B', marginTop: '0.5rem' }}>Your record is perfectly clear. Keep it up!</p>
+                                <div style={{ textAlign: 'center', padding: '5rem 2rem', background: 'var(--bg-card)', borderRadius: '24px', border: '1.5px dashed var(--border)', marginTop: '2rem' }}>
+                                    <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>🏆</div>
+                                    <h4 style={{ margin: 0, fontWeight: 900, color: 'var(--text-main)', fontSize: '1.5rem' }}>{t('workerPortal.conduct.noIncidents')}</h4>
                                 </div>
                             )}
                         </div>
                     )}
 
                     {activeTab === 'settings' && (
-                        <div className="profile-section" style={{ width: '100%' }}>
-                            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#262661' }}>Application Settings</h3>
-                            <p style={{ color: '#64748B', marginTop: '0.5rem' }}>Manage your portal preferences and notification alerts</p>
-                            <div style={{ marginTop: '2.5rem' }}>
-                                <div style={{ padding: '1.5rem', background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <div style={{ fontWeight: 800, color: '#262661' }}>Real-time Notifications</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Receive alerts on misconduct incidents immediately</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%' }}>
+                            <div className="section-title-row">
+                                <i className="fa-solid fa-sliders"></i>
+                                <h2 style={{ fontSize: '2rem', color: 'var(--text-main)' }}>{t('workerPortal.settings.title')}</h2>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem' }}>
+                                <div className="info-card" style={{ marginBottom: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                    <div className="card-header">
+                                        <i className="fa-solid fa-palette"></i>
+                                        <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.settings.appearance')}</h3>
                                     </div>
-                                    <div style={{ width: '40px', height: '24px', background: '#10B981', borderRadius: '99px' }}></div>
+                                    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{t('workerPortal.settings.theme')}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('themes.light')} / {t('themes.dark')}</div>
+                                            </div>
+                                            <button 
+                                                onClick={toggleTheme}
+                                                style={{ 
+                                                    padding: '0.6rem 1.25rem', 
+                                                    borderRadius: '12px', 
+                                                    border: '1px solid var(--border)', 
+                                                    background: 'var(--bg-main)', 
+                                                    color: 'var(--text-main)', 
+                                                    fontWeight: 700, 
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.75rem',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                {currentTheme === 'light' ? <i className="fa-solid fa-sun"></i> : <i className="fa-solid fa-moon"></i>}
+                                                {currentTheme === 'light' ? t('themes.light') : t('themes.dark')}
+                                            </button>
+                                        </div>
+
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+                                            <div>
+                                                <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{t('workerPortal.settings.language')}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>English / Español</div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-main)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <button 
+                                                    onClick={() => setLanguage('en')}
+                                                    style={{ 
+                                                        padding: '0.5rem 1rem', 
+                                                        borderRadius: '8px', 
+                                                        border: 'none', 
+                                                        background: i18n.language === 'en' ? 'var(--primary)' : 'transparent', 
+                                                        color: i18n.language === 'en' ? 'white' : 'var(--text-main)', 
+                                                        fontWeight: 800, 
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.85rem'
+                                                    }}
+                                                >
+                                                    EN
+                                                </button>
+                                                <button 
+                                                    onClick={() => setLanguage('es')}
+                                                    style={{ 
+                                                        padding: '0.5rem 1rem', 
+                                                        borderRadius: '8px', 
+                                                        border: 'none', 
+                                                        background: i18n.language === 'es' ? 'var(--primary)' : 'transparent', 
+                                                        color: i18n.language === 'es' ? 'white' : 'var(--text-main)', 
+                                                        fontWeight: 800, 
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.85rem'
+                                                    }}
+                                                >
+                                                    ES
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-
-
                     {activeTab === 'training' && (
                         <div className="profile-section" style={{ width: '100%' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
                                 <div>
-                                    <h3 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: '#1e1b4b', letterSpacing: '-0.03em' }}>Babylon Training System</h3>
-                                    <p style={{ color: '#94a3b8', marginTop: '0.5rem', fontWeight: 600, fontSize: '1.1rem' }}>Complete your mandatory structural training</p>
+                                    <h3 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.03em' }}>{t('workerPortal.training.systemName')}</h3>
+                                    <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontWeight: 600, fontSize: '1.1rem' }}>{t('workerPortal.training.systemSubtitle')}</p>
                                 </div>
                             </div>
 
                             <div style={{ marginBottom: '3rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                        <div style={{ width: '40px', height: '40px', background: '#e0e7ff', color: '#4f46e5', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
+                                        <div style={{ width: '48px', height: '48px', background: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
                                             <i className="fa-solid fa-layer-group"></i>
                                         </div>
-                                        <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#1e1b4b' }}>Level 1: Core Orientation</h4>
+                                        <div>
+                                            <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{t('workerPortal.training.level1Title')}</h4>
+                                            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>{t('workerPortal.training.level1Subtitle')}</p>
+                                        </div>
                                     </div>
-                                    <div style={{ background: '#f0fdf4', color: '#15803d', padding: '0.5rem 1rem', borderRadius: '12px', fontWeight: 800, border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-                                        <i className="fa-solid fa-chart-pie"></i> Progress: {Math.round((completedTrainings.filter(t => LEVEL_1_TRAININGS.find(l1 => l1.name === t)).length / LEVEL_1_TRAININGS.length) * 100)}%
+                                    <div style={{ background: 'var(--bg-card)', color: 'var(--success)', padding: '0.75rem 1.25rem', borderRadius: '16px', fontWeight: 800, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+                                        <i className="fa-solid fa-chart-pie"></i> {t('workerPortal.training.progress')}: {trainingMaterials.filter(m => m.level === 1).length > 0 ? Math.round((completedTrainings.filter(t => trainingMaterials.find(m => m.level === 1 && m.category === t)).length / trainingMaterials.filter(m => m.level === 1).reduce((acc, curr) => acc.add(curr.category), new Set()).size) * 100) : 0}%
                                     </div>
                                 </div>
-                                <p style={{ color: '#64748b', marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.95rem' }}>Required for ALL employees (Slides + Quiz + Sign Off)</p>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
-                                    {LEVEL_1_TRAININGS.map((training, idx) => (
-                                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.25rem' }}>
-                                                <div style={{ width: '40px', height: '40px', background: idx === 0 ? '#dcfce7' : '#f8fafc', color: idx === 0 ? '#10b981' : '#94a3b8', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: idx === 0 ? 'none' : '1px solid #e2e8f0' }}>
-                                                    {idx === 0 ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-display"></i>}
+                                    {/* Group Level 1 materials by category */}
+                                    {Array.from(new Set(trainingMaterials.filter(m => m.level === 1).map(m => m.category))).map((categoryName, idx) => {
+                                        const materials = trainingMaterials.filter(m => m.level === 1 && m.category === categoryName);
+                                        const isCompleted = completedTrainings.includes(categoryName);
+                                        return (
+                                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', padding: '1.75rem', borderRadius: '24px', border: '1px solid var(--border)', transition: 'all 0.3s', boxShadow: 'var(--shadow-sm)' }}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                                                    <div style={{ 
+                                                        width: '48px', 
+                                                        height: '48px', 
+                                                        background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-main)', 
+                                                        color: isCompleted ? 'var(--success)' : 'var(--text-muted)', 
+                                                        borderRadius: '14px', 
+                                                        display: 'flex', 
+                                                        alignItems: 'center', 
+                                                        justifyContent: 'center', 
+                                                        flexShrink: 0, 
+                                                        border: isCompleted ? 'none' : '1px solid var(--border)',
+                                                        fontSize: '1.2rem'
+                                                    }}>
+                                                        {isCompleted ? <i className="fa-solid fa-circle-check"></i> : <i className="fa-solid fa-display"></i>}
+                                                    </div>
+                                                    <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.4 }}>{categoryName}</div>
                                                 </div>
-                                                <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{training.name}</div>
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Formal Slides</div>
-                                                    {completedTrainings.includes(training.name) ? (
-                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', background: '#dcfce7', padding: '0.35rem 0.85rem', borderRadius: '99px' }}>COMPLETED</span>
-                                                    ) : (
-                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4f46e5', background: '#eef2ff', padding: '0.35rem 0.85rem', borderRadius: '99px' }}>IN PROGRESS</span>
-                                                    )}
-                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: 'auto', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('workerPortal.training.materials')}</div>
+                                                        <span style={{ 
+                                                            fontSize: '0.7rem', 
+                                                            fontWeight: 900, 
+                                                            color: isCompleted ? 'var(--success)' : 'var(--primary)', 
+                                                            background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(79, 70, 229, 0.1)', 
+                                                            padding: '0.4rem 1rem', 
+                                                            borderRadius: '99px',
+                                                            textTransform: 'uppercase'
+                                                        }}>
+                                                            {isCompleted ? t('workerPortal.training.completed') : t('workerPortal.training.inProgress')}
+                                                        </span>
+                                                    </div>
 
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                                    {training.pdfs.map((pdf, pIdx) => (
-                                                        <button
-                                                            key={pIdx}
-                                                            onClick={() => {
-                                                                setSelectedPdf(pdf.path);
-                                                                setCurrentTrainingName(training.name);
-                                                            }}
-                                                            style={{
-                                                                flex: 1,
-                                                                minWidth: training.pdfs.length > 1 ? '140px' : '100%',
-                                                                padding: '0.65rem',
-                                                                borderRadius: '10px',
-                                                                border: '1.5px solid #e2e8f0',
-                                                                background: 'white',
-                                                                color: '#4f46e5',
-                                                                fontWeight: 700,
-                                                                fontSize: '0.8rem',
-                                                                cursor: 'pointer',
-                                                                transition: 'all 0.2s',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                gap: '0.5rem'
-                                                            }}
-                                                            onMouseOver={e => {
-                                                                e.currentTarget.style.backgroundColor = '#eef2ff';
-                                                                e.currentTarget.style.borderColor = '#4f46e5';
-                                                            }}
-                                                            onMouseOut={e => {
-                                                                e.currentTarget.style.backgroundColor = 'white';
-                                                                e.currentTarget.style.borderColor = '#e2e8f0';
-                                                            }}
-                                                        >
-                                                            <i className="fa-solid fa-file-pdf"></i>
-                                                            {training.pdfs.length > 1 ? `Part ${pIdx + 1}` : 'View Slides'}
-                                                        </button>
-                                                    ))}
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                                        {materials.map((mat, mIdx) => (
+                                                            <button
+                                                                key={mIdx}
+                                                                onClick={() => {
+                                                                    setSelectedPdf(trainingService.getPublicUrl(mat.file_path));
+                                                                    setCurrentTrainingName(mat.category);
+                                                                }}
+                                                                style={{
+                                                                    flex: 1,
+                                                                    minWidth: materials.length > 1 ? '140px' : '100%',
+                                                                    padding: '0.8rem 1rem',
+                                                                    borderRadius: '12px',
+                                                                    border: '1.5px solid var(--border)',
+                                                                    background: 'var(--bg-main)',
+                                                                    color: 'var(--primary)',
+                                                                    fontWeight: 800,
+                                                                    fontSize: '0.85rem',
+                                                                    cursor: 'pointer',
+                                                                    transition: 'all 0.2s',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    gap: '0.6rem'
+                                                                }}
+                                                            >
+                                                                <i className="fa-solid fa-file-pdf"></i>
+                                                                {materials.length > 1 ? `${t('workerPortal.training.part')} ${mIdx + 1}` : t('workerPortal.training.viewSlides')}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
-                            <div>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div style={{ paddingTop: '2rem', borderTop: '2px solid var(--border)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                        <div style={{ width: '40px', height: '40px', background: '#ffedd5', color: '#ea580c', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
-                                            <i className="fa-solid fa-book-open-reader"></i>
+                                        <div style={{ width: '48px', height: '48px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--accent)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
+                                            <i className="fa-solid fa-rectangle-list"></i>
                                         </div>
-                                        <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#1e1b4b' }}>Level 2: Role-Based SOP Material</h4>
+                                        <div>
+                                            <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{t('workerPortal.training.level2Title')}</h4>
+                                            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>{t('workerPortal.training.level2Subtitle')}</p>
+                                        </div>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                        {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 0 && typeof trainingRole === 'string' && (() => {
-                                            const roleSops = LEVEL_2_SOPS[trainingRole] || [];
-                                            const totalRoleSops = roleSops.reduce((acc: any, section: any) => acc + section.pdfs.length, 0);
-                                            const completedRoleSops = completedTrainings.filter(t => roleSops.some((section: any) => section.pdfs.some((pdf: any) => pdf.name === t))).length;
-                                            const progress = totalRoleSops > 0 ? Math.round((completedRoleSops / totalRoleSops) * 100) : 0;
-                                            return (
-                                                <div style={{ background: progress === 100 ? '#f0fdf4' : '#fff7ed', color: progress === 100 ? '#15803d' : '#ea580c', padding: '0.5rem 1rem', borderRadius: '12px', fontWeight: 800, border: `1px solid ${progress === 100 ? '#bbf7d0' : '#ffedd5'}`, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-                                                    <i className="fa-solid fa-chart-pie"></i> Progress: {progress}%
-                                                </div>
-                                            );
-                                        })()}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>VIEWING ROLE:</span>
-                                                <select
-                                                    value={trainingRole}
-                                                    onChange={e => {
-                                                        const newRole = e.target.value as any;
-                                                        setTrainingRole(newRole);
-                                                        if (LEVEL_2_SOPS[newRole]) {
-                                                            setSelectedSOPSection(LEVEL_2_SOPS[newRole][0].name);
-                                                        } else {
-                                                            setSelectedSOPSection('');
+
+                                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--bg-main)', padding: '4px', borderRadius: '14px', border: '1px solid var(--border)' }}>
+                                            {Array.from(new Set(trainingMaterials.filter(m => m.level === 2).map(m => m.department))).map(dept => dept && (
+                                                <button
+                                                    key={dept}
+                                                    onClick={() => {
+                                                        setTrainingRole(dept as any);
+                                                        const rolesForDept = trainingMaterials.filter(m => m.level === 2 && m.department === dept);
+                                                        if (rolesForDept.length > 0) {
+                                                            setSelectedSOPSection(rolesForDept[0].category);
                                                         }
                                                     }}
-                                                    style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
+                                                    style={{
+                                                        padding: '0.6rem 1.25rem',
+                                                        borderRadius: '10px',
+                                                        border: 'none',
+                                                        background: trainingRole === dept ? 'var(--primary)' : 'transparent',
+                                                        color: trainingRole === dept ? 'white' : 'var(--text-muted)',
+                                                        fontWeight: 800,
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.85rem',
+                                                        transition: 'all 0.2s'
+                                                    }}
                                                 >
-                                                    <option value="Production">Production</option>
-                                                    <option value="Compounder I">Compounder I</option>
-                                                    <option value="QC">Quality Control (QC)</option>
-                                                    <option value="Quality Assurance">Quality Assurance</option>
-                                                    <option value="Shipping & Recieving">Shipping & Recieving</option>
-                                                    <option value="Purchase">Purchase</option>
-                                                </select>
-                                            </div>
-                                            {LEVEL_2_SOPS[trainingRole] && LEVEL_2_SOPS[trainingRole].length > 1 && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>SECTION:</span>
-                                                    <select
-                                                        value={selectedSOPSection}
-                                                        onChange={e => setSelectedSOPSection(e.target.value)}
-                                                        style={{ padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', fontSize: '0.85rem', fontWeight: 700, color: '#1e1b4b', cursor: 'pointer', outline: 'none' }}
-                                                    >
-                                                        {LEVEL_2_SOPS[trainingRole].map((section: any, idx: number) => (
-                                                            <option key={idx} value={section.name}>{section.name}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            )}
+                                                    {dept}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
-                                <p style={{ color: '#64748b', marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.95rem' }}>Controlled SOP reading and acknowledgment (No Slides)</p>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                                    {(LEVEL_2_SOPS[trainingRole] || [])
-                                        .filter((section: any) => section.name === selectedSOPSection)
-                                        .map((section: any, sIdx: number) => (
-                                            <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', gridColumn: '1 / -1' }}>
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                                                    {section.pdfs.map((pdf: any, pIdx: number) => {
-                                                        const isCompleted = completedTrainings.includes(pdf.name);
-                                                        return (
-                                                            <div key={pIdx} style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }} onMouseOver={e => (e.currentTarget.style.borderColor = '#cbd5e1')} onMouseOut={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
-                                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
-                                                                    <i className="fa-regular fa-file-lines" style={{ color: '#ea580c', fontSize: '1.25rem', marginTop: '0.2rem' }}></i>
-                                                                    <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1.05rem', lineHeight: 1.4 }}>{pdf.name}</div>
+                                <div style={{ display: 'flex', gap: '2.5rem', alignItems: 'flex-start' }}>
+                                    <div style={{ width: '300px', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.75rem', borderRadius: '20px', border: '1px solid var(--border)', flexShrink: 0 }}>
+                                        {Array.from(new Set(trainingMaterials.filter(m => m.level === 2 && m.department === trainingRole).map(m => m.category))).map(cat => (
+                                            <button
+                                                key={cat}
+                                                onClick={() => setSelectedSOPSection(cat)}
+                                                style={{
+                                                    textAlign: 'left',
+                                                    padding: '1rem 1.25rem',
+                                                    borderRadius: '12px',
+                                                    border: 'none',
+                                                    background: selectedSOPSection === cat ? 'var(--bg-card)' : 'transparent',
+                                                    color: selectedSOPSection === cat ? 'var(--primary)' : 'var(--text-muted)',
+                                                    fontWeight: 800,
+                                                    fontSize: '0.9rem',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: selectedSOPSection === cat ? '0 4px 6px -1px rgba(0, 0, 0, 0.05)' : 'none',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between'
+                                                }}
+                                            >
+                                                {cat}
+                                                {selectedSOPSection === cat && <i className="fa-solid fa-chevron-right" style={{ fontSize: '0.75rem' }}></i>}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div style={{ flex: 1 }}>
+                                        {selectedSOPSection ? (
+                                            <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem' }}>
+                                                    <div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>{trainingRole}</div>
+                                                        <h5 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{selectedSOPSection}</h5>
+                                                    </div>
+                                                    <div style={{ background: 'var(--bg-main)', color: 'var(--primary)', padding: '0.5rem 1.25rem', borderRadius: '12px', fontWeight: 800, fontSize: '0.9rem', border: '1px solid var(--border)' }}>
+                                                        {trainingMaterials.filter(m => m.level === 2 && m.department === trainingRole && m.category === selectedSOPSection).length} {t('workerPortal.training.documents')}
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem' }}>
+                                                    {trainingMaterials
+                                                        .filter(m => m.level === 2 && m.department === trainingRole && m.category === selectedSOPSection)
+                                                        .map((doc, dIdx) => (
+                                                            <button
+                                                                key={dIdx}
+                                                                onClick={() => {
+                                                                    setSelectedPdf(trainingService.getPublicUrl(doc.file_path));
+                                                                    setCurrentTrainingName(doc.display_name); // For SOPs, we track by doc name maybe? OR category?
+                                                                }}
+                                                                style={{
+                                                                    textAlign: 'left',
+                                                                    padding: '1.25rem',
+                                                                    background: 'var(--bg-main)',
+                                                                    border: '1.5px solid var(--border)',
+                                                                    borderRadius: '16px',
+                                                                    cursor: 'pointer',
+                                                                    transition: 'all 0.2s',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '1.25rem'
+                                                                }}
+                                                            >
+                                                                <div style={{ width: '40px', height: '40px', background: 'white', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: '1.2rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', flexShrink: 0 }}>
+                                                                    <i className="fa-solid fa-file-pdf"></i>
                                                                 </div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                                                                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Status:</span>
-                                                                    <span style={{
-                                                                        fontSize: '0.75rem',
-                                                                        fontWeight: 800,
-                                                                        color: isCompleted ? '#15803d' : '#ea580c',
-                                                                        background: isCompleted ? '#dcfce7' : 'transparent',
-                                                                        padding: isCompleted ? '0.2rem 0.6rem' : '0',
-                                                                        borderRadius: '99px'
-                                                                    }}>
-                                                                        {isCompleted ? 'Completed' : 'Pending Read'}
-                                                                    </span>
-                                                                </div>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setSelectedPdf(pdf.path);
-                                                                        setCurrentTrainingName(pdf.name);
-                                                                    }}
-                                                                    style={{ width: '100%', padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s', marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
-                                                                    onMouseOver={e => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = '#ea580c'; }}
-                                                                    onMouseOut={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                                                                >
-                                                                    {isCompleted ? 'Read Again' : 'Read'}
-                                                                </button>
-                                                            </div>
-                                                        );
-                                                    })}
+                                                                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: 1.4 }}>{doc.display_name}</div>
+                                                            </button>
+                                                        ))}
                                                 </div>
                                             </div>
-                                        ))}
-                                    {(!LEVEL_2_SOPS[trainingRole] || LEVEL_2_SOPS[trainingRole].length === 0) && (
-                                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', background: '#f8fafc', borderRadius: '24px', border: '2px dashed #e2e8f0' }}>
-                                            <i className="fa-solid fa-folder-open" style={{ fontSize: '3rem', color: '#cbd5e1', marginBottom: '1rem', display: 'block' }}></i>
-                                            <p style={{ color: '#64748b', fontWeight: 700, fontSize: '1.1rem', margin: 0 }}>No specific SOP materials found for this role.</p>
-                                        </div>
-                                    )}
+                                        ) : (
+                                            <div style={{ textAlign: 'center', padding: '5rem 2rem', background: 'var(--bg-main)', borderRadius: '24px', border: '1.5px dashed var(--border)', color: 'var(--text-muted)' }}>
+                                                <i className="fa-solid fa-arrow-left" style={{ fontSize: '2rem', marginBottom: '1rem', display: 'block' }}></i>
+                                                <p style={{ fontWeight: 700 }}>Select a section from the left to view training materials</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1967,88 +2141,92 @@ export const WorkerPortalPage: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%' }}>
                             <div className="section-title-row">
                                 <i className="fa-solid fa-calendar-day"></i>
-                                <h2 style={{ fontSize: '2rem' }}>Time Off & Leave</h2>
+                                <h2 style={{ fontSize: '2rem', color: 'var(--text-main)' }}>{t('workerPortal.timeOff.title')}</h2>
                             </div>
 
                             {/* Balance Cards */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '1rem' }}>
-                                <div className="info-card" style={{ marginBottom: 0 }}>
-                                    <div className="card-header" style={{ background: '#f0f9ff' }}>
+                                <div className="info-card" style={{ marginBottom: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                    <div className="card-header" style={{ background: 'rgba(3, 105, 161, 0.08)' }}>
                                         <i className="fa-solid fa-umbrella-beach" style={{ color: '#0369a1' }}></i>
-                                        <h3 style={{ color: '#0369a1' }}>PTO Balance</h3>
+                                        <h3 style={{ color: '#0369a1' }}>{t('workerPortal.timeOff.pto')}</h3>
                                     </div>
                                     <div style={{ padding: '2rem', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '3.5rem', fontWeight: 900, color: '#0c4a6e', lineHeight: 1 }}>{user?.pto_balance || '0.00'}</div>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0369a1', marginTop: '0.5rem', textTransform: 'uppercase' }}>Hours Available</div>
+                                        <div style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1 }}>{user?.pto_balance || '0.00'}</div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0369a1', marginTop: '0.5rem', textTransform: 'uppercase' }}>{t('workerPortal.timeOff.hoursAvailable')}</div>
                                     </div>
                                 </div>
-                                <div className="info-card" style={{ marginBottom: 0 }}>
-                                    <div className="card-header" style={{ background: '#f0fdf4' }}>
+                                <div className="info-card" style={{ marginBottom: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                    <div className="card-header" style={{ background: 'rgba(21, 128, 61, 0.08)' }}>
                                         <i className="fa-solid fa-briefcase-medical" style={{ color: '#15803d' }}></i>
-                                        <h3 style={{ color: '#15803d' }}>Sick Leave</h3>
+                                        <h3 style={{ color: '#15803d' }}>{t('workerPortal.timeOff.sick')}</h3>
                                     </div>
                                     <div style={{ padding: '2rem', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '3.5rem', fontWeight: 900, color: '#064e3b', lineHeight: 1 }}>{user?.sick_balance || '0.00'}</div>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#15803d', marginTop: '0.5rem', textTransform: 'uppercase' }}>Hours Available</div>
+                                        <div style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1 }}>{user?.sick_balance || '0.00'}</div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#15803d', marginTop: '0.5rem', textTransform: 'uppercase' }}>{t('workerPortal.timeOff.hoursAvailable')}</div>
                                     </div>
                                 </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.5fr)', gap: '2rem' }}>
                                 {/* Request Form */}
-                                <div className="info-card" style={{ height: 'fit-content' }}>
+                                <div className="info-card" style={{ height: 'fit-content', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                                     <div className="card-header">
                                         <i className="fa-solid fa-paper-plane"></i>
-                                        <h3>Request Time Off</h3>
+                                        <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.timeOff.requestTitle')}</h3>
                                     </div>
                                     <form onSubmit={handleLeaveSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                                         <div className="info-field">
-                                            <label>Leave Type</label>
+                                            <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.type')}</label>
                                             <select 
                                                 className="info-input"
+                                                style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                                                 value={leaveFormData.type}
                                                 onChange={e => setLeaveFormData(prev => ({ ...prev, type: e.target.value as 'pto' | 'sick' }))}
                                             >
-                                                <option value="pto">Paid Time Off (PTO)</option>
-                                                <option value="sick">Sick Leave</option>
+                                                <option value="pto">{t('workerPortal.timeOff.pto')}</option>
+                                                <option value="sick">{t('workerPortal.timeOff.sick')}</option>
                                             </select>
                                         </div>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                             <div className="info-field">
-                                                <label>Start Date</label>
+                                                <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.startDate')}</label>
                                                 <input 
                                                     type="date" 
                                                     className="info-input"
+                                                    style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                                                     value={leaveFormData.start_date}
                                                     onChange={e => setLeaveFormData(prev => ({ ...prev, start_date: e.target.value }))}
                                                 />
                                             </div>
                                             <div className="info-field">
-                                                <label>End Date</label>
+                                                <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.endDate')}</label>
                                                 <input 
                                                     type="date" 
                                                     className="info-input"
+                                                    style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                                                     value={leaveFormData.end_date}
                                                     onChange={e => setLeaveFormData(prev => ({ ...prev, end_date: e.target.value }))}
                                                 />
                                             </div>
                                         </div>
                                         <div className="info-field">
-                                            <label>Total Hours Requested</label>
+                                            <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.hoursRequested')}</label>
                                             <input 
                                                 type="number" 
                                                 className="info-input"
+                                                style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                                                 placeholder="e.g. 8"
                                                 value={leaveFormData.hours_requested || ''}
                                                 onChange={e => setLeaveFormData(prev => ({ ...prev, hours_requested: parseFloat(e.target.value) }))}
                                             />
                                         </div>
                                         <div className="info-field">
-                                            <label>Reason / Notes</label>
+                                            <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.reason')}</label>
                                             <textarea 
                                                 className="info-input"
-                                                style={{ minHeight: '100px', resize: 'vertical' }}
-                                                placeholder="Briefly explain your request..."
+                                                style={{ minHeight: '100px', resize: 'vertical', background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
+                                                placeholder={t('workerPortal.timeOff.reasonPlaceholder')}
                                                 value={leaveFormData.reason}
                                                 onChange={e => setLeaveFormData(prev => ({ ...prev, reason: e.target.value }))}
                                             />
@@ -2057,39 +2235,39 @@ export const WorkerPortalPage: React.FC = () => {
                                             type="submit" 
                                             className="clock-btn" 
                                             disabled={isSubmittingLeave}
-                                            style={{ background: '#1e1b4b', color: 'white', marginTop: '0.5rem' }}
+                                            style={{ background: 'var(--primary)', color: 'white', marginTop: '0.5rem' }}
                                         >
-                                            {isSubmittingLeave ? 'Submitting...' : 'Submit Request'}
+                                            {isSubmittingLeave ? t('workerPortal.timeOff.submitting') : t('workerPortal.timeOff.submit')}
                                         </button>
                                     </form>
                                 </div>
 
                                 {/* History */}
-                                <div className="info-card">
+                                <div className="info-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                                     <div className="card-header">
                                         <i className="fa-solid fa-history"></i>
-                                        <h3>Request History</h3>
+                                        <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.timeOff.historyTitle')}</h3>
                                     </div>
                                     <div style={{ overflowX: 'auto' }}>
                                         <table className="info-table">
                                             <thead>
                                                 <tr>
-                                                    <th>Type</th>
-                                                    <th>Dates</th>
-                                                    <th>Hours</th>
-                                                    <th>Status</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.type')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.dates')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.hours')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.status')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {leaveRequests.length > 0 ? leaveRequests.map(req => (
                                                     <tr key={req.id}>
-                                                        <td style={{ fontWeight: 800, color: '#1e1b4b' }}>
-                                                            {req.type === 'pto' ? 'PTO' : 'Sick'}
+                                                        <td style={{ fontWeight: 800, color: 'var(--text-main)' }}>
+                                                            {req.type === 'pto' ? t('workerPortal.timeOff.pto') : t('workerPortal.timeOff.sick')}
                                                         </td>
-                                                        <td>
+                                                        <td style={{ color: 'var(--text-main)' }}>
                                                             <div style={{ fontSize: '0.85rem' }}>{new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}</div>
                                                         </td>
-                                                        <td style={{ fontWeight: 700 }}>{req.hours_requested} hrs</td>
+                                                        <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>{req.hours_requested} hrs</td>
                                                         <td>
                                                             <span style={{ 
                                                                 padding: '4px 8px', 
@@ -2097,8 +2275,8 @@ export const WorkerPortalPage: React.FC = () => {
                                                                 fontSize: '0.75rem', 
                                                                 fontWeight: 800,
                                                                 textTransform: 'uppercase',
-                                                                background: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
-                                                                color: req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#991b1b' : '#92400e'
+                                                                background: req.status === 'approved' ? 'var(--success-bg)' : req.status === 'rejected' ? 'var(--danger-bg)' : 'var(--warning-bg)',
+                                                                color: req.status === 'approved' ? 'var(--success)' : req.status === 'rejected' ? 'var(--danger)' : 'var(--warning)'
                                                             }}>
                                                                 {req.status}
                                                             </span>
@@ -2106,8 +2284,8 @@ export const WorkerPortalPage: React.FC = () => {
                                                     </tr>
                                                 )) : (
                                                     <tr>
-                                                        <td colSpan={4} style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                                            No leave requests found.
+                                                        <td colSpan={4} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                                            {t('workerPortal.timeOff.noRequests')}
                                                         </td>
                                                     </tr>
                                                 )}
@@ -2124,16 +2302,16 @@ export const WorkerPortalPage: React.FC = () => {
             {/* PDF Viewer Modal */}
             {selectedPdf && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.95)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-                    <div style={{ background: 'white', width: '100%', maxWidth: '1200px', borderRadius: '32px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', height: '90vh' }}>
-                        <div style={{ background: '#1e1b4b', padding: '1.25rem 2rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ background: 'var(--bg-card)', width: '100%', maxWidth: '1200px', borderRadius: '32px', overflow: 'hidden', boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', height: '90vh', border: '1px solid var(--border)' }}>
+                        <div style={{ background: 'var(--primary)', padding: '1.25rem 2rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Training Material Viewer</h3>
-                                <p style={{ margin: '0.25rem 0 0', opacity: 0.7, fontSize: '0.85rem' }}>Review the following slides carefully before proceeding.</p>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>{t('workerPortal.training.viewer.title')}</h3>
+                                <p style={{ margin: '0.25rem 0 0', opacity: 0.7, fontSize: '0.85rem' }}>{t('workerPortal.training.viewer.subtitle')}</p>
                             </div>
                             <button
                                 onClick={() => {
                                     if (isTimerActive) {
-                                        alert(`Please finish reading first. Remaining time: ${readingTimer} seconds.`);
+                                        alert(t('workerPortal.training.viewer.finishReadingFirst', { time: readingTimer }));
                                         return;
                                     }
                                     setSelectedPdf(null);
@@ -2158,42 +2336,51 @@ export const WorkerPortalPage: React.FC = () => {
                                 <i className="fa-solid fa-xmark"></i>
                             </button>
                         </div>
-                        <div style={{ flex: 1, background: '#f1f5f9', position: 'relative', overflowY: 'auto', overflowX: 'hidden', maxHeight: '75vh' }}>
-                            <div style={{ width: '100%', height: `${unlockedHeight}px`, overflow: 'hidden', position: 'relative' }}>
-                                <div style={{ width: 'calc(100% + 40px)', height: '100%' }}>
-                                    <iframe
-                                        src={`${selectedPdf}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                                        style={{ 
-                                            width: '100%', 
-                                            height: '40000px', // Large height to ensure no internal scrollbar is needed
-                                            border: 'none',
-                                            pointerEvents: 'none', // DISABLE ALL INTERNAL INTERACTION (No scrolling inside iframe)
-                                            userSelect: 'none'
-                                        }}
-                                        title="Training Slide Viewer"
-                                    />
-                                </div>
+                        <div style={{ flex: 1, background: 'var(--bg-main)', position: 'relative', overflowY: 'auto', overflowX: 'hidden', maxHeight: '75vh' }}>
+                            <div style={{ width: 'calc(100% + 40px)', height: `${unlockedHeight}px`, overflowX: 'hidden', position: 'relative' }}>
+                                {selectedPdf && (
+                                    <div style={{ position: 'absolute', inset: 0, width: 'calc(100% - 40px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)', zIndex: 1 }}>
+                                        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: 'var(--primary)', opacity: 0.5 }}></i>
+                                    </div>
+                                )}
+                                <iframe
+                                    src={`${selectedPdf}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                                    onLoad={(e) => {
+                                        const loader = (e.target as HTMLElement).previousElementSibling as HTMLElement;
+                                        if (loader) loader.style.display = 'none';
+                                    }}
+                                    scrolling="no"
+                                    style={{ 
+                                        width: '100%', 
+                                        height: `${unlockedHeight}px`, 
+                                        border: 'none',
+                                        pointerEvents: 'none',
+                                        userSelect: 'none',
+                                        overflow: 'hidden'
+                                    }}
+                                    title="Training Slide Viewer"
+                                />
                             </div>
                         </div>
-                        <div style={{ padding: '1.25rem 2rem', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ padding: '1.25rem 2rem', background: 'var(--bg-card)', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {!isTimerActive && (
-                                <div style={{ display: 'flex', justifyContent: 'flex-start', background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0', borderLeft: '4px solid #f59e0b' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: '#334155', fontSize: '0.95rem', fontWeight: 600 }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-start', background: 'var(--bg-main)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '4px solid var(--accent)' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-main)', fontSize: '0.95rem', fontWeight: 600 }}>
                                         <input 
                                             type="checkbox" 
                                             checked={isEndOfPdf} 
                                             onChange={(e) => setIsEndOfPdf(e.target.checked)}
-                                            style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#10b981' }}
+                                            style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--success)' }}
                                         />
-                                        I confirm that I have scrolled to and reached the VERY END of this training document.
+                                        {t('workerPortal.training.viewer.confirmEnd')}
                                     </label>
                                 </div>
                             )}
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                 {isTimerActive ? (
-                                    <div style={{ color: '#64748b', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <i className="fa-solid fa-clock-rotate-left fa-spin" style={{ color: '#10b981' }}></i>
-                                        Reading time required: {readingTimer}s remaining
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <i className="fa-solid fa-clock-rotate-left fa-spin" style={{ color: 'var(--success)' }}></i>
+                                        {t('workerPortal.training.viewer.reading', { time: readingTimer })}
                                     </div>
                                 ) : (
                                     <button
@@ -2201,9 +2388,9 @@ export const WorkerPortalPage: React.FC = () => {
                                         style={{ 
                                             padding: '0.75rem 1.5rem', 
                                             borderRadius: '12px', 
-                                            border: '1.5px solid #10b981', 
-                                            background: 'white', 
-                                            color: '#10b981', 
+                                            border: '1.5px solid var(--success)', 
+                                            background: 'transparent', 
+                                            color: 'var(--success)', 
                                             fontWeight: 800, 
                                             cursor: 'pointer',
                                             display: 'flex',
@@ -2212,7 +2399,7 @@ export const WorkerPortalPage: React.FC = () => {
                                         }}
                                     >
                                         <i className="fa-solid fa-arrow-down"></i>
-                                        Unlock Next Section
+                                        {t('workerPortal.training.viewer.unlockNext')}
                                     </button>
                                 )}
                                 <button
@@ -2239,15 +2426,15 @@ export const WorkerPortalPage: React.FC = () => {
                                         padding: '0.75rem 2rem', 
                                         borderRadius: '12px', 
                                         border: 'none', 
-                                        background: (isTimerActive || !isEndOfPdf) ? '#e2e8f0' : '#10b981', 
-                                        color: (isTimerActive || !isEndOfPdf) ? '#94a3b8' : 'white', 
+                                        background: (isTimerActive || !isEndOfPdf) ? 'var(--border)' : 'var(--success)', 
+                                        color: (isTimerActive || !isEndOfPdf) ? 'var(--text-muted)' : 'white', 
                                         fontWeight: 800, 
                                         cursor: (isTimerActive || !isEndOfPdf) ? 'not-allowed' : 'pointer', 
-                                        boxShadow: (isTimerActive || !isEndOfPdf) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.4)',
+                                        boxShadow: (isTimerActive || !isEndOfPdf) ? 'none' : 'var(--shadow-sm)',
                                         transition: 'all 0.3s'
                                     }}
                                 >
-                                    {isTimerActive ? `Reading... (${readingTimer}s)` : 'I have finished reading'}
+                                    {isTimerActive ? t('workerPortal.training.viewer.reading', { time: readingTimer }) : t('workerPortal.training.viewer.finished')}
                                 </button>
                             </div>
                         </div>
@@ -2258,13 +2445,13 @@ export const WorkerPortalPage: React.FC = () => {
             {/* Break Notification Overlay */}
             {showBreakOverlay && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.9)', zIndex: 10002, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-                    <div style={{ background: 'white', maxWidth: '500px', width: '100%', borderRadius: '24px', padding: '3rem', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
-                        <div style={{ width: '80px', height: '80px', background: '#FEF3C7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem' }}>
-                            <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: '2.5rem', color: '#D97706' }}></i>
+                    <div style={{ background: 'var(--bg-card)', maxWidth: '500px', width: '100%', borderRadius: '24px', padding: '3rem', textAlign: 'center', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }}>
+                        <div style={{ width: '80px', height: '80px', background: 'var(--accent-bg)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem' }}>
+                            <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: '2.5rem', color: 'var(--accent)' }}></i>
                         </div>
-                        <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#1E1B4B', marginBottom: '1rem' }}>Time for a Break!</h2>
-                        <p style={{ color: '#64748B', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '2.5rem' }}>
-                            You have been working for 5 hours straight. For your health and safety, all active tasks have been paused. Please take a moment to rest.
+                        <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '1rem' }}>{t('break.title')}</h2>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '2.5rem' }}>
+                            {t('break.message')}
                         </p>
                         <button
                             onClick={handleEndBreak}
@@ -2272,17 +2459,17 @@ export const WorkerPortalPage: React.FC = () => {
                                 width: '100%',
                                 padding: '1.25rem',
                                 borderRadius: '16px',
-                                background: '#10B981',
+                                background: 'var(--success)',
                                 color: 'white',
                                 border: 'none',
                                 fontSize: '1.2rem',
                                 fontWeight: 800,
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
-                                boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)'
+                                boxShadow: 'var(--shadow-md)'
                             }}
                         >
-                            Return to Work
+                            {t('break.return')}
                         </button>
                     </div>
                 </div>
@@ -2290,3 +2477,5 @@ export const WorkerPortalPage: React.FC = () => {
         </div>
     );
 };
+
+export default WorkerPortalPage;

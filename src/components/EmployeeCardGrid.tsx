@@ -1,5 +1,6 @@
 import React from 'react';
 import type { User } from '../types';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
     employees: any[];
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, onDelete }) => {
+    const { t } = useTranslation();
     return (
         <div style={{
             display: 'grid',
@@ -45,11 +47,11 @@ export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, 
 
                 return (
                     <div key={employee.id} style={{
-                        background: 'white',
+                        background: 'var(--bg-card)',
                         borderRadius: '24px',
                         padding: '1.5rem',
-                        border: '1px solid #E2E8F0',
-                        boxShadow: '0 8px 20px -5px rgba(0, 0, 0, 0.03)',
+                        border: '1px solid var(--border)',
+                        boxShadow: 'var(--shadow-sm)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '1.25rem',
@@ -60,14 +62,14 @@ export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, 
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                 <div style={{
                                     width: '56px', height: '56px', borderRadius: '50%',
-                                    background: '#F8FAFC', color: '#94A3B8', display: 'flex',
+                                    background: 'var(--bg-body)', color: '#94A3B8', display: 'flex',
                                     alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: 900,
-                                    border: '1px solid #F1F5F9'
+                                    border: '1px solid var(--border)'
                                 }}>
                                     {initials}
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0F172A', letterSpacing: '-0.02em', marginBottom: '2px' }}>{employee.name}</span>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em', marginBottom: '2px' }}>{employee.name}</span>
                                     <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#3B82F6', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                         {role}
                                     </span>
@@ -88,19 +90,19 @@ export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, 
                         {/* ID and Mode */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                             <div style={{ background: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '16px', border: '1px solid #F1F5F9' }}>
-                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Employee ID</div>
-                                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0F172A' }}>{empId}</div>
+                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t('workers.employeeId')}</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>{empId}</div>
                             </div>
                             <div style={{ background: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '16px', border: '1px solid #F1F5F9' }}>
-                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Work Mode</div>
-                                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0F172A' }}>{workMode}</div>
+                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t('workers.workMode')}</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>{workMode}</div>
                             </div>
                         </div>
 
                         {/* Remuneration */}
                         <div style={{ background: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '16px', border: '1px solid #F1F5F9' }}>
-                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Monthly Remuneration</div>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0F172A' }}>
+                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t('workers.monthlyRemuneration')}</div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
                                 $ {monthlyRemuneration.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </div>
                         </div>
@@ -117,7 +119,7 @@ export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, 
                                     borderRadius: '16px',
                                     fontSize: '0.8rem',
                                     fontWeight: 800,
-                                    color: '#0F172A',
+                                    color: 'var(--text-main)',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     display: 'flex',
@@ -128,7 +130,7 @@ export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, 
                                 onMouseOver={(e) => e.currentTarget.style.background = '#F8FAFC'}
                                 onMouseOut={(e) => e.currentTarget.style.background = 'white'}
                             >
-                                DETAILS
+                                {t('common.details').toUpperCase()}
                             </button>
                             <button
                                 onClick={(e) => { e.stopPropagation(); onDelete(employee.id, employee.active); }}

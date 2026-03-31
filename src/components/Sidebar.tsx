@@ -1,6 +1,8 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../context/ThemeContext';
 
 export const Sidebar: React.FC<{
     isCollapsed: boolean,
@@ -9,6 +11,12 @@ export const Sidebar: React.FC<{
     setIsMobileOpen?: (o: boolean) => void
 }> = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen }) => {
     const { logout } = useAuth();
+    const { t, i18n } = useTranslation();
+    const { theme, toggleTheme } = useTheme();
+
+    const changeLanguage = (lng: string) => {
+        i18n.changeLanguage(lng);
+    };
 
     const toggleSidebar = () => {
         setIsCollapsed(!isCollapsed);
@@ -37,52 +45,52 @@ export const Sidebar: React.FC<{
             <ul className="nav-menu">
                 <li>
                     <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} end onClick={handleMobileClose}>
-                        <i className="fa-solid fa-border-all"></i> <span>Dashboard</span>
+                        <i className="fa-solid fa-border-all"></i> <span>{t('sidebar.dashboard')}</span>
                     </NavLink>
                 </li>
                 <li>
                     <NavLink to="/control-matrix" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
-                        <i className="fa-solid fa-table-cells"></i> <span>Control Matrix</span>
+                        <i className="fa-solid fa-table-cells"></i> <span>{t('sidebar.controlMatrix')}</span>
                     </NavLink>
                 </li>
                 <li>
                     <NavLink to="/control-table" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
-                        <i className="fa-solid fa-table-list"></i> <span>Control Table</span>
+                        <i className="fa-solid fa-table-list"></i> <span>{t('sidebar.controlTable')}</span>
                     </NavLink>
                 </li>
                 <li>
                     <NavLink to="/manufacturing-orders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
-                        <i className="fa-regular fa-clipboard"></i> <span>Manufacturing Orders</span>
+                        <i className="fa-regular fa-clipboard"></i> <span>{t('sidebar.manufacturingOrders')}</span>
                     </NavLink>
                 </li>
                 <li>
                     <NavLink to="/employee-activity" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
-                        <i className="fa-solid fa-users-viewfinder"></i> <span>Employee Activity</span>
+                        <i className="fa-solid fa-users-viewfinder"></i> <span>{t('sidebar.employeeActivity')}</span>
                     </NavLink>
                 </li>
                 <li>
                     <NavLink to="/workers" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
-                        <i className="fa-regular fa-user"></i> <span>Workers</span>
+                        <i className="fa-regular fa-user"></i> <span>{t('sidebar.workers')}</span>
                     </NavLink>
                 </li>
                 <li>
                     <NavLink to="/operations" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
-                        <i className="fa-solid fa-list-check"></i> <span>Operations</span>
+                        <i className="fa-solid fa-list-check"></i> <span>{t('sidebar.operations')}</span>
                     </NavLink>
                 </li>
                 <li>
                     <NavLink to="/reports" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
-                        <i className="fa-solid fa-chart-column"></i> <span>Reports</span>
+                        <i className="fa-solid fa-chart-column"></i> <span>{t('sidebar.reports')}</span>
                     </NavLink>
                 </li>
                 <li>
                     <NavLink to="/discipline" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
-                        <i className="fa-solid fa-gavel"></i> <span>Discipline</span>
+                        <i className="fa-solid fa-gavel"></i> <span>{t('sidebar.discipline')}</span>
                     </NavLink>
                 </li>
                 <li>
                     <NavLink to="/nfc" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
-                        <i className="fa-solid fa-rss"></i> <span>NFC Setup</span>
+                        <i className="fa-solid fa-rss"></i> <span>{t('sidebar.nfcSetup')}</span>
                     </NavLink>
                 </li>
             </ul>
@@ -90,8 +98,20 @@ export const Sidebar: React.FC<{
             <div className="bottom-menu">
                 <ul className="nav-menu">
                     <li>
+                        <div className="nav-item" onClick={toggleTheme}>
+                            <i className={`fa-solid ${theme === 'light' ? 'fa-moon' : 'fa-sun'}`}></i>
+                            <span>{theme === 'light' ? t('themes.dark') : t('themes.light')}</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div className="nav-item" onClick={() => changeLanguage(i18n.language === 'en' ? 'es' : 'en')}>
+                            <i className="fa-solid fa-language"></i>
+                            <span>{i18n.language === 'en' ? 'Español' : 'English'}</span>
+                        </div>
+                    </li>
+                    <li>
                         <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); logout(); }}>
-                            <i className="fa-solid fa-arrow-right-from-bracket"></i> <span>Logout</span>
+                            <i className="fa-solid fa-arrow-right-from-bracket"></i> <span>{t('sidebar.logout')}</span>
                         </a>
                     </li>
                 </ul>

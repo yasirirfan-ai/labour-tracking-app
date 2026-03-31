@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { sortManufacturingOrders } from '../utils/moSorting';
 
+import { useTranslation } from 'react-i18next';
+
 export const ControlTablePage: React.FC = () => {
+    const { t } = useTranslation();
     const [tasks, setTasks] = useState<any[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
     const [mos, setMos] = useState<any[]>([]);
@@ -174,11 +177,11 @@ export const ControlTablePage: React.FC = () => {
 
     const getStatusLabel = (status: string) => {
         const s = status?.toLowerCase();
-        if (s === 'active') return <span className="status-badge badge-green" style={{ fontSize: '0.7rem' }}>TIMER RUNNING</span>;
-        if (s === 'clocked_in') return <span className="status-badge badge-blue" style={{ fontSize: '0.7rem' }}>CLOCKED IN</span>;
-        if (s === 'break') return <span className="status-badge badge-yellow" style={{ fontSize: '0.7rem' }}>ON BREAK</span>;
-        if (s === 'completed') return <span className="status-badge badge-gray" style={{ fontSize: '0.7rem' }}>COMPLETED</span>;
-        return <span className="status-badge badge-gray" style={{ fontSize: '0.7rem' }}>PENDING</span>;
+        if (s === 'active') return <span className="status-badge badge-green" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.timerRunning')}</span>;
+        if (s === 'clocked_in') return <span className="status-badge badge-blue" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.clockedIn')}</span>;
+        if (s === 'break') return <span className="status-badge badge-yellow" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.onBreak')}</span>;
+        if (s === 'completed') return <span className="status-badge badge-gray" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.completed')}</span>;
+        return <span className="status-badge badge-gray" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.pending')}</span>;
     };
 
     const handleEditClick = (task: any) => {
@@ -209,7 +212,7 @@ export const ControlTablePage: React.FC = () => {
         if (editForm.status === 'active') {
             const worker = employees.find(e => e.id === editingTask.assigned_to_id);
             if (worker && worker.availability === 'break') {
-                alert(`Cannot start timer. ${worker.name} is currently on break.`);
+                alert(t('matrix.cannotActionBreak', { action: 'start', name: worker.name }));
                 return;
             }
         }
@@ -260,18 +263,18 @@ export const ControlTablePage: React.FC = () => {
             setIsEditOpen(false);
             fetchData();
         } catch (e: any) {
-            alert('Error updating task: ' + e.message);
+            alert(t('table.errorUpdating') + ': ' + e.message);
         }
     };
 
     const handleDeleteTask = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this activity entry?')) return;
+        if (!confirm(t('table.deleteConfirm'))) return;
         try {
             const { error } = await supabase.from('tasks').delete().eq('id', id);
             if (error) throw error;
             fetchData();
         } catch (err: any) {
-            alert('Error deleting task: ' + err.message);
+            alert(t('table.errorDeleting') + ': ' + err.message);
         }
     };
 
@@ -303,14 +306,14 @@ export const ControlTablePage: React.FC = () => {
 
     const handleCreateTask = async () => {
         if (!createForm.worker_id || !createForm.mo_reference || !createForm.description) {
-            alert("Please select Worker, MO, and Operation");
+            alert(t('table.modals.validationError'));
             return;
         }
 
         const emp = employees.find(e => e.id === createForm.worker_id);
 
         if (createForm.status === 'active' && emp?.availability === 'break') {
-            alert(`Cannot start timer. ${emp.name} is currently on break.`);
+            alert(t('matrix.cannotActionBreak', { action: 'start', name: emp.name }));
             return;
         }
 
@@ -362,7 +365,7 @@ export const ControlTablePage: React.FC = () => {
             setIsCreateOpen(false);
             fetchData();
         } catch (e: any) {
-            alert('Error creating task: ' + e.message);
+            alert(t('table.errorCreating') + ': ' + e.message);
         }
     };
 
@@ -467,11 +470,11 @@ export const ControlTablePage: React.FC = () => {
         <>
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h1 className="page-title">Control Table</h1>
-                    <p className="page-subtitle">Real-time tracking of worker task activities (PST Timezone)</p>
+                    <h1 className="page-title">{t('table.title')}</h1>
+                    <p className="page-subtitle">{t('table.subtitle')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={handleCreateClick} style={{ width: 'auto', padding: '0.6rem 1.5rem' }}>
-                    <i className="fa-solid fa-plus" style={{ marginRight: '8px' }}></i> Manual Entry
+                    <i className="fa-solid fa-plus" style={{ marginRight: '8px' }}></i> {t('table.manualEntry')}
                 </button>
             </div>
 
@@ -481,7 +484,7 @@ export const ControlTablePage: React.FC = () => {
                     <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }}></i>
                     <input
                         type="text"
-                        placeholder="Search MO, Operation, or Worker..."
+                        placeholder={t('table.searchPlaceholder')}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.25rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
@@ -489,30 +492,30 @@ export const ControlTablePage: React.FC = () => {
                 </div>
 
                 <select value={workerFilter} onChange={(e) => setWorkerFilter(e.target.value)} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none', background: 'white' }}>
-                    <option value="all">All Workers</option>
+                    <option value="all">{t('table.allWorkers')}</option>
                     {employees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
                 </select>
 
                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none', background: 'white' }}>
-                    <option value="all">All Statuses</option>
-                    <option value="timer running">Timer Running</option>
-                    <option value="clocked in">Clocked In</option>
-                    <option value="on break">On Break</option>
-                    <option value="completed">Completed</option>
-                    <option value="pending">Pending</option>
+                    <option value="all">{t('table.allStatuses')}</option>
+                    <option value="timer running">{t('table.statusLabels.timerRunning')}</option>
+                    <option value="clocked in">{t('table.statusLabels.clockedIn')}</option>
+                    <option value="on break">{t('table.statusLabels.onBreak')}</option>
+                    <option value="completed">{t('table.statusLabels.completed')}</option>
+                    <option value="pending">{t('table.statusLabels.pending')}</option>
                 </select>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#F8FAFC', padding: '0.25rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748B' }}>From:</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748B' }}>{t('table.from')}</span>
                     <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setActiveChip(''); }} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: '#475569' }} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#F8FAFC', padding: '0.25rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748B' }}>To:</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748B' }}>{t('table.to')}</span>
                     <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setActiveChip(''); }} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: '#475569' }} />
                 </div>
 
                 <button className="btn btn-secondary" onClick={resetFilters} style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}>
-                    Reset
+                    {t('table.reset')}
                 </button>
             </div>
 
@@ -538,7 +541,7 @@ export const ControlTablePage: React.FC = () => {
                                 boxShadow: isActive ? '0 4px 6px -1px rgba(30, 41, 59, 0.2)' : 'none'
                             }}
                         >
-                            {label}
+                            {t(`table.chips.${label.toLowerCase().replace(' ', '')}`)}
                         </button>
                     );
                 })}
@@ -548,17 +551,17 @@ export const ControlTablePage: React.FC = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                     <thead>
                         <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
-                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Worker ID</th>
-                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569', left: '100px' }}>Name</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>MO</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Operation</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Clock In</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Start Time</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Clock Out</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Last Action</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Duration</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Status</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Edit</th>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.workerId')}</th>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569', left: '100px' }}>{t('table.columns.name')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.mo')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.operation')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.clockIn')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.startTime')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.clockOut')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.lastAction')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.duration')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.status')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>{t('table.columns.edit')}</th>
                         </tr>
                     </thead>
                     <tbody style={{ background: 'white' }}>
@@ -601,7 +604,7 @@ export const ControlTablePage: React.FC = () => {
                                     <button
                                         onClick={() => handleEditClick(task)}
                                         className="icon-btn"
-                                        title="Edit Entry"
+                                        title={t('table.columns.edit')}
                                         style={{ color: '#475569', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
                                     >
                                         <i className="fa-solid fa-pen-to-square"></i>
@@ -609,7 +612,7 @@ export const ControlTablePage: React.FC = () => {
                                     <button
                                         onClick={() => handleDeleteTask(task.id)}
                                         className="icon-btn delete"
-                                        title="Delete Entry"
+                                        title={t('common.delete')}
                                         style={{ color: '#EF4444', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
                                     >
                                         <i className="fa-regular fa-trash-can"></i>
@@ -631,7 +634,7 @@ export const ControlTablePage: React.FC = () => {
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
             }}>
                 <div className="offcanvas-header" style={{ marginBottom: '1rem', padding: '1.5rem 1.5rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 className="offcanvas-title" style={{ fontSize: '1.1rem', fontWeight: 700 }}>Edit Task Entry</h3>
+                    <h3 className="offcanvas-title" style={{ fontSize: '1.1rem', fontWeight: 700 }}>{t('table.modals.editTitle')}</h3>
                     <button className="close-btn" onClick={() => setIsEditOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>
                         <i className="fa-solid fa-xmark"></i>
                     </button>
@@ -642,11 +645,11 @@ export const ControlTablePage: React.FC = () => {
                             <div style={{ background: '#F8FAFC', padding: '0.75rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
-                                        <div style={{ fontSize: '0.8rem', color: '#64748B' }}>Worker</div>
+                                        <div style={{ fontSize: '0.8rem', color: '#64748B' }}>{t('table.modals.worker')}</div>
                                         <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{editingTask.worker_name}</div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '0.8rem', color: '#64748B' }}>Task</div>
+                                        <div style={{ fontSize: '0.8rem', color: '#64748B' }}>{t('table.modals.task')}</div>
                                         <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{editingTask.description}</div>
                                     </div>
                                 </div>
@@ -654,7 +657,7 @@ export const ControlTablePage: React.FC = () => {
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Clock In</label>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.clockIn')}</label>
                                     <input
                                         type="datetime-local"
                                         value={editForm.created_at}
@@ -663,7 +666,7 @@ export const ControlTablePage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Start Time</label>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.startTime')}</label>
                                     <input
                                         type="datetime-local"
                                         value={editForm.start_time}
@@ -672,7 +675,7 @@ export const ControlTablePage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Clock Out</label>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.clockOut')}</label>
                                     <input
                                         type="datetime-local"
                                         value={editForm.end_time}
@@ -681,7 +684,7 @@ export const ControlTablePage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Last Action</label>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.lastAction')}</label>
                                     <input
                                         type="datetime-local"
                                         value={editForm.last_action_time}
@@ -691,8 +694,8 @@ export const ControlTablePage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Total Duration (Allocated)</label>
+                             <div>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.duration')}</label>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <input
@@ -701,7 +704,7 @@ export const ControlTablePage: React.FC = () => {
                                             onChange={e => setEditForm(prev => ({ ...prev, active_hours: parseInt(e.target.value) || 0 }))}
                                             style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
                                         />
-                                        <span style={{ fontSize: '0.85rem', color: '#64748B' }}>hrs</span>
+                                        <span style={{ fontSize: '0.85rem', color: '#64748B' }}>{t('table.modals.hours')}</span>
                                     </div>
                                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <input
@@ -711,14 +714,14 @@ export const ControlTablePage: React.FC = () => {
                                             max="59"
                                             style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
                                         />
-                                        <span style={{ fontSize: '0.85rem', color: '#64748B' }}>mins</span>
+                                        <span style={{ fontSize: '0.85rem', color: '#64748B' }}>{t('table.modals.minutes')}</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Hourly Rate ($)</label>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.hourlyRate')}</label>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -728,24 +731,24 @@ export const ControlTablePage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Status</label>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.status')}</label>
                                     <select
                                         value={editForm.status}
                                         onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value }))}
                                         style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
                                     >
-                                        <option value="pending">Pending</option>
-                                        <option value="clocked_in">Clocked In</option>
-                                        <option value="active">Timer Running</option>
-                                        <option value="break">On Break</option>
-                                        <option value="completed">Completed</option>
+                                        <option value="pending">{t('table.statusLabels.pending')}</option>
+                                        <option value="clocked_in">{t('table.statusLabels.clockedIn')}</option>
+                                        <option value="active">{t('table.statusLabels.timerRunning')}</option>
+                                        <option value="break">{t('table.statusLabels.onBreak')}</option>
+                                        <option value="completed">{t('table.statusLabels.completed')}</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                                <button className="btn btn-secondary" onClick={() => setIsEditOpen(false)} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>Cancel</button>
-                                <button className="btn btn-primary" onClick={handleUpdateTask} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>Update Entry</button>
+                                <button className="btn btn-secondary" onClick={() => setIsEditOpen(false)} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>{t('table.modals.cancel')}</button>
+                                <button className="btn btn-primary" onClick={handleUpdateTask} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>{t('table.modals.update')}</button>
                             </div>
                         </div>
                     )}
@@ -762,7 +765,7 @@ export const ControlTablePage: React.FC = () => {
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
             }}>
                 <div className="offcanvas-header" style={{ marginBottom: '1rem', padding: '1.5rem 1.5rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 className="offcanvas-title" style={{ fontSize: '1.1rem', fontWeight: 700 }}>Manual Entry</h3>
+                    <h3 className="offcanvas-title" style={{ fontSize: '1.1rem', fontWeight: 700 }}>{t('table.modals.manualTitle')}</h3>
                     <button className="close-btn" onClick={() => setIsCreateOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>
                         <i className="fa-solid fa-xmark"></i>
                     </button>
@@ -773,26 +776,26 @@ export const ControlTablePage: React.FC = () => {
                         {/* Row 1: Worker & MO */}
                         <div className="form-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Worker</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.worker')}</label>
                                 <select
                                     value={createForm.worker_id}
                                     onChange={e => setCreateForm(prev => ({ ...prev, worker_id: e.target.value }))}
                                     style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem', background: 'white' }}
                                 >
-                                    <option value="">Select Worker...</option>
+                                    <option value="">{t('table.modals.selectWorker')}</option>
                                     {employees.map(e => (
                                         <option key={e.id} value={e.id}>{e.name}</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Manufacturing Order</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.columns.mo')}</label>
                                 <select
                                     value={createForm.mo_reference}
                                     onChange={e => setCreateForm(prev => ({ ...prev, mo_reference: e.target.value }))}
                                     style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem', background: 'white' }}
                                 >
-                                    <option value="">Select MO...</option>
+                                    <option value="">{t('table.modals.selectMo')}</option>
                                     {mos.map(m => (
                                         <option key={m.id} value={m.mo_number}>{m.mo_number} - {m.product_name}</option>
                                     ))}
@@ -803,34 +806,34 @@ export const ControlTablePage: React.FC = () => {
                         {/* Row 2: Operation, Status & Rate */}
                         <div className="form-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Operation</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.columns.operation')}</label>
                                 <select
                                     value={createForm.description}
                                     onChange={e => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
                                     style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem', background: 'white' }}
                                 >
-                                    <option value="">Select Operation...</option>
-                                    {operations.map(o => (
-                                        <option key={o.id} value={o.name}>{o.name}</option>
+                                    <option value="">{t('table.modals.selectOp')}</option>
+                                    {operations.map(op => (
+                                        <option key={op} value={op}>{op}</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Initial Status</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.status')}</label>
                                 <select
                                     value={createForm.status}
                                     onChange={e => setCreateForm(prev => ({ ...prev, status: e.target.value }))}
                                     style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
                                 >
-                                    <option value="pending">Pending</option>
-                                    <option value="clocked_in">Clocked In</option>
-                                    <option value="active">Timer Running</option>
-                                    <option value="break">On Break</option>
-                                    <option value="completed">Completed</option>
+                                    <option value="pending">{t('table.statusLabels.pending')}</option>
+                                    <option value="clocked_in">{t('table.statusLabels.clockedIn')}</option>
+                                    <option value="active">{t('table.statusLabels.timerRunning')}</option>
+                                    <option value="break">{t('table.statusLabels.onBreak')}</option>
+                                    <option value="completed">{t('table.statusLabels.completed')}</option>
                                 </select>
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Hourly Rate ($)</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.hourlyRate')}</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -844,7 +847,7 @@ export const ControlTablePage: React.FC = () => {
                         {/* Row 3: Times */}
                         <div className="form-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Clock In</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.clockIn')}</label>
                                 <input
                                     type="datetime-local"
                                     value={createForm.created_at}
@@ -853,7 +856,7 @@ export const ControlTablePage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Start Time</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.startTime')}</label>
                                 <input
                                     type="datetime-local"
                                     value={createForm.start_time}
@@ -862,7 +865,7 @@ export const ControlTablePage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Clock Out</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.clockOut')}</label>
                                 <input
                                     type="datetime-local"
                                     value={createForm.end_time}
@@ -871,7 +874,7 @@ export const ControlTablePage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Last Action</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.lastAction')}</label>
                                 <input
                                     type="datetime-local"
                                     value={createForm.last_action_time}
@@ -883,7 +886,7 @@ export const ControlTablePage: React.FC = () => {
 
                         {/* Row 4: Duration */}
                         <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>Total Duration (Initial)</label>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.duration')}</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <input
@@ -892,7 +895,7 @@ export const ControlTablePage: React.FC = () => {
                                         onChange={e => setCreateForm(prev => ({ ...prev, active_hours: parseInt(e.target.value) || 0 }))}
                                         style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
                                     />
-                                    <span style={{ fontSize: '0.85rem', color: '#64748B' }}>hrs</span>
+                                    <span style={{ fontSize: '0.85rem', color: '#64748B' }}>{t('table.modals.hours')}</span>
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <input
@@ -902,14 +905,14 @@ export const ControlTablePage: React.FC = () => {
                                         max="59"
                                         style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
                                     />
-                                    <span style={{ fontSize: '0.85rem', color: '#64748B' }}>mins</span>
+                                    <span style={{ fontSize: '0.85rem', color: '#64748B' }}>{t('table.modals.minutes')}</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setIsCreateOpen(false)} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handleCreateTask} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>Create Entry</button>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+                            <button className="btn btn-secondary" onClick={() => setIsCreateOpen(false)} style={{ padding: '0.6rem 1.25rem' }}>{t('table.modals.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleCreateTask} style={{ padding: '0.6rem 1.25rem' }}>{t('table.modals.create')}</button>
                         </div>
                     </div>
                 </div>

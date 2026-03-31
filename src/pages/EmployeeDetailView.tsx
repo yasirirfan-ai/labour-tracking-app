@@ -10,10 +10,12 @@ import {
 } from '../lib/accrualService';
 import type { LeaveHistoryRow } from '../lib/accrualService';
 import type { User } from '../types';
-import { LEVEL_2_SOPS } from '../data/sopData';
-import { LEVEL_1_TRAININGS } from '../data/trainingData';
+import { trainingService } from '../lib/trainingService';
+import type { TrainingMaterial } from '../lib/trainingService';
+import { useTranslation } from 'react-i18next';
 
 export const EmployeeDetailView: React.FC = () => {
+    const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [employee, setEmployee] = useState<User | null>(null);
@@ -34,6 +36,15 @@ export const EmployeeDetailView: React.FC = () => {
     const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
     const [isProcessingLeave, setIsProcessingLeave] = useState<string | null>(null);
     const [selectedTrainingRole, setSelectedTrainingRole] = useState<string | null>(null);
+    const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>([]);
+
+    useEffect(() => {
+        const fetchTrainings = async () => {
+            const materials = await trainingService.getAllMaterials();
+            setTrainingMaterials(materials);
+        };
+        fetchTrainings();
+    }, []);
 
     const fetchLeaveRequests = async (employeeId: string) => {
         const { data } = await supabase
@@ -84,8 +95,8 @@ export const EmployeeDetailView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, !!employee]);
 
-    if (loading) return <div className="loading-screen">Loading Profile...</div>;
-    if (!employee || !initialEmployee) return <div>Employee not found</div>;
+    if (loading) return <div className="loading-screen">{t('common.loading')}</div>;
+    if (!employee || !initialEmployee) return <div>{t('common.notFound')}</div>;
 
     const isDirty = JSON.stringify(employee) !== JSON.stringify(initialEmployee);
 
@@ -95,19 +106,19 @@ export const EmployeeDetailView: React.FC = () => {
 
         // Validation
         const errors: Record<string, string> = {};
-        if (!employee.worker_id?.trim()) errors.worker_id = "Employee # is required";
-        if (!employee.first_name?.trim()) errors.first_name = "First Name is required";
+        if (!employee.worker_id?.trim()) errors.worker_id = t('employeeDetail.personal.idRequired');
+        if (!employee.first_name?.trim()) errors.first_name = t('employeeDetail.personal.firstNameRequired');
 
         const validatePhone = (val?: string) => {
             if (!val) return true;
             return /^[0-9+() -]*$/.test(val);
         };
 
-        if (!validatePhone(employee.phone)) errors.phone = "Phone must be numeric";
-        if (!validatePhone(employee.work_phone)) errors.work_phone = "Work Phone must be numeric";
-        if (!validatePhone(employee.mobile_phone)) errors.mobile_phone = "Mobile Phone must be numeric";
-        if (!validatePhone(employee.home_phone)) errors.home_phone = "Home Phone must be numeric";
-        if (!validatePhone(employee.emergency_contact_phone)) errors.emergency_contact_phone = "Emergency Phone must be numeric";
+        if (!validatePhone(employee.phone)) errors.phone = t('employeeDetail.personal.phoneNumeric');
+        if (!validatePhone(employee.work_phone)) errors.work_phone = t('employeeDetail.personal.phoneNumeric');
+        if (!validatePhone(employee.mobile_phone)) errors.mobile_phone = t('employeeDetail.personal.phoneNumeric');
+        if (!validatePhone(employee.home_phone)) errors.home_phone = t('employeeDetail.personal.phoneNumeric');
+        if (!validatePhone(employee.emergency_contact_phone)) errors.emergency_contact_phone = t('employeeDetail.personal.phoneNumeric');
 
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
@@ -130,20 +141,20 @@ export const EmployeeDetailView: React.FC = () => {
 
             // Build a helpful message.
             const fieldLabels: Record<string, string> = {
-                worker_id:               'Employee #',
-                first_name:              'First Name',
-                phone:                   'Phone',
-                work_phone:              'Work Phone',
-                mobile_phone:            'Mobile Phone',
-                home_phone:              'Home Phone',
-                emergency_contact_phone: 'Emergency Phone',
+                worker_id:               t('employeeDetail.personal.employeeNum'),
+                first_name:              t('employeeDetail.personal.firstName'),
+                phone:                   t('employeeDetail.personal.phone'),
+                work_phone:              t('employeeDetail.personal.workPhone'),
+                mobile_phone:            t('employeeDetail.personal.mobilePhone'),
+                home_phone:              t('employeeDetail.personal.homePhone'),
+                emergency_contact_phone: t('employeeDetail.emergency.phone'),
             };
             const missingLabels = Object.keys(errors)
                 .map(k => fieldLabels[k] || k)
                 .join(', ');
 
             setToast({
-                message: `Fix on "${targetTab}" tab: ${missingLabels}`,
+                message: t('employeeDetail.personal.fixOnTab', { tab: targetTab, fields: missingLabels }),
                 type: 'error',
             });
             setTimeout(() => setToast(null), 5000);
@@ -156,10 +167,10 @@ export const EmployeeDetailView: React.FC = () => {
             if (error) throw error;
 
             setInitialEmployee(employee);
-            setToast({ message: "Worker updated successfully", type: 'success' });
+            setToast({ message: t('employeeDetail.personal.updateSuccess'), type: 'success' });
             setTimeout(() => setToast(null), 3000);
         } catch (err: any) {
-            setToast({ message: err.message || "Failed to save changes", type: 'error' });
+            setToast({ message: err.message || t('common.error'), type: 'error' });
             setTimeout(() => setToast(null), 3000);
         } finally {
             setIsSaving(false);
@@ -212,12 +223,12 @@ export const EmployeeDetailView: React.FC = () => {
                 if (historyError) throw historyError;
             }
 
-            setToast({ message: `Request ${status} successfully.`, type: 'success' });
+            setToast({ message: t('leave.actions.success', { status: t(`leave.filters.${status}`) }), type: 'success' });
             setTimeout(() => setToast(null), 3000);
             fetchEmployee(); 
             fetchLeaveRequests(employee!.id);
         } catch (err: any) {
-            setToast({ message: err.message || "Failed to process request", type: 'error' });
+            setToast({ message: err.message || t('leave.actions.error', { message: '' }), type: 'error' });
             setTimeout(() => setToast(null), 3000);
         } finally {
             setIsProcessingLeave(null);
@@ -258,7 +269,7 @@ export const EmployeeDetailView: React.FC = () => {
             <header className="profile-header">
                 <div className="header-top">
                     <button className="back-btn" onClick={() => navigate('/workers')}>
-                        <i className="fa-solid fa-arrow-left"></i> Back to People
+                        <i className="fa-solid fa-arrow-left"></i> {t('common.backToPeople')}
                     </button>
                 </div>
                 
@@ -285,7 +296,7 @@ export const EmployeeDetailView: React.FC = () => {
                             className={`nav-tab ${activeTab === tab ? 'active' : ''}`}
                             onClick={() => setActiveTab(tab)}
                         >
-                            {tab}
+                            {t(`employeeDetail.tabs.${tab.toLowerCase()}`, tab)}
                         </button>
                     ))}
                 </nav>
@@ -294,17 +305,17 @@ export const EmployeeDetailView: React.FC = () => {
             <div className="profile-content">
                 <aside className="profile-sidebar">
                     <section className="sidebar-section">
-                        <h3>Vitals</h3>
+                        <h3>{t('employeeDetail.vitals')}</h3>
                         <div className="vitals-list">
-                            <div className="vital-item"><i className="fa-solid fa-phone"></i> {employee.phone || 'N/A'}</div>
+                            <div className="vital-item"><i className="fa-solid fa-phone"></i> {employee.phone || t('common.notAvailable')}</div>
                             <div className="vital-item"><i className="fa-solid fa-envelope"></i> {employee.email || employee.username}</div>
-                            <div className="vital-item"><i className="fa-solid fa-briefcase"></i> {employee.job_title || 'Manufacturing Associate'} <br/> Full Time</div>
-                            <div className="vital-item"><i className="fa-solid fa-building"></i> {employee.department || 'Our Babylon'}</div>
+                            <div className="vital-item"><i className="fa-solid fa-briefcase"></i> {employee.job_title || t('employeeDetail.job.defaultTitle')} <br/> {t('hire.options.employment.fullTime')}</div>
+                            <div className="vital-item"><i className="fa-solid fa-building"></i> {employee.department || t('employeeDetail.job.defaultDepartment')}</div>
                         </div>
                     </section>
 
                     <section className="sidebar-section">
-                        <h3>Hire Date</h3>
+                        <h3>{t('employeeDetail.hireDate')}</h3>
                         <div className="vital-item">
                             <i className="fa-solid fa-calendar"></i> 
                             {employee.hire_date || '—'} 
@@ -321,7 +332,7 @@ export const EmployeeDetailView: React.FC = () => {
                     </section>
 
                     <section className="sidebar-section">
-                        <h3>Manager</h3>
+                        <h3>{t('employeeDetail.manager')}</h3>
                         <div className="manager-info">
                             <div className="manager-photo">
                                 <i className="fa-solid fa-user"></i>
@@ -331,7 +342,7 @@ export const EmployeeDetailView: React.FC = () => {
                                 <p>Chief Technology Officer</p>
                             </div>
                         </div>
-                        <button className="text-link">View in org chart</button>
+                        <button className="text-link">{t('employeeDetail.viewInOrgChart')}</button>
                     </section>
                 </aside>
 
@@ -339,10 +350,16 @@ export const EmployeeDetailView: React.FC = () => {
                     {activeTab === 'Training' && (() => {
                         const completed = employee.completed_trainings || [];
                         
+                        const l1Materials = trainingMaterials.filter(m => m.level === 1);
+                        const l1Categories = Array.from(new Set(l1Materials.map(m => m.category)));
+                        
                         // Level 1 Progress
-                        const l1CompletedCount = completed.filter(t => LEVEL_1_TRAININGS.find(l1 => l1.name === t)).length;
-                        const l1Total = LEVEL_1_TRAININGS.length;
+                        const l1CompletedCount = completed.filter(t => l1Categories.includes(t)).length;
+                        const l1Total = l1Categories.length;
                         const l1Percent = l1Total > 0 ? Math.round((l1CompletedCount / l1Total) * 100) : 0;
+
+                        // Get unique roles from L2
+                        const l2Roles = Array.from(new Set(trainingMaterials.filter(m => m.level === 2).map(m => m.department))).filter(Boolean) as string[];
 
                         // Level 2 Progress (using role-based SOPs)
                         const autoRole = (employee.job_title?.includes('QC') || employee.department === 'QC') ? 'QC' : 
@@ -353,9 +370,10 @@ export const EmployeeDetailView: React.FC = () => {
                                      
                         const role = selectedTrainingRole || autoRole;
                                      
-                        const roleSops = LEVEL_2_SOPS[role] || [];
-                        const l2Total = roleSops.reduce((acc: number, section: any) => acc + section.pdfs.length, 0);
-                        const l2CompletedCount = completed.filter(t => roleSops.some((section: any) => section.pdfs.some((pdf: any) => pdf.name === t))).length;
+                        const roleMaterials = trainingMaterials.filter(m => m.level === 2 && m.department === role);
+                        
+                        const l2Total = roleMaterials.length;
+                        const l2CompletedCount = completed.filter(t => roleMaterials.some(m => m.display_name === t)).length;
                         const l2Percent = l2Total > 0 ? Math.round((l2CompletedCount / l2Total) * 100) : 0;
                         const totalPercent = Math.round((l1Percent + l2Percent) / 2);
 
@@ -363,9 +381,9 @@ export const EmployeeDetailView: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div className="section-title-row">
                                 <i className="fa-solid fa-graduation-cap"></i>
-                                <h2>Training & Development</h2>
+                                <h2>{t('employeeDetail.training.title')}</h2>
                                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>VIEWING ROLE:</span>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t('employeeDetail.training.viewingRole')}</span>
                                     <select 
                                         value={role} 
                                         onChange={(e) => setSelectedTrainingRole(e.target.value)}
@@ -380,7 +398,7 @@ export const EmployeeDetailView: React.FC = () => {
                                             background: '#f8fafc'
                                         }}
                                     >
-                                        {Object.keys(LEVEL_2_SOPS).map(r => (
+                                        {l2Roles.map(r => (
                                             <option key={r} value={r}>{r}</option>
                                         ))}
                                     </select>
@@ -406,8 +424,8 @@ export const EmployeeDetailView: React.FC = () => {
                                             <text x="18" y="20.35" className="progress-percentage-mid">{l1Percent}%</text>
                                         </svg>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Level 1 Progress</div>
-                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{l1CompletedCount} / {l1Total} SOPs</div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('employeeDetail.training.level1Progress')}</div>
+                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.5rem' }}>{l1CompletedCount} / {l1Total} SOPs</div>
                                 </div>
 
                                 {/* Level 2 Circle */}
@@ -432,16 +450,16 @@ export const EmployeeDetailView: React.FC = () => {
                                             <text x="18" y="20.35" className="progress-percentage-mid">{l1CompletedCount + l2CompletedCount}</text>
                                         </svg>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Completed</div>
-                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{Math.round(((l1CompletedCount + l2CompletedCount) / (l1Total + l2Total)) * 100)}% Overall</div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('employeeDetail.training.totalCompleted')}</div>
+                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{Math.round(((l1CompletedCount + l2CompletedCount) / (l1Total + l2Total)) * 100)}% {t('employeeDetail.training.overall')}</div>
                                 </div>
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>Core Orientation (Level 1)</h3>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>{t('employeeDetail.training.coreTitle')}</h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-                                    {LEVEL_1_TRAININGS.map((t, idx) => {
-                                        const isDone = completed.includes(t.name);
+                                    {l1Categories.map((tName, idx) => {
+                                        const isDone = completed.includes(tName);
                                         return (
                                             <div key={idx} style={{ 
                                                 background: 'white', 
@@ -461,9 +479,9 @@ export const EmployeeDetailView: React.FC = () => {
                                                     <i className={`fa-solid ${isDone ? 'fa-check' : 'fa-clock'}`}></i>
                                                 </div>
                                                 <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b' }}>{t.name}</div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b' }}>{tName}</div>
                                                     <div style={{ fontSize: '0.75rem', color: isDone ? '#10b981' : '#64748b', fontWeight: 700 }}>
-                                                        {isDone ? 'COMPLETED' : 'PENDING'}
+                                                        {isDone ? t('employeeDetail.training.completed') : t('employeeDetail.training.pending')}
                                                     </div>
                                                 </div>
                                             </div>
@@ -473,12 +491,12 @@ export const EmployeeDetailView: React.FC = () => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>Role SOPs (Level 2: {role})</h3>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>{t('employeeDetail.training.roleTitle', { role })}</h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-                                    {roleSops.map((section: any) => section.pdfs.map((pdf: any, idx: number) => {
-                                        const isDone = completed.includes(pdf.name);
+                                    {roleMaterials.map((doc, idx) => {
+                                        const isDone = completed.includes(doc.display_name);
                                         return (
-                                            <div key={`${section.name}-${idx}`} style={{ 
+                                            <div key={`${doc.category}-${idx}`} style={{ 
                                                 background: 'white', 
                                                 padding: '1.25rem', 
                                                 borderRadius: '16px', 
@@ -496,14 +514,14 @@ export const EmployeeDetailView: React.FC = () => {
                                                     <i className={`fa-solid ${isDone ? 'fa-check' : 'fa-book'}`}></i>
                                                 </div>
                                                 <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{pdf.name}</div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{doc.display_name}</div>
                                                     <div style={{ fontSize: '0.75rem', color: isDone ? '#10b981' : '#64748b', fontWeight: 700 }}>
-                                                        {isDone ? 'COMPLETED' : 'PENDING'}
+                                                        {isDone ? t('employeeDetail.training.completed') : t('employeeDetail.training.pending')}
                                                     </div>
                                                 </div>
                                             </div>
                                         );
-                                    }))}
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -527,10 +545,10 @@ export const EmployeeDetailView: React.FC = () => {
                             {/* Header */}
                             <div className="section-title-row">
                                 <i className="fa-solid fa-calendar-alt"></i>
-                                <h2>Time Off</h2>
+                                <h2>{t('employeeDetail.timeOff.title')}</h2>
                                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#94a3b8' }}>
                                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 3px rgba(34,197,94,0.2)' }}></span>
-                                    Live
+                                    {t('common.live', 'Live')}
                                 </div>
                             </div>
 
@@ -544,10 +562,10 @@ export const EmployeeDetailView: React.FC = () => {
                                         <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
                                             {ptoBalance.toFixed(2)}
                                         </span>
-                                        <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>Hrs</span>
+                                        <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
                                     </div>
-                                    <div className="card-label">Paid Time Off (PTO) Available</div>
-                                    <div className="card-sublabel">{ptoRate.toFixed(2)} hrs / pay period</div>
+                                    <div className="card-label">{t('employeeDetail.timeOff.ptoLabel')}</div>
+                                    <div className="card-sublabel">{ptoRate.toFixed(2)} {t('employeeDetail.timeOff.payPeriod')}</div>
                                 </div>
 
                                 {/* Sick Card */}
@@ -559,23 +577,23 @@ export const EmployeeDetailView: React.FC = () => {
                                                 fontSize: '0.65rem', fontWeight: 700, background: '#fef3c7',
                                                 color: '#92400e', padding: '0.15rem 0.5rem',
                                                 borderRadius: '20px', marginLeft: '0.5rem',
-                                            }}>90-day wait</span>
+                                            }}>{t('employeeDetail.timeOff.waitPeriod')}</span>
                                         )}
                                     </div>
                                     <div className="card-value">
                                         <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
                                             {sickBalance.toFixed(2)}
                                         </span>
-                                        <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>Hrs</span>
+                                        <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
                                     </div>
-                                    <div className="card-label">Sick Time Available</div>
-                                    <div className="card-sublabel">48-hr cap · accrues from hours worked</div>
+                                    <div className="card-label">{t('employeeDetail.timeOff.sickLabel')}</div>
+                                    <div className="card-sublabel">{t('employeeDetail.timeOff.sickCap')}</div>
                                 </div>
                             </div>
 
                             {/* Upcoming & Pending Requests */}
                             <div className="upcoming-section">
-                                <h3><i className="fa-solid fa-clock"></i> Leave Requests</h3>
+                                <h3><i className="fa-solid fa-clock"></i> {t('employeeDetail.timeOff.requests')}</h3>
                                 {leaveRequests.length > 0 ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
                                         {leaveRequests.map(req => (
@@ -622,7 +640,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                         background: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
                                                         color: req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#991b1b' : '#92400e'
                                                     }}>
-                                                        {req.status}
+                                                        {t(`leave.filters.${req.status}`, req.status)}
                                                     </span>
                                                     {req.status === 'pending' && (
                                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -632,7 +650,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                                 className="small-action-btn"
                                                                 style={{ background: '#10b981', color: 'white', border: 'none' }}
                                                             >
-                                                                Approve
+                                                                {t('leave.actions.approve')}
                                                             </button>
                                                             <button 
                                                                 onClick={() => handleLeaveAction(req, 'rejected')}
@@ -640,7 +658,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                                 className="small-action-btn"
                                                                 style={{ background: '#ef4444', color: 'white', border: 'none' }}
                                                             >
-                                                                Reject
+                                                                {t('leave.actions.reject')}
                                                             </button>
                                                         </div>
                                                     )}
@@ -651,8 +669,8 @@ export const EmployeeDetailView: React.FC = () => {
                                 ) : (
                                     <div className="empty-state">
                                         <i className="fa-solid fa-calendar-xmark" style={{ fontSize: '3rem', color: '#e2e8f0' }}></i>
-                                        <p>No leave requests found.</p>
-                                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Do you need to get away?</span>
+                                        <p>{t('employeeDetail.timeOff.noRequests')}</p>
+                                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{t('employeeDetail.timeOff.getAway')}</span>
                                     </div>
                                 )}
                             </div>
@@ -660,7 +678,7 @@ export const EmployeeDetailView: React.FC = () => {
                             {/* History */}
                             <div className="history-section">
                                 <div className="history-header">
-                                    <span className="history-title"><i className="fa-solid fa-clock-rotate-left"></i> History</span>
+                                    <span className="history-title"><i className="fa-solid fa-clock-rotate-left"></i> {t('employeeDetail.timeOff.history')}</span>
                                     <div className="history-filters">
                                         <div className="custom-dropdown-container">
                                             <div
@@ -719,8 +737,8 @@ export const EmployeeDetailView: React.FC = () => {
                                             </div>
                                             {openDropdown === 'view' && (
                                                 <div className="dropdown-menu">
-                                                    <div className="dropdown-item">Requests</div>
-                                                    <div className="dropdown-item selected">Balance History</div>
+                                                    <div className="dropdown-item">{t('employeeDetail.timeOff.requests')}</div>
+                                                    <div className="dropdown-item selected">{t('employeeDetail.timeOff.balanceHistory')}</div>
                                                 </div>
                                             )}
                                         </div>
@@ -730,17 +748,17 @@ export const EmployeeDetailView: React.FC = () => {
                                 {displayRows.length === 0 ? (
                                     <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
                                         <i className="fa-solid fa-inbox" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }}></i>
-                                        No history entries yet.
+                                        {t('employeeDetail.timeOff.noHistory')}
                                     </div>
                                 ) : (
                                 <table className="history-table">
                                     <thead>
                                         <tr>
-                                            <th>Date <i className="fa-solid fa-arrow-up"></i></th>
-                                            <th>Description</th>
-                                            <th>Used Hours (−)</th>
-                                            <th>Earned Hours (+)</th>
-                                            <th>Balance</th>
+                                            <th>{t('employeeDetail.timeOff.date')} <i className="fa-solid fa-arrow-up"></i></th>
+                                            <th>{t('employeeDetail.timeOff.description')}</th>
+                                            <th>{t('employeeDetail.timeOff.usedHours')}</th>
+                                            <th>{t('employeeDetail.timeOff.earnedHours')}</th>
+                                            <th>{t('employeeDetail.timeOff.balance')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -765,68 +783,68 @@ export const EmployeeDetailView: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div className="section-title-row">
                                 <i className="fa-solid fa-user-gear"></i>
-                                <h2>Personal</h2>
+                                <h2>{t('employeeDetail.tabs.personal')}</h2>
                             </div>
 
                             {/* Basic Information */}
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-id-card"></i>
-                                    <h3>Basic Information</h3>
+                                    <h3>{t('employeeDetail.personal.basicInfo')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field">
-                                        <label>Employee #</label>
+                                        <label>{t('employeeDetail.personal.employeeNum')}</label>
                                         <input type="text" className={`info-input ${validationErrors.worker_id ? 'error' : ''}`} value={employee.worker_id || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, worker_id: e.target.value } : null)} />
                                         {validationErrors.worker_id && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.worker_id}</span>}
                                     </div>
                                     <div className="info-field">
-                                        <label>Status</label>
+                                        <label>{t('employeeDetail.personal.status')}</label>
                                         <select className="info-input" value={employee.active === false ? "false" : "true"} onChange={(e) => setEmployee(prev => prev ? { ...prev, active: e.target.value === "true" } : null)}>
-                                            <option value="true">Active</option>
-                                            <option value="false">Archived</option>
+                                            <option value="true">{t('common.active')}</option>
+                                            <option value="false">{t('common.archived')}</option>
                                         </select>
                                     </div>
                                     <div className="info-field">
-                                        <label>First Name</label>
+                                        <label>{t('employeeDetail.personal.firstName')}</label>
                                         <input type="text" className={`info-input ${validationErrors.first_name ? 'error' : ''}`} value={employee.first_name || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, first_name: e.target.value } : null)} />
                                         {validationErrors.first_name && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.first_name}</span>}
                                     </div>
                                     <div className="info-field">
-                                        <label>Middle Name</label>
+                                        <label>{t('employeeDetail.personal.middleName')}</label>
                                         <input type="text" className="info-input" value={employee.middle_name || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, middle_name: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Last Name</label>
+                                        <label>{t('employeeDetail.personal.lastName')}</label>
                                         <input type="text" className="info-input" value={employee.last_name || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, last_name: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Preferred Name</label>
+                                        <label>{t('employeeDetail.personal.preferredName')}</label>
                                         <input type="text" className="info-input" value={employee.preferred_name || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, preferred_name: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Birth Date</label>
+                                        <label>{t('employeeDetail.personal.birthDate')}</label>
                                         <input type="date" className="info-input" value={employee.birth_date || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, birth_date: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Gender</label>
+                                        <label>{t('employeeDetail.personal.gender')}</label>
                                         <select className="info-input" value={employee.gender || ""} onChange={(e) => setEmployee(prev => prev ? { ...prev, gender: e.target.value } : null)}>
-                                            <option value="">-Select-</option>
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                            <option value="Other">Other</option>
+                                            <option value="">{t('common.select')}</option>
+                                            <option value="Male">{t('common.male')}</option>
+                                            <option value="Female">{t('common.female')}</option>
+                                            <option value="Other">{t('common.other')}</option>
                                         </select>
                                     </div>
                                     <div className="info-field">
-                                        <label>Marital Status</label>
+                                        <label>{t('employeeDetail.personal.maritalStatus')}</label>
                                         <select className="info-input" value={employee.marital_status || ""} onChange={(e) => setEmployee(prev => prev ? { ...prev, marital_status: e.target.value } : null)}>
-                                            <option value="">-Select-</option>
-                                            <option value="Single">Single</option>
-                                            <option value="Married">Married</option>
+                                            <option value="">{t('common.select')}</option>
+                                            <option value="Single">{t('common.single')}</option>
+                                            <option value="Married">{t('common.married')}</option>
                                         </select>
                                     </div>
                                     <div className="info-field">
-                                        <label>Shirt Size</label>
+                                        <label>{t('employeeDetail.personal.shirtSize')}</label>
                                         <select className="info-input" value={employee.shirt_size || ""} onChange={(e) => setEmployee(prev => prev ? { ...prev, shirt_size: e.target.value } : null)}>
                                             <option value="">-Select-</option>
                                             <option value="S">S</option>
@@ -844,31 +862,31 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-house"></i>
-                                    <h3>Address</h3>
+                                    <h3>{t('employeeDetail.personal.address')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field full-width">
-                                        <label>Street 1</label>
+                                        <label>{t('employeeDetail.personal.street1')}</label>
                                         <input type="text" className="info-input" value={employee.address_street1 || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_street1: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Street 2</label>
+                                        <label>{t('employeeDetail.personal.street2')}</label>
                                         <input type="text" className="info-input" value={employee.address_street2 || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_street2: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>City</label>
+                                        <label>{t('employeeDetail.personal.city')}</label>
                                         <input type="text" className="info-input" value={employee.address_city || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_city: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>State</label>
+                                        <label>{t('employeeDetail.personal.state')}</label>
                                         <input type="text" className="info-input" value={employee.address_state || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_state: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>ZIP</label>
+                                        <label>{t('employeeDetail.personal.zip')}</label>
                                         <input type="text" className="info-input" value={employee.address_zip || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_zip: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Country</label>
+                                        <label>{t('employeeDetail.personal.country')}</label>
                                         <input type="text" className="info-input" value={employee.address_country || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, address_country: e.target.value } : null)} />
                                     </div>
                                 </div>
@@ -878,12 +896,12 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-address-book"></i>
-                                    <h3>Contact</h3>
+                                    <h3>{t('contact.title')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field">
-                                        <label>Work Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.work_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_phone: e.target.value } : null)} /></div>
+                                        <label>{t('contact.workPhone')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.work_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_phone: e.target.value } : null)} /></div>
                                         {validationErrors.work_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.work_phone}</span>}
                                     </div>
                                     <div className="info-field">
@@ -892,21 +910,21 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
                                     <div className="info-field">
                                         <label>Mobile Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-mobile-screen" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.mobile_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, mobile_phone: e.target.value } : null)} /></div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-mobile-screen" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.mobile_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, mobile_phone: e.target.value } : null)} /></div>
                                         {validationErrors.mobile_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.mobile_phone}</span>}
                                     </div>
                                     <div className="info-field">
                                         <label>Home Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.home_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_phone: e.target.value } : null)} /></div>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.home_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_phone: e.target.value } : null)} /></div>
                                         {validationErrors.home_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.home_phone}</span>}
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Work Email</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i><input type="email" className="info-input" style={{flex: 1}} value={employee.work_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_email: e.target.value } : null)} /></div>
+                                        <label>{t('contact.workEmail')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "var(--text-muted)"}}></i><input type="email" className="info-input" style={{flex: 1}} value={employee.work_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_email: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Home Email</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i><input type="email" className="info-input" style={{flex: 1}} value={employee.home_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_email: e.target.value } : null)} /></div>
+                                        <label>{t('contact.homeEmail')}</label>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "var(--text-muted)"}}></i><input type="email" className="info-input" style={{flex: 1}} value={employee.home_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_email: e.target.value } : null)} /></div>
                                     </div>
                                 </div>
                             </div>
@@ -915,19 +933,19 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-share-nodes"></i>
-                                    <h3>Social Links</h3>
+                                    <h3>{t('common.socialLinks', 'Social Links')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field full-width">
-                                        <label>LinkedIn</label>
+                                        <label>{t('common.linkedin', 'LinkedIn')}</label>
                                         <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-linkedin" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={employee.linkedin_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, linkedin_url: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Twitter Username</label>
+                                        <label>{t('common.twitter', 'Twitter Username')}</label>
                                         <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-twitter" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={employee.twitter_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, twitter_url: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Facebook</label>
+                                        <label>{t('common.facebook', 'Facebook')}</label>
                                         <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-facebook" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={employee.facebook_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, facebook_url: e.target.value } : null)} /></div>
                                     </div>
                                 </div>
@@ -937,10 +955,10 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-graduation-cap"></i>
-                                    <h3>Education</h3>
+                                    <h3>{t('education.title')}</h3>
                                 </div>
                                 <div style={{ padding: '1.5rem', textAlign: 'center' }}>
-                                    <button className="text-link" style={{ color: 'var(--primary, #1e1b4b)', fontWeight: 700 }}><i className="fa-solid fa-plus-circle"></i> Add Education</button>
+                                    <button className="text-link" style={{ color: 'var(--primary, #1e1b4b)', fontWeight: 700 }}><i className="fa-solid fa-plus-circle"></i> {t('education.add')}</button>
                                 </div>
                             </div>
 
@@ -951,17 +969,17 @@ export const EmployeeDetailView: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div className="section-title-row">
                                 <i className="fa-solid fa-briefcase"></i>
-                                <h2>Job</h2>
+                                <h2>{t('employeeDetail.job.title')}</h2>
                             </div>
 
                             <div className="info-card">
                                 <div className="card-grid">
                                     <div className="info-field">
-                                        <label>Hire Date</label>
+                                        <label>{t('employeeDetail.hireDate')}</label>
                                         <input type="date" className="info-input" value={employee.hire_date || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, hire_date: e.target.value } : null)} />
                                     </div>
                                     <div className="info-field">
-                                        <label>Pay Group</label>
+                                        <label>{t('employeeDetail.job.payGroup')}</label>
                                         <select className="info-input" value={employee.pay_schedule || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, pay_schedule: e.target.value } : null)}>
                                             <option value="">-Select-</option>
                                             <option value="Twice a month">Twice a month</option>
@@ -969,11 +987,11 @@ export const EmployeeDetailView: React.FC = () => {
                                         </select>
                                     </div>
                                     <div className="info-field half-width">
-                                        <label>Direct Reports</label>
+                                        <label>{t('employeeDetail.job.directReports')}</label>
                                         <input type="text" className="info-input" value={employee.reporting_to || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, reporting_to: e.target.value } : null)} placeholder="Enter manager name" />
                                     </div>
                                     <div className="info-field">
-                                        <label>Annual Pay</label>
+                                        <label>{t('employeeDetail.job.annualPay')}</label>
                                         <div className="info-icon-value">
                                             <span>$</span>
                                             <input 
@@ -994,16 +1012,16 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-header" style={{ justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <i className="fa-solid fa-user-clock"></i>
-                                        <h3>Employment Status</h3>
+                                        <h3>{t('employeeDetail.job.employmentStatus')}</h3>
                                     </div>
                                     <button className="small-action-btn">Add Policy</button>
                                 </div>
                                 <table className="info-table">
                                     <thead>
                                         <tr>
-                                            <th>Effective Date</th>
-                                            <th>Employment Status</th>
-                                            <th>Comment</th>
+                                            <th>{t('employeeDetail.job.effectiveDate')}</th>
+                                            <th>{t('employeeDetail.job.employmentStatus')}</th>
+                                            <th>{t('employeeDetail.job.comment')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1021,20 +1039,20 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-header" style={{ justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <i className="fa-solid fa-money-check-dollar"></i>
-                                        <h3>Compensation</h3>
+                                        <h3>{t('employeeDetail.job.compensation')}</h3>
                                     </div>
-                                    <button className="small-action-btn">Add Policy</button>
+                                    <button className="small-action-btn">{t('common.addPolicy')}</button>
                                 </div>
                                 <table className="info-table">
                                     <thead>
                                         <tr>
-                                            <th>Effective Date</th>
-                                            <th>Pay Schedule</th>
-                                            <th>Pay Type</th>
-                                            <th>Pay Rate</th>
-                                            <th>Overtime</th>
-                                            <th>Change Reason</th>
-                                            <th>Comment</th>
+                                            <th>{t('employeeDetail.job.effectiveDate')}</th>
+                                            <th>{t('employeeDetail.job.paySchedule')}</th>
+                                            <th>{t('employeeDetail.job.payType')}</th>
+                                            <th>{t('employeeDetail.job.payRate')}</th>
+                                            <th>{t('employeeDetail.job.overtime')}</th>
+                                            <th>{t('employeeDetail.job.changeReason')}</th>
+                                            <th>{t('employeeDetail.job.comment')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1062,20 +1080,20 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-header" style={{ justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <i className="fa-solid fa-briefcase"></i>
-                                        <h3>Job Information</h3>
+                                        <h3>{t('employeeDetail.job.jobInfo')}</h3>
                                     </div>
                                     <button className="small-action-btn">Add Policy</button>
                                 </div>
                                 <table className="info-table">
                                     <thead>
                                         <tr>
-                                            <th>Effective Date</th>
-                                            <th>Location</th>
-                                            <th>Division</th>
-                                            <th>Department</th>
-                                            <th>Teams</th>
-                                            <th>Job Title</th>
-                                            <th>Reports To</th>
+                                            <th>{t('employeeDetail.job.effectiveDate')}</th>
+                                            <th>{t('employeeDetail.job.location')}</th>
+                                            <th>{t('employeeDetail.job.division')}</th>
+                                            <th>{t('employeeDetail.job.department')}</th>
+                                            <th>{t('employeeDetail.job.teams')}</th>
+                                            <th>{t('employeeDetail.job.jobTitle')}</th>
+                                            <th>{t('employeeDetail.job.reportsTo')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1096,11 +1114,11 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-scale-balanced"></i>
-                                    <h3>Equal Employment Opportunity</h3>
+                                    <h3>{t('eeo.title')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field half-width">
-                                        <label>Ethnicity</label>
+                                        <label>{t('eeo.ethnicity')}</label>
                                         <div className="custom-eeo-dropdown">
                                             <div 
                                                 className={`eeo-select-trigger ${openDropdown === 'ethnicity' ? 'active' : ''}`}
@@ -1144,7 +1162,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="info-field half-width">
-                                        <label>EEO Job Category</label>
+                                        <label>{t('eeo.category')}</label>
                                         <div className="custom-eeo-dropdown">
                                             <div 
                                                 className={`eeo-select-trigger ${openDropdown === 'eeo_category' ? 'active' : ''}`}
@@ -1188,7 +1206,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Veteran Status</label>
+                                        <label>{t('eeo.veteranStatus')}</label>
                                         <div className="veteran-status-list">
                                             <label className="custom-checkbox-container">
                                                 <input 
@@ -1200,7 +1218,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                     }}
                                                 />
                                                 <span className="checkmark"></span>
-                                                Active Duty Wartime or Campaign Badge Veteran
+                                                {t('eeo.activeDuty')}
                                             </label>
                                             <label className="custom-checkbox-container">
                                                 <input 
@@ -1212,7 +1230,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                     }}
                                                 />
                                                 <span className="checkmark"></span>
-                                                Armed Forces Service Medal Veteran
+                                                {t('eeo.armedForces')}
                                             </label>
                                             <label className="custom-checkbox-container">
                                                 <input 
@@ -1224,7 +1242,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                     }}
                                                 />
                                                 <span className="checkmark"></span>
-                                                Disabled Veteran
+                                                {t('eeo.disabled')}
                                             </label>
                                             <label className="custom-checkbox-container">
                                                 <input 
@@ -1236,7 +1254,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                     }}
                                                 />
                                                 <span className="checkmark"></span>
-                                                Recently Separated Veteran
+                                                {t('eeo.recentlySeparated')}
                                             </label>
                                         </div>
                                     </div>
@@ -1247,11 +1265,11 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-gift"></i>
-                                    <h3>Potential Bonus</h3>
+                                    <h3>{t('bonus.potential')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field">
-                                        <label>Annual Percentage</label>
+                                        <label>{t('bonus.percentage')}</label>
                                         <div className="bonus-input-wrapper bonus-percentage">
                                             <input 
                                                 type="number" 
@@ -1266,7 +1284,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="info-field">
-                                        <label>Annual Amount</label>
+                                        <label>{t('bonus.amount')}</label>
                                         <div className="bonus-input-wrapper amount">
                                             <span className="prefix">$</span>
                                             <input 
@@ -1290,9 +1308,9 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-header" style={{ justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <i className="fa-solid fa-coins"></i>
-                                        <h3>Bonus</h3>
+                                        <h3>{t('bonus.title')}</h3>
                                     </div>
-                                    <button className="add-entry-btn" onClick={() => setIsBonusModalOpen(true)}>Add Entry</button>
+                                    <button className="add-entry-btn" onClick={() => setIsBonusModalOpen(true)}>{t('bonus.add')}</button>
                                 </div>
                                 <table className="info-table">
                                     <thead>
@@ -1305,7 +1323,7 @@ export const EmployeeDetailView: React.FC = () => {
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No bonus entries have been added.</td>
+                                            <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>{t('bonus.noEntries')}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1316,9 +1334,9 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-header" style={{ justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <i className="fa-solid fa-chart-line-up"></i>
-                                        <h3>Commission</h3>
+                                        <h3>{t('commission.title')}</h3>
                                     </div>
-                                    <button className="add-entry-btn" onClick={() => setIsCommissionModalOpen(true)}>Add Entry</button>
+                                    <button className="add-entry-btn" onClick={() => setIsCommissionModalOpen(true)}>{t('bonus.add')}</button>
                                 </div>
                                 <table className="info-table">
                                     <thead>
@@ -1330,7 +1348,7 @@ export const EmployeeDetailView: React.FC = () => {
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td colSpan={3} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No commission entries have been added.</td>
+                                            <td colSpan={3} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>{t('commission.noEntries')}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1341,9 +1359,9 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-header" style={{ justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <i className="fa-solid fa-gem"></i>
-                                        <h3>Equity</h3>
+                                        <h3>{t('equity.title')}</h3>
                                     </div>
-                                    <button className="add-entry-btn" onClick={() => setIsEquityModalOpen(true)}>Add Entry</button>
+                                    <button className="add-entry-btn" onClick={() => setIsEquityModalOpen(true)}>{t('bonus.add')}</button>
                                 </div>
                                 <table className="info-table">
                                     <thead>
@@ -1361,7 +1379,7 @@ export const EmployeeDetailView: React.FC = () => {
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No equity entries have been added.</td>
+                                            <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>{t('equity.noEntries')}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1373,14 +1391,14 @@ export const EmployeeDetailView: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div className="section-title-row">
                                 <i className="fa-solid fa-life-ring"></i>
-                                <h2>Emergency</h2>
+                                <h2>{t('emergency.title')}</h2>
                             </div>
 
                             <div className="info-card">
                                 <div className="card-header" style={{ justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <i className="fa-solid fa-address-card"></i>
-                                        <h3>Emergency Contact Information</h3>
+                                        <h3>{t('emergency.contactInfo')}</h3>
                                     </div>
                                     <button className="small-action-btn">Add Policy</button>
                                 </div>
@@ -1393,7 +1411,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                 onChange={(e) => setEmployee(prev => prev ? { ...prev, is_primary_contact: e.target.checked } : null)}
                                                 style={{ transform: 'scale(1.2)' }} 
                                             />
-                                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>This is the primary emergency contact</span>
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>{t('emergency.primary')}</span>
                                         </div>
                                     </div>
                                     <div className="info-field half-width">
@@ -1463,7 +1481,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Email</label>
+                                        <label>{t('common.email', 'Email')}</label>
                                         <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
                                             <i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i>
                                             <input 
@@ -1482,11 +1500,11 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-house-medical"></i>
-                                    <h3>Emergency Contact Address</h3>
+                                    <h3>{t('emergency.addressTitle')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field full-width">
-                                        <label>Street 1</label>
+                                        <label>{t('employeeDetail.personal.street1')}</label>
                                         <input 
                                             type="text" 
                                             className="info-input" 
@@ -1495,7 +1513,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         />
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>Street 2</label>
+                                        <label>{t('employeeDetail.personal.street2')}</label>
                                         <input 
                                             type="text" 
                                             className="info-input" 
@@ -1504,7 +1522,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         />
                                     </div>
                                     <div className="info-field">
-                                        <label>City</label>
+                                        <label>{t('employeeDetail.personal.city')}</label>
                                         <input 
                                             type="text" 
                                             className="info-input" 
@@ -1513,7 +1531,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         />
                                     </div>
                                     <div className="info-field">
-                                        <label>State</label>
+                                        <label>{t('employeeDetail.personal.state')}</label>
                                         <input 
                                             type="text" 
                                             className="info-input" 
@@ -1522,7 +1540,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         />
                                     </div>
                                     <div className="info-field">
-                                        <label>ZIP</label>
+                                        <label>{t('employeeDetail.personal.zip')}</label>
                                         <input 
                                             type="text" 
                                             className="info-input" 
@@ -1531,7 +1549,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         />
                                     </div>
                                     <div className="info-field">
-                                        <label>Country</label>
+                                        <label>{t('employeeDetail.personal.country')}</label>
                                         <input 
                                             type="text" 
                                             className="info-input" 
@@ -1546,7 +1564,7 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-user-friends"></i>
-                                    <h3>Secondary Emergency Contact</h3>
+                                    <h3>{t('emergency.secondaryTitle')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field half-width">
@@ -1777,7 +1795,7 @@ export const EmployeeDetailView: React.FC = () => {
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field">
-                                        <label>Contact Name</label>
+                                        <label>{t('emergency.contactName')}</label>
                                         <input 
                                             type="text" 
                                             className="info-input"

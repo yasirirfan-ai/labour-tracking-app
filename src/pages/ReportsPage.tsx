@@ -1,15 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import Chart from 'chart.js/auto';
-import { LEVEL_2_SOPS } from '../data/sopData';
+import { trainingService } from '../lib/trainingService';
+import type { TrainingMaterial } from '../lib/trainingService';
+import { useTranslation } from 'react-i18next';
 
 export const ReportsPage: React.FC = () => {
-
+    const { t } = useTranslation();
     const [tasks, setTasks] = useState<any[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
     const [mos, setMos] = useState<any[]>([]);
     const [ops, setOps] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>([]);
 
     const [filters, setFilters] = useState({ employee: 'all', mo: 'all', operation: 'all', start: '', end: '' });
 
@@ -34,6 +37,8 @@ export const ReportsPage: React.FC = () => {
             const { data: userData } = await supabase.from('users').select('*').eq('role', 'employee') as { data: any[] };
             const { data: moData } = await supabase.from('manufacturing_orders').select('*') as { data: any[] };
             const { data: opData } = await supabase.from('operations').select('*') as { data: any[] };
+            
+            const trMaterials = await trainingService.getAllMaterials();
 
             if (taskData && userData) {
                 const richTasks = taskData.map((t: any) => {
@@ -49,6 +54,7 @@ export const ReportsPage: React.FC = () => {
                 setEmployees(userData || []);
                 setMos(moData || []);
                 setOps(opData || []);
+                setTrainingMaterials(trMaterials || []);
             }
         } catch (err) {
             console.error('Error fetching reports:', err);
@@ -65,8 +71,8 @@ export const ReportsPage: React.FC = () => {
         const workerCompliance = employees.map(worker => {
             const completed = worker.completed_trainings || [];
             const role = worker.role === 'manager' ? 'Quality Assurance' : 'Production';
-            const sopsForRole = LEVEL_2_SOPS[role as keyof typeof LEVEL_2_SOPS] || [];
-            const totalPossible = 3 + sopsForRole.length;
+            const sopsForRole = trainingMaterials.filter(m => m.level === 2 && m.department === role);
+            const totalPossible = 3 + sopsForRole.length; // Assuming 3 Level 1 categories on average or core trainings
             return totalPossible > 0 ? (completed.length / totalPossible) : 0;
         });
         const avgCompliance = workerCompliance.length > 0
@@ -84,9 +90,7 @@ export const ReportsPage: React.FC = () => {
     const getFilteredTasks = () => {
         return tasks.filter(task => {
             if (filters.employee !== 'all' && task.assigned_to_id !== filters.employee) return false;
-            // The template uses mo name for value
             if (filters.mo !== 'all' && task.mo_reference !== filters.mo) return false;
-            // The template uses operation name for value
             if (filters.operation !== 'all' && task.description !== filters.operation) return false;
             if (filters.start && task.start_time && task.start_time < filters.start) return false;
             if (filters.end && task.end_time && task.end_time > filters.end) return false;
@@ -96,8 +100,6 @@ export const ReportsPage: React.FC = () => {
 
     const updateCharts = () => {
         const filtered = getFilteredTasks();
-
-        // Prepare Data
         const hoursByWorker: Record<string, number> = {};
         const hoursByOp: Record<string, number> = {};
 
@@ -109,7 +111,6 @@ export const ReportsPage: React.FC = () => {
             }
         });
 
-        // Worker Chart
         if (workerChartRef.current) {
             if (chartInstances.current.worker) chartInstances.current.worker.destroy();
             chartInstances.current.worker = new Chart(workerChartRef.current, {
@@ -117,7 +118,7 @@ export const ReportsPage: React.FC = () => {
                 data: {
                     labels: Object.keys(hoursByWorker),
                     datasets: [{
-                        label: 'Productive Hours',
+                        label: t('reports.productiveHours'),
                         data: Object.values(hoursByWorker),
                         backgroundColor: '#6366F1',
                         borderRadius: 8,
@@ -130,14 +131,13 @@ export const ReportsPage: React.FC = () => {
                     indexAxis: 'y',
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { grid: { borderDash: [5, 5] }, ticks: { font: { weight: 'bold' } } },
-                        y: { grid: { display: false }, ticks: { font: { weight: 'bold' } } }
+                        x: { grid: { borderDash: [5, 5], color: 'rgba(148, 163, 184, 0.1)' }, ticks: { font: { weight: 'bold' }, color: 'var(--text-main)' } },
+                        y: { grid: { display: false }, ticks: { font: { weight: 'bold' }, color: 'var(--text-main)' } }
                     }
                 } as any
             });
         }
 
-        // Op Chart
         if (opChartRef.current) {
             if (chartInstances.current.op) chartInstances.current.op.destroy();
             chartInstances.current.op = new Chart(opChartRef.current, {
@@ -154,7 +154,7 @@ export const ReportsPage: React.FC = () => {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'right', labels: { usePointStyle: true, font: { weight: 'bold' } } }
+                        legend: { position: 'right', labels: { usePointStyle: true, font: { weight: 'bold' }, color: 'var(--text-main)' } }
                     },
                     cutout: '70%'
                 } as any
@@ -162,7 +162,7 @@ export const ReportsPage: React.FC = () => {
         }
     };
 
-    if (isLoading) return <div className="loading-screen">Generating Reports...</div>;
+    if (isLoading) return <div className="loading-screen">{t('reports.loading')}</div>;
 
     const filteredList = getFilteredTasks();
     const currentStats = calculateStats(filteredList);
@@ -171,118 +171,118 @@ export const ReportsPage: React.FC = () => {
         <>
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                    <h1 className="page-title">Reports</h1>
-                    <p className="page-subtitle">Labor cost and time analysis</p>
+                    <h1 className="page-title">{t('reports.title')}</h1>
+                    <p className="page-subtitle">{t('reports.subtitle')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                     <button className="btn btn-primary" style={{ width: 'auto' }}>
-                        <i className="fa-solid fa-file-export"></i> Export CSV
+                        <i className="fa-solid fa-file-export"></i> {t('reports.exportCsv')}
                     </button>
                 </div>
             </div>
 
-            <div className="reports-filter-card">
+            <div className="reports-filter-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                 <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)', fontWeight: 700 }}>
-                    <i className="fa-solid fa-filter" style={{ color: 'var(--primary)' }}></i> Filters
+                    <i className="fa-solid fa-filter" style={{ color: 'var(--primary)' }}></i> {t('reports.filters')}
                 </div>
                 <div className="filter-grid" id="filterForm">
                     <div className="filter-group">
-                        <label>Worker</label>
+                        <label style={{ color: 'var(--text-main)' }}>{t('reports.worker')}</label>
                         <select
                             value={filters.employee}
                             onChange={(e) => setFilters({ ...filters, employee: e.target.value })}
-                            className="form-select" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: '#F8FAFC' }}
+                            className="form-select" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                         >
-                            <option value="all">All Workers</option>
+                            <option value="all">{t('reports.allWorkers')}</option>
                             {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                         </select>
                     </div>
                     <div className="filter-group">
-                        <label>Manufacturing Order</label>
+                        <label style={{ color: 'var(--text-main)' }}>{t('reports.mo')}</label>
                         <select
                             value={filters.mo}
                             onChange={(e) => setFilters({ ...filters, mo: e.target.value })}
-                            className="form-select" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: '#F8FAFC' }}
+                            className="form-select" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                         >
-                            <option value="all">All Orders</option>
+                            <option value="all">{t('reports.allOrders')}</option>
                             {mos.map(m => <option key={m.id} value={m.mo_number}>{m.mo_number}</option>)}
                         </select>
                     </div>
                     <div className="filter-group">
-                        <label>Operation</label>
+                        <label style={{ color: 'var(--text-main)' }}>{t('reports.operation')}</label>
                         <select
                             value={filters.operation}
                             onChange={(e) => setFilters({ ...filters, operation: e.target.value })}
-                            className="form-select" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: '#F8FAFC' }}
+                            className="form-select" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                         >
-                            <option value="all">All Operations</option>
+                            <option value="all">{t('reports.allOperations')}</option>
                             {ops.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
                         </select>
                     </div>
                     <div className="filter-group">
-                        <label>Start Date</label>
+                        <label style={{ color: 'var(--text-main)' }}>{t('reports.startDate')}</label>
                         <input
                             type="date"
                             value={filters.start}
                             onChange={(e) => setFilters({ ...filters, start: e.target.value })}
-                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: '#F8FAFC' }}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                         />
                     </div>
                     <div className="filter-group">
-                        <label>End Date</label>
+                        <label style={{ color: 'var(--text-main)' }}>{t('reports.endDate')}</label>
                         <input
                             type="date"
                             value={filters.end}
                             onChange={(e) => setFilters({ ...filters, end: e.target.value })}
-                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: '#F8FAFC' }}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                         />
                     </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-                    <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setFilters({ employee: 'all', mo: 'all', operation: 'all', start: '', end: '' })}><i className="fa-solid fa-rotate-left"></i> Reset</button>
-                    <button className="btn btn-primary" style={{ width: 'auto' }}>Apply Filters</button>
+                    <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setFilters({ employee: 'all', mo: 'all', operation: 'all', start: '', end: '' })}><i className="fa-solid fa-rotate-left"></i> {t('reports.reset')}</button>
+                    <button className="btn btn-primary" style={{ width: 'auto' }}>{t('reports.applyFilters')}</button>
                 </div>
             </div>
 
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '2rem' }}>
-                <div className="report-stat-card">
+                <div className="report-stat-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                     <div>
-                        <div className="stat-label">Total Hours (Unique)</div>
-                        <div className="stat-value">{currentStats.totalHours}</div>
-                        <div className="stat-detail">{filteredList.length} time entries</div>
+                        <div className="stat-label" style={{ color: 'var(--text-muted)' }}>{t('reports.totalHours')}</div>
+                        <div className="stat-value" style={{ color: 'var(--text-main)' }}>{currentStats.totalHours}</div>
+                        <div className="stat-detail" style={{ color: 'var(--text-muted)' }}>{filteredList.length} {t('reports.timeEntries')}</div>
                     </div>
                     <div className="icon-box icon-blue"><i className="fa-regular fa-clock"></i></div>
                 </div>
-                <div className="report-stat-card">
+                <div className="report-stat-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                     <div>
-                        <div className="stat-label">Labor Cost</div>
-                        <div className="stat-value">${currentStats.totalCost.toFixed(2)}</div>
-                        <div className="stat-detail">Based on hourly rates</div>
+                        <div className="stat-label" style={{ color: 'var(--text-muted)' }}>{t('reports.laborCost')}</div>
+                        <div className="stat-value" style={{ color: 'var(--text-main)' }}>${currentStats.totalCost.toFixed(2)}</div>
+                        <div className="stat-detail" style={{ color: 'var(--text-muted)' }}>{t('reports.basedOnRates')}</div>
                     </div>
                     <div className="icon-box icon-green"><i className="fa-solid fa-dollar-sign"></i></div>
                 </div>
-                <div className="report-stat-card">
+                <div className="report-stat-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                     <div>
-                        <div className="stat-label">Avg Cost/Hour</div>
-                        <div className="stat-value">${currentStats.avgRate.toFixed(2)}</div>
-                        <div className="stat-detail">Blended rate</div>
+                        <div className="stat-label" style={{ color: 'var(--text-muted)' }}>{t('reports.avgCostPerHour')}</div>
+                        <div className="stat-value" style={{ color: 'var(--text-main)' }}>${currentStats.avgRate.toFixed(2)}</div>
+                        <div className="stat-detail" style={{ color: 'var(--text-muted)' }}>{t('reports.blendedRate')}</div>
                     </div>
                     <div className="icon-box icon-yellow"><i className="fa-solid fa-chart-line"></i></div>
                 </div>
-                <div className="report-stat-card">
+                <div className="report-stat-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                     <div>
-                        <div className="stat-label">Training Compliance</div>
-                        <div className="stat-value">{currentStats.avgCompliance}%</div>
-                        <div className="stat-detail">Overall staff readiness</div>
+                        <div className="stat-label" style={{ color: 'var(--text-muted)' }}>{t('reports.trainingCompliance')}</div>
+                        <div className="stat-value" style={{ color: 'var(--text-main)' }}>{currentStats.avgCompliance}%</div>
+                        <div className="stat-detail" style={{ color: 'var(--text-muted)' }}>{t('reports.overallReadiness')}</div>
                     </div>
-                    <div className="icon-box" style={{ background: '#f0f9ff', color: '#0369a1' }}><i className="fa-solid fa-user-graduate"></i></div>
+                    <div className="icon-box" style={{ background: 'var(--bg-main)', color: 'var(--primary)' }}><i className="fa-solid fa-user-graduate"></i></div>
                 </div>
             </div>
 
             <div className="content-grid" style={{ marginBottom: '2rem' }}>
                 <div className="section-card">
                     <div className="section-header">
-                        <h2 className="section-title"><i className="fa-solid fa-users" style={{ marginRight: '8px' }}></i> Hours by Worker</h2>
+                        <h2 className="section-title"><i className="fa-solid fa-users" style={{ marginRight: '8px' }}></i> {t('reports.hoursByWorker')}</h2>
                     </div>
                     <div style={{ height: '300px' }}>
                         <canvas ref={workerChartRef}></canvas>
@@ -290,7 +290,7 @@ export const ReportsPage: React.FC = () => {
                 </div>
                 <div className="section-card">
                     <div className="section-header">
-                        <h2 className="section-title"><i className="fa-solid fa-list-check" style={{ marginRight: '8px' }}></i> Hours by Operation</h2>
+                        <h2 className="section-title"><i className="fa-solid fa-list-check" style={{ marginRight: '8px' }}></i> {t('reports.hoursByOperation')}</h2>
                     </div>
                     <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <canvas ref={opChartRef}></canvas>
@@ -300,44 +300,44 @@ export const ReportsPage: React.FC = () => {
 
             <div className="section-card">
                 <div className="section-header">
-                    <h2 className="section-title"><i className="fa-regular fa-clock" style={{ marginRight: '8px' }}></i> Time Entry Details</h2>
+                    <h2 className="section-title"><i className="fa-regular fa-clock" style={{ marginRight: '8px' }}></i> {t('reports.timeEntryDetails')}</h2>
                 </div>
                 <div className="table-container">
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
-                            <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
-                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Worker</th>
-                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Order</th>
-                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Operation</th>
-                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Start Time</th>
-                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Duration</th>
-                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Type</th>
-                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Cost</th>
+                            <tr style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border)' }}>
+                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{t('reports.worker')}</th>
+                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{t('reports.order')}</th>
+                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{t('reports.operation')}</th>
+                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{t('reports.startTime')}</th>
+                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{t('reports.duration')}</th>
+                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{t('reports.type')}</th>
+                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-main)' }}>{t('reports.cost')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredList.map(task => (
                                 <tr key={task.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                    <td style={{ padding: '1rem', fontWeight: 700 }}>{task.employee_name}</td>
+                                    <td style={{ padding: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{task.employee_name}</td>
                                     <td style={{ padding: '1rem', color: 'var(--primary)', fontWeight: 600 }}>{task.mo_reference}</td>
-                                    <td style={{ padding: '1rem' }}>{task.description}</td>
+                                    <td style={{ padding: '1rem', color: 'var(--text-main)' }}>{task.description}</td>
                                     <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>
                                         {task.start_time ? task.start_time.substring(0, 16).replace('T', ', ') : 'N/A'}
                                     </td>
-                                    <td style={{ padding: '1rem' }}>
+                                    <td style={{ padding: '1rem', color: 'var(--text-main)' }}>
                                         {Math.floor((task.active_seconds || 0) / 3600)}h {Math.floor(((task.active_seconds || 0) % 3600) / 60)}m
                                     </td>
                                     <td style={{ padding: '1rem' }}>
-                                        <span className="badge" style={{ background: '#EEF2FF', color: '#4F46E5', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                        <span className="badge" style={{ background: 'var(--bg-main)', color: 'var(--primary)', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>
                                             {task.manual ? 'manual' : 'auto'}
                                         </span>
                                     </td>
-                                    <td style={{ padding: '1rem', fontWeight: 700 }}>${(task.cost || 0).toFixed(2)}</td>
+                                    <td style={{ padding: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>${(task.cost || 0).toFixed(2)}</td>
                                 </tr>
                             ))}
                             {filteredList.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No entries found for the selected filters.</td>
+                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>{t('reports.noEntries')}</td>
                                 </tr>
                             )}
                         </tbody>

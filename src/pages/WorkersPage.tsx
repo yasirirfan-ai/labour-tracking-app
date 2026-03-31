@@ -3,8 +3,10 @@ import { supabase } from '../lib/supabase';
 import { EmployeeCardGrid } from '../components/EmployeeCardGrid';
 import { useNavigate } from 'react-router-dom';
 import type { User } from '../types';
+import { useTranslation } from 'react-i18next';
 
 export const WorkersPage: React.FC = () => {
+    const { t } = useTranslation();
     const [workers, setWorkers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -33,7 +35,7 @@ export const WorkersPage: React.FC = () => {
 
     const handleArchive = async (id: string, currentStatus: boolean) => {
         const action = currentStatus ? 'archive' : 'restore';
-        if (!confirm(`Are you sure you want to ${action} this worker?`)) return;
+        if (!confirm(t('common.confirmAction', { action: t(`common.${action}`) }))) return;
 
         const { error } = await (supabase.from('users') as any).update({ active: !currentStatus }).eq('id', id);
         if (!error) fetchWorkers();
@@ -43,7 +45,7 @@ export const WorkersPage: React.FC = () => {
     const handleResetPassword = async () => {
         if (!selectedWorker) return;
 
-        const newPassword = window.prompt(`Enter a new password for ${selectedWorker.name}:`);
+        const newPassword = window.prompt(t('common.enterNewPassword', { name: selectedWorker.name }));
         if (!newPassword || newPassword.trim() === '') {
             return; // Cancelled or empty string
         }
@@ -53,9 +55,9 @@ export const WorkersPage: React.FC = () => {
             .eq('id', selectedWorker.id);
 
         if (!error) {
-            alert(`Password successfully updated for ${selectedWorker.name}.`);
+            alert(t('common.passwordUpdated', { name: selectedWorker.name }));
         } else {
-            alert('Error resetting password: ' + error.message);
+            alert(t('common.errorResettingPassword') + ': ' + error.message);
         }
     };
 
@@ -89,46 +91,44 @@ export const WorkersPage: React.FC = () => {
         navigate(`/workers/${employee.id}`);
     };
 
-    if (isLoading) return <div className="loading-screen">Loading Workers...</div>;
+    if (isLoading) return <div className="loading-screen">{t('common.loading')}</div>;
 
     return (
-        <>
-            <div className="workers-page">
+        <div className="workers-page">
             <header className="people-header">
                 <div className="people-header-main">
                     <div className="title-section">
-                        <h1 className="people-title">People</h1>
+                        <h1 className="people-title">{t('workers.title')}</h1>
                     </div>
                     
                     <div className="header-actions">
                         <button className="btn-new-employee" onClick={handleAddNew}>
-                            <i className="fa-solid fa-circle-plus"></i> New Employee
+                            <i className="fa-solid fa-circle-plus"></i> {t('common.add')}
                         </button>
                     </div>
                 </div>
             </header>
 
-            <div className="filter-bar" style={{ justifyContent: 'flex-end' }}>
+            <div className="filter-bar">
                 <div className="search-filter-group">
                     <div className="search-wrapper">
                         <i className="fa-solid fa-magnifying-glass"></i>
                         <input 
                             type="text" 
-                            placeholder="Search..." 
+                            placeholder={t('common.search')} 
                             value={search} 
                             onChange={(e) => setSearch(e.target.value)} 
                         />
                     </div>
                     <div className="status-filter">
-                        <span>Showing</span>
+                        <span>{t('common.showing')}</span>
                         <div className="select-wrapper">
                             <select value={showArchived ? 'Archived' : 'Active'} onChange={(e) => setShowArchived(e.target.value === 'Archived')}>
-                                <option value="Active">Active</option>
-                                <option value="Archived">Archived</option>
+                                <option value="Active">{t('common.active')}</option>
+                                <option value="Archived">{t('common.archived')}</option>
                             </select>
                         </div>
                     </div>
-                    <button className="more-filters-btn"><i className="fa-solid fa-ellipsis"></i></button>
                 </div>
             </div>
 
@@ -138,53 +138,111 @@ export const WorkersPage: React.FC = () => {
                 onDelete={handleArchive}
             />
 
+            {/* History Modal */}
+            <div className={`custom-modal ${isHistoryOpen ? 'active' : ''} history-modal`}>
+                <div className="modal-header">
+                    <div>
+                        <h3>{t('common.rateHistory')}</h3>
+                        <p>{selectedWorker?.name}</p>
+                    </div>
+                    <button className="close-x" onClick={() => setIsHistoryOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                </div>
+                <div className="modal-body">
+                    {rateHistory.length > 0 ? (
+                        <div className="history-list">
+                            {rateHistory.map((h, i) => (
+                                <div key={h.id} className={`history-item ${i === 0 ? 'current' : ''}`}>
+                                    <div className="history-info">
+                                        <div className="rate-amount">$ {parseFloat(h.hourly_rate).toFixed(2)}/hr</div>
+                                        <div className="effective-date">
+                                            {t('common.effectiveSince', { date: new Date(h.changed_at).toLocaleDateString() })}
+                                        </div>
+                                    </div>
+                                    {i === 0 && <span className="current-badge">{t('common.current')}</span>}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="no-data">{t('common.noHistory')}</div>
+                    )}
+                </div>
+                <div className="modal-footer">
+                    <button className="secondary-btn" onClick={() => setIsHistoryOpen(false)}>{t('common.close')}</button>
+                </div>
+            </div>
+
+            {/* Worker Details Modal */}
+            <div className={`custom-modal ${isDetailsOpen ? 'active' : ''} details-modal`}>
+                <div className="modal-header details-header">
+                    <div className="worker-header-info">
+                        <div className="worker-avatar">
+                            {selectedWorker?.name?.substring(0, 2)?.toUpperCase() || 'W'}
+                        </div>
+                        <div>
+                            <h3>{selectedWorker?.name}</h3>
+                            <div className="worker-id-badge">
+                                {selectedWorker?.worker_id || 'NO ID'}
+                            </div>
+                        </div>
+                    </div>
+                    <button className="close-x" onClick={() => setIsDetailsOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                </div>
+                <div className="modal-body">
+                    <div className="details-grid">
+                        <div className="detail-field">
+                            <label>{t('common.username')}</label>
+                            <div className="detail-value">{selectedWorker?.username}</div>
+                        </div>
+                        <div className="detail-row">
+                            <div className="detail-field">
+                                <label>{t('common.hourlyRate')}</label>
+                                <div className="detail-value highlight">${parseFloat(selectedWorker?.hourly_rate || 0).toFixed(2)}/hr</div>
+                            </div>
+                            <div className="detail-field">
+                                <label>{t('common.accountStatus')}</label>
+                                <div className={`detail-value status ${selectedWorker?.active === false ? 'archived' : 'active'}`}>
+                                    {selectedWorker?.active === false ? t('common.archived') : t('common.active')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="modal-actions-list">
+                            <button className="action-btn" onClick={() => { setIsDetailsOpen(false); openHistory(selectedWorker); }}>
+                                <i className="fa-solid fa-clock-rotate-left"></i> {t('common.viewRateHistory')}
+                            </button>
+                            <button className="action-btn warning" onClick={handleResetPassword}>
+                                <i className="fa-solid fa-key"></i> {t('common.resetPassword')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {(isHistoryOpen || isDetailsOpen) && <div className="modal-overlay active" onClick={() => { setIsHistoryOpen(false); setIsDetailsOpen(false); }}></div>}
+
             <style>{`
+                .workers-page {
+                    min-height: 100vh;
+                    background: var(--bg-main);
+                }
                 .people-header {
-                    padding-bottom: 2rem;
-                    border-bottom: 1px solid #e2e8f0;
+                    padding: 1rem 0 2rem;
+                    border-bottom: 1px solid var(--border);
                     margin-bottom: 2rem;
                 }
                 .people-header-main {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    gap: 2rem;
-                }
-                .title-section {
-                    display: flex;
-                    align-items: center;
-                    gap: 1.5rem;
                 }
                 .people-title {
                     font-size: 2rem;
-                    font-weight: 900;
-                    color: #0f172a;
+                    font-weight: 800;
+                    color: var(--text-main);
                     margin: 0;
-                    letter-spacing: -0.02em;
-                }
-                .quick-access-btn {
-                    background: #f1f5f9;
-                    border: 1px solid #e2e8f0;
-                    padding: 0.5rem 1rem;
-                    border-radius: 8px;
-                    font-size: 0.85rem;
-                    font-weight: 600;
-                    color: #64748b;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    transition: all 0.2s;
-                }
-                .quick-access-btn:hover { background: #e2e8f0; color: #1e293b; }
-                
-                .header-actions {
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
                 }
                 .btn-new-employee {
-                    background: var(--primary, #1e1b4b);
+                    background: var(--primary);
                     color: white;
                     border: none;
                     padding: 0.75rem 1.5rem;
@@ -194,175 +252,154 @@ export const WorkersPage: React.FC = () => {
                     align-items: center;
                     gap: 8px;
                     cursor: pointer;
-                    box-shadow: 0 4px 12px rgba(30, 27, 75, 0.15);
                     transition: all 0.2s;
                 }
-                .btn-new-employee:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(30, 27, 75, 0.2); }
-                
-                .view-mode-tabs {
-                    display: flex;
-                    background: #f1f5f9;
-                    padding: 4px;
-                    border-radius: 10px;
-                    border: 1px solid #e2e8f0;
-                }
-                .view-tab {
-                    padding: 0.5rem 1rem;
-                    border-radius: 8px;
-                    border: none;
-                    background: transparent;
-                    font-size: 0.85rem;
-                    font-weight: 600;
-                    color: #64748b;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    transition: all 0.2s;
-                }
-                .view-tab.active { background: white; color: var(--primary, #1e1b4b); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-                
+                .btn-new-employee:hover { opacity: 0.9; transform: translateY(-1px); }
+
                 .filter-bar {
                     display: flex;
-                    justify-content: space-between;
-                    align-items: center;
+                    justify-content: flex-end;
                     margin-bottom: 2rem;
+                }
+                .search-filter-group {
+                    display: flex;
                     gap: 1rem;
+                    align-items: center;
                 }
-                .filter-group, .search-filter-group { display: flex; align-items: center; gap: 0.75rem; }
-                .select-wrapper { position: relative; display: flex; align-items: center; }
-                .select-wrapper select {
-                    appearance: none;
-                    background: white;
-                    border: 1.5px solid #e2e8f0;
-                    padding: 0.6rem 2.5rem 0.6rem 1rem;
-                    border-radius: 10px;
-                    font-size: 0.9rem;
-                    font-weight: 600;
-                    color: #1e293b;
-                    outline: none;
-                    min-width: 160px;
-                }
-                .count-badge {
-                    position: absolute;
-                    right: 12px;
-                    background: #f1f5f9;
-                    padding: 2px 8px;
-                    border-radius: 6px;
-                    font-size: 0.75rem;
-                    font-weight: 700;
-                    color: #64748b;
-                }
-                .search-wrapper { position: relative; flex: 1; min-width: 300px; }
-                .search-wrapper i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+                .search-wrapper { position: relative; width: 300px; }
+                .search-wrapper i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
                 .search-wrapper input {
                     width: 100%;
                     padding: 0.6rem 1rem 0.6rem 2.5rem;
-                    border: 1.5px solid #e2e8f0;
-                    border-radius: 10px;
-                    font-size: 0.9rem;
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    background: var(--bg-card);
+                    color: var(--text-main);
                     outline: none;
                 }
-                .status-filter { display: flex; align-items: center; gap: 10px; color: #64748b; font-size: 0.85rem; font-weight: 600; }
+                .status-filter { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+                .select-wrapper select {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    padding: 0.5rem 1rem;
+                    border-radius: 8px;
+                    color: var(--text-main);
+                    font-weight: 600;
+                }
+
+                /* Modals Styling */
+                .custom-modal {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%) scale(0.9);
+                    background: var(--bg-card);
+                    border-radius: 20px;
+                    z-index: 1000;
+                    opacity: 0;
+                    visibility: hidden;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    border: 1px solid var(--border);
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+                }
+                .custom-modal.active { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+                .history-modal { width: 450px; }
+                .details-modal { width: 400px; }
+
+                .modal-header {
+                    padding: 1.5rem;
+                    border-bottom: 1px solid var(--border);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .modal-header h3 { margin: 0; font-size: 1.25rem; color: var(--text-main); font-weight: 700; }
+                .modal-header p { margin: 4px 0 0; font-size: 0.85rem; color: var(--text-muted); }
+                .close-x { background: none; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer; }
+
+                .modal-body { padding: 1.5rem; }
+                .modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); text-align: right; }
+
+                .history-list { display: flex; flex-direction: column; gap: 12px; }
+                .history-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 1rem;
+                    border-radius: 12px;
+                    background: var(--bg-main);
+                    border: 1px solid var(--border);
+                }
+                .history-item.current { background: var(--primary-light, rgba(79, 70, 229, 0.05)); border-color: var(--primary); }
+                .rate-amount { font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+                .effective-date { font-size: 0.75rem; color: var(--text-muted); }
+                .current-badge { font-size: 0.65rem; font-weight: 800; background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; }
+
+                .secondary-btn {
+                    padding: 0.6rem 1.5rem;
+                    background: var(--bg-main);
+                    border: 1px solid var(--border);
+                    color: var(--text-main);
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                }
+
+                .worker-header-info { display: flex; gap: 12px; align-items: center; }
+                .worker-avatar {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 50%;
+                    background: var(--primary);
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 700;
+                }
+                .worker-id-badge { font-size: 0.75rem; color: var(--primary); font-weight: 700; }
+
+                .details-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+                .detail-field label { display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+                .detail-value { font-size: 1rem; font-weight: 600; color: var(--text-main); }
+                .detail-value.highlight { color: var(--primary); font-weight: 800; }
+                .detail-value.status.active { color: #10b981; }
+                .detail-value.status.archived { color: #ef4444; }
+                .detail-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+                .modal-actions-list { margin-top: 1rem; display: flex; flex-direction: column; gap: 10px; }
+                .action-btn {
+                    width: 100%;
+                    padding: 0.8rem;
+                    border-radius: 10px;
+                    background: var(--bg-main);
+                    border: 1px solid var(--border);
+                    color: var(--text-main);
+                    font-weight: 700;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    cursor: pointer;
+                }
+                .action-btn:hover { background: var(--border); }
+                .action-btn.warning { color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.05); }
+
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.5);
+                    backdrop-filter: blur(4px);
+                    z-index: 999;
+                    opacity: 0;
+                    visibility: hidden;
+                    transition: all 0.3s;
+                }
+                .modal-overlay.active { opacity: 1; visibility: visible; }
             `}</style>
-            </div>
-
-            {/* Edit Modal (similarly) - This modal is now redundant if the Add modal is reused for Edit */}
-            {/* The original edit modal content is removed as per the instruction to reuse the add modal for edit */}
-            {/* History Modal */}
-            <div className={`custom-modal ${isHistoryOpen ? 'active' : ''}`} style={{ width: '500px', padding: 0, borderRadius: '16px', overflow: 'hidden', background: 'white' }}>
-                <div style={{ padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9' }}>
-                    <div>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Rate History</h3>
-                        <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0 }}>{selectedWorker?.name}</p>
-                    </div>
-                    <button onClick={() => setIsHistoryOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', color: '#666', cursor: 'pointer' }}><i className="fa-solid fa-xmark"></i></button>
-                </div>
-                <div style={{ padding: '2rem', maxHeight: '400px', overflowY: 'auto' }}>
-                    {rateHistory.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {rateHistory.map((h, i) => (
-                                <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: i === 0 ? '#F0F9FF' : '#F8FAFC', borderRadius: '12px', border: i === 0 ? '1px solid #BAE6FD' : '1px solid #E2E8F0' }}>
-                                    <div>
-                                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0F172A' }}>$ {parseFloat(h.hourly_rate).toFixed(2)}/hr</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.2rem' }}>
-                                            Effective since: {new Date(h.changed_at).toLocaleDateString()} {new Date(h.changed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </div>
-                                    </div>
-                                    {i === 0 && <span style={{ fontSize: '0.7rem', background: '#0EA5E9', color: 'white', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 700 }}>CURRENT</span>}
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: '#94A3B8' }}>No history records found.</div>
-                    )}
-                </div>
-                <div style={{ padding: '1.5rem 2rem', background: '#F8FAFC', textAlign: 'right' }}>
-                    <button className="btn" onClick={() => setIsHistoryOpen(false)} style={{ width: 'auto', padding: '0.6rem 1.5rem', borderRadius: '8px', border: '1.5px solid #DDD', background: 'white', fontWeight: 600 }}>Close</button>
-                </div>
-            </div>
-
-            {/* Worker Details Modal */}
-            <div className={`custom-modal ${isDetailsOpen ? 'active' : ''}`} style={{ width: '450px', padding: 0, borderRadius: '24px', overflow: 'hidden', background: 'white' }}>
-                <div style={{ padding: '2rem', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2E8F0' }}>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <div style={{
-                            width: '64px',
-                            height: '64px',
-                            borderRadius: '50%',
-                            background: '#1E1B4B',
-                            color: '#F59E0B',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 900,
-                            fontSize: '1.5rem',
-                            letterSpacing: '1px',
-                            boxShadow: '0 4px 10px rgba(30, 27, 75, 0.2)'
-                        }}>
-                            {selectedWorker?.name?.substring(0, 2)?.toUpperCase() || 'W'}
-                        </div>
-                        <div>
-                            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: '#0F172A', letterSpacing: '-0.02em' }}>{selectedWorker?.name}</h3>
-                            <div style={{ color: '#3B82F6', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '0.25rem' }}>
-                                {selectedWorker?.worker_id || 'NO ID'}
-                            </div>
-                        </div>
-                    </div>
-                    <button onClick={() => setIsDetailsOpen(false)} style={{ background: 'white', border: '1px solid #E2E8F0', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', cursor: 'pointer', transition: 'all 0.2s' }}><i className="fa-solid fa-xmark"></i></button>
-                </div>
-                <div style={{ padding: '2rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                        <div>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Email / Username</div>
-                            <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A' }}>{selectedWorker?.username}</div>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                            <div>
-                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Hourly Rate</div>
-                                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0F172A' }}>${parseFloat(selectedWorker?.hourly_rate || 0).toFixed(2)}/hr</div>
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Account Status</div>
-                                <div style={{ fontSize: '1rem', fontWeight: 800, color: selectedWorker?.active === false ? '#EF4444' : '#10B981' }}>
-                                    {selectedWorker?.active === false ? 'Archived' : 'Active'}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ marginTop: '1rem', paddingTop: '1.5rem', borderTop: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <button className="btn" onClick={() => { setIsDetailsOpen(false); openHistory(selectedWorker); }} style={{ width: '100%', padding: '1rem', borderRadius: '12px', background: '#F8FAFC', color: '#0F172A', border: '1px solid #E2E8F0', fontWeight: 700, display: 'flex', justifyContent: 'center', gap: '0.5rem', alignItems: 'center', transition: 'all 0.2s' }}>
-                                <i className="fa-solid fa-clock-rotate-left"></i> View Rate History
-                            </button>
-                            <button className="btn" onClick={handleResetPassword} style={{ width: '100%', padding: '1rem', borderRadius: '12px', background: '#FFF7ED', color: '#D97706', border: '1px solid #FFEDD5', fontWeight: 700, display: 'flex', justifyContent: 'center', gap: '0.5rem', alignItems: 'center', transition: 'all 0.2s' }}>
-                                <i className="fa-solid fa-key"></i> Reset Worker Password
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {(isHistoryOpen || isDetailsOpen) && <div className="overlay active" onClick={() => { setIsHistoryOpen(false); setIsDetailsOpen(false); }}></div>}
-        </>
+        </div>
     );
 };

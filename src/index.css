@@ -30,6 +30,37 @@
     --shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.12);
 }
 
+[data-theme='dark'] {
+    --primary: #0f172a;
+    --primary-light: #1e293b;
+    --bg-body: #020617;
+    --bg-main: #020617;
+    --bg-card: #0f172a;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --border: #334155;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+/* Worker Portal - Restoration to Original Design */
+[data-portal='worker'] {
+    --primary: #2563eb; /* Classic Blue */
+    --primary-light: #3b82f6;
+    --accent: #f59e0b;
+    --sidebar-width: 260px;
+}
+
+[data-portal='worker'][data-theme='dark'] {
+    --primary: #1d4ed8;
+    --primary-light: #2563eb;
+    --bg-body: #0f172a;
+    --bg-main: #0f172a;
+    --bg-card: #1e293b;
+    --border: #334155;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -170,7 +201,7 @@ body {
     -webkit-overflow-scrolling: touch;
     border-radius: 12px;
     border: 1px solid var(--border);
-    background: white;
+    background: var(--bg-card);
     margin-bottom: 1rem;
 }
 
@@ -190,7 +221,7 @@ body {
 }
 
 th.sticky-column {
-    background: #F9FAFB !important;
+    background: var(--bg-main) !important;
     z-index: 11;
 }
 
@@ -357,22 +388,22 @@ th.sticky-column {
 }
 
 .icon-blue {
-    background: #E8EAF6;
-    color: var(--primary);
+    background: var(--primary-light);
+    color: white;
 }
 
 .icon-green {
-    background: #ECFDF5;
+    background: rgba(16, 185, 129, 0.1);
     color: var(--success);
 }
 
 .icon-yellow {
-    background: #FFFBEB;
+    background: rgba(245, 158, 11, 0.1);
     color: var(--warning);
 }
 
 .icon-red {
-    background: #FEF2F2;
+    background: rgba(239, 68, 68, 0.1);
     color: var(--danger);
 }
 
@@ -425,9 +456,10 @@ th.sticky-column {
     align-items: center;
     justify-content: space-between;
     padding: 1rem;
-    background: #F9FAFB;
+    background: var(--bg-main);
     border-radius: 8px;
     margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
 }
 
 .list-item:last-child {
@@ -551,10 +583,11 @@ th.sticky-column {
 /* Matrix Styles */
 .matrix-container {
     overflow-x: auto;
-    background: white;
+    background: var(--bg-card);
     border-radius: 12px;
     padding: 1.25rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
 }
 
 .matrix-grid {
@@ -607,7 +640,7 @@ th.sticky-column {
     vertical-align: top;
     height: 105px;
     width: 170px;
-    background: #FAFAFA;
+    background: var(--bg-main);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 0.75rem;
@@ -703,9 +736,9 @@ th.sticky-column {
 
 /* Table Styles */
 .table-container {
-    background: white;
+    background: var(--bg-card);
     border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-sm);
     overflow: hidden;
     border: 1px solid var(--border);
 }
@@ -723,7 +756,7 @@ td {
 }
 
 th {
-    background: #F9FAFB;
+    background: var(--bg-main);
     font-weight: 600;
     color: var(--text-muted);
     font-size: 0.8rem;

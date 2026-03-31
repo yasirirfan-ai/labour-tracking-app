@@ -4,8 +4,10 @@ import { Link } from 'react-router-dom';
 import { performTaskAction } from '../lib/taskService';
 import type { Task, User, ManufacturingOrder } from '../types';
 import { sortManufacturingOrders } from '../utils/moSorting';
+import { useTranslation } from 'react-i18next';
 
 export const ControlMatrixPage: React.FC = () => {
+    const { t } = useTranslation();
     const [mos, setMos] = useState<any[]>([]);
     const [operations, setOperations] = useState<string[]>([]);
     const [employees, setEmployees] = useState<User[]>([]);
@@ -108,7 +110,7 @@ export const ControlMatrixPage: React.FC = () => {
             );
 
             if (existing) {
-                alert('Worker is already assigned to this operation!');
+                alert(t('matrix.alreadyAssigned'));
                 setIsSaving(false);
                 return;
             }
@@ -129,7 +131,7 @@ export const ControlMatrixPage: React.FC = () => {
 
             fetchData();
         } catch (e: any) {
-            alert('Error assigning worker: ' + e.message);
+            alert(t('matrix.errorAssigning') + ': ' + e.message);
         } finally {
             setIsSaving(false);
             // Don't close modal to allow assigning more
@@ -138,7 +140,7 @@ export const ControlMatrixPage: React.FC = () => {
     };
 
     const deleteTask = async (taskId: string) => {
-        if (!confirm('Remove this worker assignment?')) return;
+        if (!confirm(t('matrix.removeAssignment'))) return;
         try {
             const { error } = await supabase.from('tasks').delete().eq('id', taskId);
             if (error) throw error;
@@ -152,7 +154,7 @@ export const ControlMatrixPage: React.FC = () => {
         // Check if worker is on break
         const worker = employees.find(e => e.id === task.assigned_to_id);
         if (worker && worker.availability === 'break' && (action === 'start' || action === 'resume')) {
-            alert(`Cannot ${action} task. ${worker.name} is currently on break.`);
+            alert(t('matrix.cannotActionBreak', { action, name: worker.name }));
             return;
         }
 
@@ -174,7 +176,7 @@ export const ControlMatrixPage: React.FC = () => {
         if (!task) return;
 
         // Manual pause via modal
-        await handleTaskAction(task, 'pause', pauseReason || 'Manual Pause');
+        await handleTaskAction(task, 'pause', pauseReason || t('matrix.manualPause'));
         setIsPauseModalOpen(false);
         setPauseTaskId(null);
     };
@@ -196,10 +198,11 @@ export const ControlMatrixPage: React.FC = () => {
         let color = '#94A3B8'; // gray
         let label = s.toUpperCase();
 
-        if (s === 'active') { color = '#22C55E'; label = 'ACTIVE'; }
-        if (s === 'break') { color = '#F59E0B'; label = 'ON BREAK'; } // Auto-paused
-        if (s === 'paused') { color = '#F59E0B'; label = 'PAUSED'; }
-        if (s === 'completed') { color = '#10B981'; label = 'DONE'; }
+        if (s === 'active') { color = '#22C55E'; label = t('matrix.status.active'); }
+        if (s === 'break') { color = '#F59E0B'; label = t('matrix.status.break'); } // Auto-paused
+        if (s === 'paused') { color = '#F59E0B'; label = t('matrix.status.paused'); }
+        if (s === 'completed') { color = '#10B981'; label = t('matrix.status.done'); }
+        if (s === 'pending') { color = '#94A3B8'; label = t('matrix.status.pending'); }
 
         return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: `${color}15`, padding: '4px 8px', borderRadius: '6px' }}>
@@ -209,7 +212,7 @@ export const ControlMatrixPage: React.FC = () => {
         );
     };
 
-    if (isLoading) return <div className="loading-screen">Loading Matrix...</div>;
+    if (isLoading) return <div className="loading-screen">{t('common.loading')}</div>;
 
     const selectedWorker = employees.find(e => e.id === selectedWorkerId);
 
@@ -220,8 +223,8 @@ export const ControlMatrixPage: React.FC = () => {
         <>
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h1 className="page-title">Production Control Matrix</h1>
-                    <p className="page-subtitle">Click any cell to assign workers and control timers</p>
+                    <h1 className="page-title">{t('matrix.title')}</h1>
+                    <p className="page-subtitle">{t('matrix.subtitle')}</p>
                 </div>
             </div>
 
@@ -230,7 +233,7 @@ export const ControlMatrixPage: React.FC = () => {
                     <div className="matrix-row">
                         <div className="matrix-header-cell" style={{ textAlign: 'left', paddingLeft: '20px' }}>
                             <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
-                                <i className="fa-regular fa-clipboard"></i> Manufacturing Orders
+                                <i className="fa-regular fa-clipboard"></i> {t('matrix.manufacturingOrders')}
                             </span>
                         </div>
                         {operations.map(op => (
@@ -282,7 +285,7 @@ export const ControlMatrixPage: React.FC = () => {
                                             {cellTasks.length > 0 ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
                                                     <div style={{ fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
-                                                        {cellTasks.length} workers
+                                                        {t('matrix.workers', { count: cellTasks.length })}
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
                                                         {cellTasks.slice(0, 3).map(t => {
@@ -296,7 +299,7 @@ export const ControlMatrixPage: React.FC = () => {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="matrix-cell-empty">Assign</div>
+                                                <div className="matrix-cell-empty">{t('matrix.assign')}</div>
                                             )}
                                         </div>
                                     );
@@ -329,14 +332,14 @@ export const ControlMatrixPage: React.FC = () => {
 
                 <div className="offcanvas-body" style={{ padding: '1.5rem', background: '#F8FAFC', flex: 1, overflowY: 'auto', minHeight: '400px' }}>
                     <div style={{ marginBottom: '2rem' }}>
-                        <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748B', marginBottom: '0.75rem', textTransform: 'uppercase' }}>Add Worker</h3>
+                        <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748B', marginBottom: '0.75rem', textTransform: 'uppercase' }}>{t('matrix.addWorker')}</h3>
                         <div style={{ background: 'white', padding: '0.4rem', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <div style={{ flex: 1, position: 'relative', minWidth: 0 }} ref={dropdownRef}>
                                 <div
                                     onClick={() => setShowWorkerDropdown(!showWorkerDropdown)}
                                     style={{ height: '48px', padding: '0 0.75rem', borderRadius: '8px', background: selectedWorkerId ? '#F1F5F9' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
                                 >
-                                    <span style={{ fontSize: '0.9rem', color: selectedWorkerId ? '#0F172A' : '#94A3B8', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedWorker ? selectedWorker.name : 'Select worker...'}</span>
+                                    <span style={{ fontSize: '0.9rem', color: selectedWorkerId ? '#0F172A' : '#94A3B8', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedWorker ? selectedWorker.name : t('matrix.selectWorker')}</span>
                                     <i className="fa-solid fa-chevron-down" style={{ color: '#94A3B8', fontSize: '0.75rem', marginLeft: '8px' }}></i>
                                 </div>
 
@@ -348,12 +351,12 @@ export const ControlMatrixPage: React.FC = () => {
                                                 <span style={{ fontSize: '0.8rem', color: '#64748B', background: '#F1F5F9', padding: '2px 6px', borderRadius: '4px' }}>${emp.hourly_rate}/hr</span>
                                             </div>
                                         )) : (
-                                            <div style={{ padding: '12px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' }}>No workers clocked in</div>
+                                            <div style={{ padding: '12px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' }}>{t('matrix.noWorkersClockedIn')}</div>
                                         )}
                                     </div>
                                 )}
                             </div>
-                            <button className="btn btn-primary" onClick={assignSingleWorker} disabled={isSaving || !selectedWorkerId} style={{ height: '48px', padding: '0 1.5rem' }}>Assign</button>
+                            <button className="btn btn-primary" onClick={assignSingleWorker} disabled={isSaving || !selectedWorkerId} style={{ height: '48px', padding: '0 1.5rem' }}>{t('matrix.assign')}</button>
                         </div>
                     </div>
 
@@ -500,13 +503,13 @@ export const ControlMatrixPage: React.FC = () => {
                     position: 'relative',
                     zIndex: 3001
                 }}>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', color: '#0F172A' }}>Pause Task</h3>
-                    <p style={{ color: '#64748B', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>Enter a reason for pausing this task (optional).</p>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', color: '#0F172A' }}>{t('matrix.pauseTask')}</h3>
+                    <p style={{ color: '#64748B', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>{t('matrix.pauseMessage')}</p>
 
                     <textarea
                         value={pauseReason}
                         onChange={(e) => setPauseReason(e.target.value)}
-                        placeholder="e.g. Machine Maintenance"
+                        placeholder={t('matrix.pauseReasonPlaceholder')}
                         style={{
                             width: '100%',
                             padding: '0.75rem',
@@ -533,7 +536,7 @@ export const ControlMatrixPage: React.FC = () => {
                                 cursor: 'pointer'
                             }}
                         >
-                            Cancel
+                            {t('table.modals.cancel')}
                         </button>
                         <button
                             onClick={confirmPauseManual}
@@ -547,7 +550,7 @@ export const ControlMatrixPage: React.FC = () => {
                                 cursor: 'pointer'
                             }}
                         >
-                            Confirm Pause
+                            {t('matrix.confirmPause')}
                         </button>
                     </div>
                 </div>

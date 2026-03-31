@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { LeaveRequest } from '../types';
+import { useTranslation } from 'react-i18next';
 
 export const LeaveRequestsPage: React.FC = () => {
+    const { t } = useTranslation();
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
@@ -30,13 +32,12 @@ export const LeaveRequestsPage: React.FC = () => {
     };
 
     const handleAction = async (request: LeaveRequest, status: 'approved' | 'rejected') => {
-        const adminNotes = window.prompt(`Add a note for this ${status} (optional):`);
-        if (adminNotes === null) return; // Cancelled
+        const adminNotes = window.prompt(t('leave.actions.notePrompt', { status: t(`leave.filters.${status}`) }));
+        if (adminNotes === null) return;
 
         setIsProcessing(request.id);
         
         try {
-            // 1. Update request status
             const { error: reqError } = await (supabase.from('leave_requests') as any)
                 .update({ 
                     status, 
@@ -47,11 +48,8 @@ export const LeaveRequestsPage: React.FC = () => {
 
             if (reqError) throw reqError;
 
-            // 2. If approved, deduct balance and add to history
             if (status === 'approved') {
                 const balanceField = request.type === 'pto' ? 'pto_balance' : 'sick_balance';
-                
-                // Get current balance
                 const { data: userData, error: userFetchError } = await supabase
                     .from('users')
                     .select(balanceField)
@@ -63,30 +61,28 @@ export const LeaveRequestsPage: React.FC = () => {
                 const currentBalance = parseFloat(userData[balanceField] || '0');
                 const newBalance = (currentBalance - request.hours_requested).toFixed(2);
 
-                // Update balance
                 const { error: balanceError } = await (supabase.from('users') as any)
                     .update({ [balanceField]: newBalance })
                     .eq('id', request.user_id);
 
                 if (balanceError) throw balanceError;
 
-                // 3. Add to leave_history
                 const { error: historyError } = await (supabase.from('leave_history') as any).insert([{
                     user_id: request.user_id,
                     type: request.type,
                     amount: -request.hours_requested,
                     description: `Approved ${request.type.toUpperCase()} for ${request.start_date} - ${request.end_date}`,
-                    entry_date: request.start_date, // Setting entry date to the start of the leave
+                    entry_date: request.start_date,
                     created_at: new Date().toISOString()
                 }]);
 
                 if (historyError) throw historyError;
             }
 
-            alert(`Request ${status} successfully.`);
+            alert(t('leave.actions.success', { status: t(`leave.filters.${status}`) }));
             fetchRequests();
         } catch (err: any) {
-            alert('Error processing request: ' + err.message);
+            alert(t('leave.actions.error', { message: err.message }));
         } finally {
             setIsProcessing(null);
         }
@@ -94,12 +90,12 @@ export const LeaveRequestsPage: React.FC = () => {
 
     return (
         <div className="leave-requests-page" style={{ padding: '2rem' }}>
-            <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: '#0f172a' }}>Leave Management</h1>
-                    <p style={{ color: '#64748b', marginTop: '0.4rem', fontWeight: 600 }}>Review and process employee PTO and Sick time requests</p>
+                    <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>{t('leave.title')}</h1>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: 600 }}>{t('leave.subtitle')}</p>
                 </div>
-                <div style={{ display: 'flex', background: '#f1f5f9', padding: '0.4rem', borderRadius: '12px', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', background: 'var(--bg-main)', padding: '0.4rem', borderRadius: '12px', gap: '0.4rem', border: '1px solid var(--border)' }}>
                     {(['pending', 'approved', 'rejected', 'all'] as const).map(f => (
                         <button
                             key={f}
@@ -108,109 +104,113 @@ export const LeaveRequestsPage: React.FC = () => {
                                 padding: '0.6rem 1.25rem',
                                 borderRadius: '8px',
                                 border: 'none',
-                                background: filter === f ? 'white' : 'transparent',
-                                color: filter === f ? '#1e1b4b' : '#64748b',
+                                background: filter === f ? 'var(--bg-card)' : 'transparent',
+                                color: filter === f ? 'var(--primary)' : 'var(--text-muted)',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
-                                boxShadow: filter === f ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-                                textTransform: 'capitalize'
+                                boxShadow: filter === f ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
                             }}
                         >
-                            {f}
+                            {t(`leave.filters.${f}`)}
                         </button>
                     ))}
                 </div>
             </header>
 
             {isLoading ? (
-                <div style={{ padding: '4rem', textAlign: 'center', color: '#64748b', fontWeight: 700 }}>Loading requests...</div>
+                <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 700 }}>{t('leave.loading')}</div>
             ) : requests.length > 0 ? (
-                <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Employee</th>
-                                <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Type</th>
-                                <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Dates</th>
-                                <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Hours</th>
-                                <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Status</th>
-                                <th style={{ textAlign: 'right', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {requests.map(req => (
-                                <tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                                        <div style={{ fontWeight: 800, color: '#1e1b4b' }}>{req.user?.name}</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{req.user?.worker_id}</div>
-                                    </td>
-                                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                                        <span style={{ 
-                                            padding: '4px 10px', 
-                                            borderRadius: '99px', 
-                                            fontSize: '0.7rem', 
-                                            fontWeight: 800,
-                                            background: req.type === 'pto' ? '#e0f2fe' : '#f0fdf4',
-                                            color: req.type === 'pto' ? '#0369a1' : '#15803d'
-                                        }}>
-                                            {req.type.toUpperCase()}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                                        <div style={{ fontWeight: 600, color: '#1e293b' }}>
-                                            {new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}
-                                        </div>
-                                        {req.reason && <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem', fontStyle: 'italic' }}>"{req.reason}"</div>}
-                                    </td>
-                                    <td style={{ padding: '1.25rem 1.5rem', fontWeight: 800, color: '#1e1b4b' }}>{req.hours_requested} hrs</td>
-                                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                                        <span style={{ 
-                                            padding: '4px 8px', 
-                                            borderRadius: '6px', 
-                                            fontSize: '0.75rem', 
-                                            fontWeight: 800,
-                                            textTransform: 'uppercase',
-                                            background: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
-                                            color: req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#991b1b' : '#92400e'
-                                        }}>
-                                            {req.status}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
-                                        {req.status === 'pending' ? (
-                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                                <button 
-                                                    onClick={() => handleAction(req, 'approved')}
-                                                    disabled={isProcessing === req.id}
-                                                    style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', background: '#10b981', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
-                                                >
-                                                    Approve
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleAction(req, 'rejected')}
-                                                    disabled={isProcessing === req.id}
-                                                    style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', background: '#ef4444', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
-                                                >
-                                                    Reject
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                                Processed on {req.processed_at ? new Date(req.processed_at).toLocaleDateString() : 'N/A'}
-                                            </div>
-                                        )}
-                                    </td>
+                <div style={{ background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                    <div className="table-responsive-container">
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border)' }}>
+                                    <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('leave.headers.employee')}</th>
+                                    <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('leave.headers.type')}</th>
+                                    <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('leave.headers.dates')}</th>
+                                    <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('leave.headers.hours')}</th>
+                                    <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('leave.headers.status')}</th>
+                                    <th style={{ textAlign: 'right', padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('leave.headers.actions')}</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {requests.map(req => (
+                                    <tr key={req.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                        <td style={{ padding: '1.25rem 1.5rem' }}>
+                                            <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{req.user?.name}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{req.user?.worker_id}</div>
+                                        </td>
+                                        <td style={{ padding: '1.25rem 1.5rem' }}>
+                                            <span style={{ 
+                                                padding: '4px 10px', 
+                                                borderRadius: '99px', 
+                                                fontSize: '0.7rem', 
+                                                fontWeight: 800,
+                                                background: req.type === 'pto' ? 'rgba(3, 105, 161, 0.1)' : 'rgba(21, 128, 61, 0.1)',
+                                                color: req.type === 'pto' ? '#0369a1' : '#15803d',
+                                                border: req.type === 'pto' ? '1px solid rgba(3, 105, 161, 0.2)' : '1px solid rgba(21, 128, 61, 0.2)'
+                                            }}>
+                                                {req.type.toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '1.25rem 1.5rem' }}>
+                                            <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                                                {new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}
+                                            </div>
+                                            {req.reason && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', fontStyle: 'italic' }}>"{req.reason}"</div>}
+                                        </td>
+                                        <td style={{ padding: '1.25rem 1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{req.hours_requested} {t('leave.headers.hours').toLowerCase()}</td>
+                                        <td style={{ padding: '1.25rem 1.5rem' }}>
+                                            <span style={{ 
+                                                padding: '4px 8px', 
+                                                borderRadius: '6px', 
+                                                fontSize: '0.75rem', 
+                                                fontWeight: 800,
+                                                textTransform: 'uppercase',
+                                                background: req.status === 'approved' ? 'rgba(16, 185, 129, 0.1)' : req.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                                                color: req.status === 'approved' ? '#10b981' : req.status === 'rejected' ? '#ef4444' : '#f59e0b'
+                                            }}>
+                                                {t(`leave.filters.${req.status}`)}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
+                                            {req.status === 'pending' ? (
+                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                    <button 
+                                                        onClick={() => handleAction(req, 'approved')}
+                                                        disabled={isProcessing === req.id}
+                                                        className="btn btn-primary"
+                                                        style={{ padding: '0.5rem 1rem', width: 'auto', background: '#10b981' }}
+                                                    >
+                                                        {t('leave.actions.approve')}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleAction(req, 'rejected')}
+                                                        disabled={isProcessing === req.id}
+                                                        className="btn btn-primary"
+                                                        style={{ padding: '0.5rem 1rem', width: 'auto', background: '#ef4444' }}
+                                                    >
+                                                        {t('leave.actions.reject')}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                                    {t('leave.processedOn', { date: req.processed_at ? new Date(req.processed_at).toLocaleDateString() : 'N/A' })}
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             ) : (
-                <div style={{ textAlign: 'center', padding: '6rem 2rem', background: '#f8fafc', borderRadius: '24px', border: '2px dashed #e2e8f0' }}>
+                <div style={{ textAlign: 'center', padding: '6rem 2rem', background: 'var(--bg-card)', borderRadius: '24px', border: '2px dashed var(--border)' }}>
                     <div style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>📁</div>
-                    <h3 style={{ margin: 0, fontWeight: 900, color: '#262661' }}>No Requests Found</h3>
-                    <p style={{ color: '#64748B', marginTop: '0.5rem' }}>There are no {filter !== 'all' ? filter : ''} leave requests matching your current view.</p>
+                    <h3 style={{ margin: 0, fontWeight: 900, color: 'var(--text-main)' }}>{t('leave.noRequests')}</h3>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>{t('leave.noRequestsSub', { filter: filter !== 'all' ? t(`leave.filters.${filter}`) : '' })}</p>
                 </div>
             )}
         </div>
