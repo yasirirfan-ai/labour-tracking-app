@@ -640,7 +640,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                         background: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
                                                         color: req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#991b1b' : '#92400e'
                                                     }}>
-                                                        {t(`leave.filters.${req.status}`, req.status)}
+                                                        {String(t(`leave.filters.${req.status}`, req.status))}
                                                     </span>
                                                     {req.status === 'pending' && (
                                                         <div style={{ display: 'flex', gap: '0.5rem' }}>

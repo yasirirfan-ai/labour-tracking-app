@@ -112,7 +112,7 @@ export const LeaveRequestsPage: React.FC = () => {
                                 boxShadow: filter === f ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
                             }}
                         >
-                            {t(`leave.filters.${f}`)}
+                            {String(t(`leave.filters.${f}`))}
                         </button>
                     ))}
                 </div>
@@ -171,7 +171,7 @@ export const LeaveRequestsPage: React.FC = () => {
                                                 background: req.status === 'approved' ? 'rgba(16, 185, 129, 0.1)' : req.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
                                                 color: req.status === 'approved' ? '#10b981' : req.status === 'rejected' ? '#ef4444' : '#f59e0b'
                                             }}>
-                                                {t(`leave.filters.${req.status}`)}
+                                                {String(t(`leave.filters.${req.status}`))}
                                             </span>
                                         </td>
                                         <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
@@ -210,7 +210,7 @@ export const LeaveRequestsPage: React.FC = () => {
                 <div style={{ textAlign: 'center', padding: '6rem 2rem', background: 'var(--bg-card)', borderRadius: '24px', border: '2px dashed var(--border)' }}>
                     <div style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>📁</div>
                     <h3 style={{ margin: 0, fontWeight: 900, color: 'var(--text-main)' }}>{t('leave.noRequests')}</h3>
-                    <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>{t('leave.noRequestsSub', { filter: filter !== 'all' ? t(`leave.filters.${filter}`) : '' })}</p>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>{t('leave.noRequestsSub', { filter: filter !== 'all' ? String(t(`leave.filters.${filter}`)) : '' })}</p>
                 </div>
             )}
         </div>
