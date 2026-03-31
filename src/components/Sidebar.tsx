@@ -12,7 +12,7 @@ export const Sidebar: React.FC<{
 }> = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen }) => {
     const { logout } = useAuth();
     const { t, i18n } = useTranslation();
-    const { theme, toggleTheme } = useTheme();
+    const { currentTheme: theme, toggleTheme } = useTheme();
 
     const changeLanguage = (lng: string) => {
         i18n.changeLanguage(lng);

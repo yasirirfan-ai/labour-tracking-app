@@ -343,7 +343,7 @@ export const DisciplineAdminPage: React.FC = () => {
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
                                     <span className={`severity-badge sev-${inc.severity}`}>
-                                        {t(`discipline.severity.${inc.severity}`, inc.severity?.replace('_', ' '))}
+                                        {String(t(`discipline.severity.${inc.severity}`, inc.severity?.replace('_', ' ')))}
                                     </span>
                                     <span style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 700 }}>
                                         {inc.incident_date ? new Date(inc.incident_date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}
@@ -364,7 +364,7 @@ export const DisciplineAdminPage: React.FC = () => {
                                         <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700 }}>{inc.reporter?.name || 'System'}</span>
                                     </div>
                                     <span style={{ color: '#f59e0b', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase' }}>
-                                        {t(`discipline.modals.categories.${inc.category}`, inc.category)}
+                                        {String(t(`discipline.modals.categories.${inc.category}`, inc.category))}
                                     </span>
                                 </div>
                             </div>
@@ -392,7 +392,7 @@ export const DisciplineAdminPage: React.FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
                             <div>
                                 <span className={`severity-badge sev-${selectedIncident.severity}`} style={{ marginBottom: '0.5rem', display: 'inline-block' }}>
-                                    {t(`discipline.severity.${selectedIncident.severity}`, selectedIncident.severity.toUpperCase().replace('_', ' '))}
+                                    {String(t(`discipline.severity.${selectedIncident.severity}`, selectedIncident.severity.toUpperCase().replace('_', ' ')))}
                                 </span>
                                 <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e1b4b', margin: 0 }}>{t('discipline.modals.detailTitle')}</h2>
                             </div>
@@ -409,13 +409,13 @@ export const DisciplineAdminPage: React.FC = () => {
                             </div>
                             <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
                                 <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>{t('discipline.modals.incidentType')}</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e1b4b', marginBottom: '0.25rem' }}>{t(`discipline.modals.categories.${selectedIncident.category}`, selectedIncident.category.toUpperCase().replace('_', ' '))}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e1b4b', marginBottom: '0.25rem' }}>{String(t(`discipline.modals.categories.${selectedIncident.category}`, selectedIncident.category.toUpperCase().replace('_', ' ')))}</div>
                                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>{new Date(selectedIncident.incident_date).toLocaleDateString(undefined, { dateStyle: 'medium' })}</div>
                             </div>
                             <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
                                 <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>{t('discipline.modals.severityRef')}</div>
                                 <span className={`severity-badge sev-${selectedIncident.severity}`} style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem', borderRadius: '6px', marginBottom: '0.5rem', display: 'inline-block' }}>
-                                    {t(`discipline.severity.${selectedIncident.severity}`, selectedIncident.severity.toUpperCase().replace('_', ' '))}
+                                    {String(t(`discipline.severity.${selectedIncident.severity}`, selectedIncident.severity.toUpperCase().replace('_', ' ')))}
                                 </span>
                                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e1b4b' }}>REF: {selectedIncident.documentation || 'N/A'}</div>
                             </div>
