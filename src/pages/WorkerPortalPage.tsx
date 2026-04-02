@@ -907,8 +907,8 @@ export const WorkerPortalPage: React.FC = () => {
                 }
 
                 .off-duty-banner {
-                    background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
-                    box-shadow: 0 20px 40px -10px rgba(30, 64, 175, 0.3);
+                    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+                    box-shadow: 0 20px 40px -10px rgba(30, 27, 75, 0.3);
                 }
 
                 .banner-content {
@@ -1200,9 +1200,9 @@ export const WorkerPortalPage: React.FC = () => {
                     color: white;
                 }
                 .portal-nav-item.active {
-                    background: white;
+                    background: var(--accent);
                     color: var(--primary);
-                    box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1);
+                    box-shadow: 0 10px 20px -5px rgba(245, 158, 11, 0.2);
                 }
                 .portal-nav-item.active i {
                     color: var(--primary);

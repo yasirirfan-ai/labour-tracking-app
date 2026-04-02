@@ -67,16 +67,12 @@
 
 /* ── Worker Portal ── */
 [data-portal='worker'] {
-    --primary: #2563eb;
-    --primary-light: #3b82f6;
-    --primary-bg: rgba(37,99,235,0.08);
+    --primary-bg: rgba(30,27,75,0.06);
     --accent: #f59e0b;
     --sidebar-width: 260px;
 }
 
 [data-portal='worker'][data-theme='dark'] {
-    --primary: #3b82f6;
-    --primary-light: #60a5fa;
     --bg-body: #0a0f1e;
     --bg-main: #0f172a;
     --bg-card: #1a2236;
@@ -87,7 +83,7 @@
     --input-border: #2d3d55;
     --input-text: #f1f5f9;
     --select-bg: #1e2d45;
-    --primary-bg: rgba(59,130,246,0.12);
+    --primary-bg: rgba(99,102,241,0.12);
 }
 
 * {
