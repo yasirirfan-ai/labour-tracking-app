@@ -1,0 +1,165 @@
+[dotenv@17.3.1] injecting env (5) from .env -- tip: =ƒöÉ prevent committing .env to code: https://dotenvx.com/precommit
+
+G£à Total records: 157
+   English: 145 | Spanish: 12
+
+=== ENGLISH RECORDS ===
+  L1 | GMP and Quality Awareness | GMP and Quality Awareness - Part 1
+  L1 | GMP and Quality Awareness | GMP and Quality Awareness - Part 2
+  L1 | Gowning, Hand Washing and Conduct | Gowning, Hand Washing and Conduct - Part 1
+  L1 | Premises Cleaning and Sanitation | Premises Cleaning and Sanitation - Part 1
+  L1 | Pest Control | Pest Control - Part 1
+  L1 | Biohazard Response | Biohazard Response - Part 1
+  L1 | Personnel and Training | Personnel and Training - Part 1
+  L1 | Visitor Policy | Visitor Policy - Part 1
+  L2 | Production associate I | SOP Good Documentation Practices 17.4 Rev. New
+  L2 | Production associate I | SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New
+  L2 | Production associate I | SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate
+  L2 | Production associate I | SOP Personnel and Training New - Obsolate
+  L2 | Production associate I | SOP Premise cleaning and sanitation - Obsolate
+  L2 | Production associate I | SOP Visitor Policy 3.6-1 
+  L2 | Production associate I | _SOP Pest Control
+  L2 | Production associate II | SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate
+  L2 | Production associate II | SOP Good Documentation Practices 17.4 Rev. New
+  L2 | Production associate II | SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New
+  L2 | Production associate II | SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate
+  L2 | Production associate II | SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate
+  L2 | Production associate II | SOP Personnel and Training New - Obsolate
+  L2 | Production associate II | SOP Premise cleaning and sanitation - Obsolate
+  L2 | Production associate II | SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate
+  L2 | Production associate II | SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate
+  L2 | Production associate II | SOP Visitor Policy 3.6-1 
+  L2 | Production associate II | SOP_ APS-106_108 Wrap-around label applicator 5.1.6
+  L2 | Production associate II | SOP_ Kaishan Rotary Screw Air Compressor
+  L2 | Production associate II | SOP_Lot number machine_Videojet 1580 Inkjet printer
+  L2 | Production associate II | _SOP Pest Control
+  L2 | Production associate III | SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate
+  L2 | Production associate III | SOP Good Documentation Practices 17.4 Rev. New
+  L2 | Production associate III | SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New
+  L2 | Production associate III | SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate
+  L2 | Production associate III | SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate
+  L2 | Production associate III | SOP Personnel and Training New - Obsolate
+  L2 | Production associate III | SOP Premise cleaning and sanitation - Obsolate
+  L2 | Quality Control | SOP Equipment Maintenance
+  L2 | Production associate III | SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate
+  L2 | Production associate III | SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate
+  L2 | Production associate III | SOP Visitor Policy 3.6-1 
+  L2 | Production associate III | SOP_ APS-106_108 Wrap-around label applicator 5.1.6
+  L2 | Production associate III | SOP_ Kaishan Rotary Screw Air Compressor
+  L2 | Production associate III | SOP_Lot number machine_Videojet 1580 Inkjet printer
+  L2 | Production associate III | _SOP Pest Control
+  L2 | Compounder I | SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate
+  L2 | Compounder I | SOP Good Documentation Practices 17.4 Rev. New
+  L2 | Compounder I | SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New
+  L2 | Compounder I | SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate
+  L2 | Compounder I | SOP Personnel and Training New - Obsolate
+  L2 | Compounder I | SOP Premise cleaning and sanitation - Obsolate
+  L2 | Compounder I | SOP Production and Process Control of Batching Process 7.2.3 Rev.01 - Obsolate
+  L2 | Compounder I | SOP Production Pre Weigh Process 7.2.1 Rev01 - Obsolate
+  L2 | Compounder I | SOP Visitor Policy 3.6-1 
+  L2 | Compounder I | SOP_ APS-106_108 Wrap-around label applicator 5.1.6
+  L2 | Compounder I | SOP_ In Line High Shear Batch Mixer 5.1.7 Rev. New 
+  L2 | Compounder I | SOP_ Kaishan Rotary Screw Air Compressor
+  L2 | Compounder I | SOP_ Silverson High Shear Batch Mixer FX60
+  L2 | Compounder I | SOP_Lot number machine_Videojet 1580 Inkjet printer
+  L2 | Compounder I | _SOP Pest Control
+  L2 | Quality Control | Calibration Record 
+  L2 | Quality Control | Packaging in-Process Inspection 7.3.6 - Obsolete
+  L2 | Quality Control | SOP Acceptance and Control Subcontracting 
+  L2 | Quality Control | SOP Change Control Process 15.1.2
+  L2 | Quality Control | SOP Cleaning and washing of laboratory glassware
+  L2 | Quality Control | SOP Complaint and Reject Handling Process 
+  L2 | Quality Control | SOP Control of Measuring and Test Instruments 5.4 Rev. New 
+  L2 | Quality Control | SOP Control of Non-Conforming Product 10.1.1 
+  L2 | Quality Control | SOP Corrective and Preventive Action System Procedure - Obslolate 
+  L2 | Quality Control | SOP Creating and Changing Specification 15.1
+  L2 | Quality Control | SOP Customer Returns 8.5.1
+  L2 | Quality Control | SOP Deviation Procedure - Obsolate
+  L2 | Quality Control | SOP Deviation Procedure 13.1 Rev New
+  L2 | Quality Control | SOP Document Control and Data Control Procedure
+  L2 | Quality Control | SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate
+  L2 | Quality Control | SOP Equipment Installation Qualification 
+  L2 | Quality Control | SOP Good Documentation Practices 17.4 Rev. New
+  L2 | Quality Control | SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New
+  L2 | Quality Control | SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate
+  L2 | Quality Control | SOP Handling Storage, Treatment and Disposal of Wastes - Obsolate
+  L2 | Quality Control | SOP Identification & Traceability of Raw Materials, Manufactured, and Packaged Products 
+  L2 | Quality Control | SOP Incoming Inspection 6.3 Rev. New - Obsolate 
+  L2 | Quality Control | SOP Internal Audits Procedure 16.2 Rev.01 - Obsolate
+  L2 | Quality Control | SOP Laboratory Basic Safety Rules
+  L2 | Quality Control | SOP Non-Conforming Event Procedure 10.1.2 New - Obsolate
+  L2 | Quality Control | SOP Out-of-Specification (OOS) Procedure
+  L2 | Quality Control | SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate
+  L2 | Quality Control | SOP Performance Evaluation of Suppliers of Significant Materials and Services
+  L2 | Quality Control | SOP Personnel and Training New - Obsolate
+  L2 | Quality Control | SOP Pest Control 4.13 Revision 01
+  L2 | Quality Control | SOP Premise cleaning and sanitation - Obsolate
+  L2 | Quality Control | SOP Preparation and Standardization of pH Solutions
+  L2 | Quality Control | SOP Production and Process Control of Batching Process 7.2.3 Rev.01 - Obsolate
+  L2 | Quality Control | SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate
+  L2 | Quality Control | SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate
+  L2 | Quality Control | SOP Production Pre Weigh Process 7.2.1 Rev01 - Obsolate
+  L2 | Quality Control | SOP Purchasing and Assessment of Suppliers 6.2-1
+  L2 | Quality Control | SOP Receipt and Storage of Chemicals
+  L2 | Quality Control | SOP Response Plan for Incidents Involving Biohazards
+  L2 | Quality Control | SOP Retains 9.8 Rev New
+  L2 | Quality Control | SOP Retention of Finished Products 8.1 Rev. New
+  L2 | Quality Control | SOP Retention of Raw Materials 9.7.3 Rev New
+  L2 | Quality Control | SOP Rework Procedure  
+  L2 | Quality Control | SOP Risk Assessment 15.2 Rev. New - Obsolate
+  L2 | Quality Control | SOP Root Cause Analysis (RCA) Procedure
+  L2 | Quality Control | SOP Sampling Procedure 9.7.1 - Obsolete
+  L2 | Quality Control | SOP Shipping Procedure 8.4 Rev.01
+  L2 | Quality Control | SOP Signature Authority for Controlled Documents 
+  L2 | Quality Control | SOP Supplier Audits
+  L2 | Quality Control | SOP Supplier Control
+  L2 | Quality Control | SOP Supplier Corrective Action Request (SCAR) 6.2.3
+  L2 | Quality Control | SOP Visitor Policy 3.6-1 
+  L2 | Quality Control | SOP Water System 6.5 Revision 01
+  L2 | Quality Control | SOP_ APS-106_108 Wrap-around label applicator 5.1.6
+  L2 | Quality Control | SOP_ Kaishan Rotary Screw Air Compressor
+  L2 | Quality Control | SOP_ Silverson High Shear Batch Mixer FX60
+  L2 | Quality Control | SOP_ Thermo Scientific Thermoflex 2500 Recirculating chiller
+  L2 | Quality Control | SOP_Lot number machine_Videojet 1580 Inkjet printer
+  L2 | Quality Control | Work Instruction Piston Filler (1)
+  L2 | Quality Control | Work Instruction Piston Filler
+  L2 | Quality Assurance | SOP Control of Measuring and Test Instruments 5.4 Rev. New 
+  L2 | Quality Assurance | SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate
+  L2 | Quality Assurance | SOP Equipment Installation Qualification 
+  L2 | Quality Assurance | SOP Equipment Maintenance
+  L2 | Quality Assurance | SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New
+  L2 | Quality Assurance | SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate
+  L2 | Quality Assurance | SOP Matrix Quality Assurance
+  L2 | Quality Assurance | SOP Personnel and Training New - Obsolate
+  L2 | Quality Assurance | SOP Pest Control 4.13 Revision 01
+  L2 | Quality Assurance | SOP Premise cleaning and sanitation - Obsolate
+  L2 | Quality Assurance | SOP Response Plan for Incidents Involving Biohazards
+  L2 | Quality Assurance | SOP Visitor Policy 3.6-1 
+  L2 | Quality Assurance | SOP_ APS-106_108 Wrap-around label applicator 5.1.6
+  L2 | Quality Assurance | SOP_ Kaishan Rotary Screw Air Compressor
+  L2 | Quality Assurance | SOP_ Thermo Scientific Thermoflex 2500 Recirculating chiller
+  L2 | Quality Assurance | SOP_Lot number machine_Videojet 1580 Inkjet printer
+  L2 | Quality Assurance | Work Instruction Piston Filler (1)
+  L2 | Quality Assurance | Work Instruction Piston Filler
+  L2 | Shipping & Recieving | SOP Customer Returns 8.5.1
+  L2 | Shipping & Recieving | SOP Shipping Procedure 8.4 Rev.01
+  L2 | Purchase | SOP Incoming Inspection 6.3 Rev. 02 
+  L2 | Purchase | SOP Performance Evaluation of Suppliers of Significant Materials and Services
+  L2 | Purchase | SOP Purchasing and Assessment of Suppliers 6.2-1
+  L2 | Purchase | SOP Supplier Audits
+  L2 | Purchase | SOP Supplier Control
+  L2 | Purchase | SOP Supplier Corrective Action Request (SCAR) 6.2.3
+
+=== SPANISH RECORDS ===
+  L1 | Pest Control | Pest Control
+  L1 | Gowning, Hand washing and Conduct | Vestimenta, Lavado de Manos y Conducta
+  L1 | Premises Cleaning and Sanitation | Limpieza y Saneamiento de Instalaciones
+  L1 | Pest Control | Control de Plagas
+  L1 | Personnel and Training | Personnel and Training
+  L1 | Visitor Policy | Visitor Policy
+  L1 | Gowning, Hand washing and Conduct | Gowning, Hand washing and Conduct
+  L1 | Premises Cleaning and Sanitation | Premises Cleaning and Sanitation
+  L1 | Biohazard Response | Biohazard Response
+  L1 | GMP Training Presentation | GMP Presentation (Short, Feb 2025)
+  L1 | GMP Training Presentation | GMP Presentation (Aug 2024)
+  L1 | GMP Training Presentation | GMP Presentation (Dec 2024)

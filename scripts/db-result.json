@@ -1,0 +1,951 @@
+{
+  "total": 157,
+  "english_count": 145,
+  "spanish_count": 12,
+  "english": [
+    {
+      "level": 1,
+      "category": "GMP and Quality Awareness",
+      "display_name": "GMP and Quality Awareness - Part 1",
+      "file_path": "Level1/GMP_and_Quality_Awareness/part_1.pdf"
+    },
+    {
+      "level": 1,
+      "category": "GMP and Quality Awareness",
+      "display_name": "GMP and Quality Awareness - Part 2",
+      "file_path": "Level1/GMP_and_Quality_Awareness/part_2.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Gowning, Hand Washing and Conduct",
+      "display_name": "Gowning, Hand Washing and Conduct - Part 1",
+      "file_path": "Level1/Gowning__Hand_Washing_and_Conduct/part_1.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Premises Cleaning and Sanitation",
+      "display_name": "Premises Cleaning and Sanitation - Part 1",
+      "file_path": "Level1/Premises_Cleaning_and_Sanitation/part_1.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Pest Control",
+      "display_name": "Pest Control - Part 1",
+      "file_path": "Level1/Pest_Control/part_1.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Biohazard Response",
+      "display_name": "Biohazard Response - Part 1",
+      "file_path": "Level1/Biohazard_Response/part_1.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Personnel and Training",
+      "display_name": "Personnel and Training - Part 1",
+      "file_path": "Level1/Personnel_and_Training/part_1.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Visitor Policy",
+      "display_name": "Visitor Policy - Part 1",
+      "file_path": "Level1/Visitor_Policy/part_1.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate I",
+      "display_name": "SOP Good Documentation Practices 17.4 Rev. New",
+      "file_path": "Level2/Production/Production_associate_I/SOP_Good_Documentation_Practices_17.4_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate I",
+      "display_name": "SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New",
+      "file_path": "Level2/Production/Production_associate_I/SOP_Good_Manufacturing_Practices__GMP__3.4-1_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate I",
+      "display_name": "SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate",
+      "file_path": "Level2/Production/Production_associate_I/SOP_Gowning__Hand_Washing_and_Conduct_3.5.2_Rev.01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate I",
+      "display_name": "SOP Personnel and Training New - Obsolate",
+      "file_path": "Level2/Production/Production_associate_I/SOP_Personnel_and_Training_New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate I",
+      "display_name": "SOP Premise cleaning and sanitation - Obsolate",
+      "file_path": "Level2/Production/Production_associate_I/SOP_Premise_cleaning_and_sanitation_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate I",
+      "display_name": "SOP Visitor Policy 3.6-1 ",
+      "file_path": "Level2/Production/Production_associate_I/SOP_Visitor_Policy_3.6-1_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate I",
+      "display_name": "_SOP Pest Control",
+      "file_path": "Level2/Production/Production_associate_I/_SOP_Pest_Control.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Equipment_Cleaning_and_Sanitation_5.6.1_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Good Documentation Practices 17.4 Rev. New",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Good_Documentation_Practices_17.4_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Good_Manufacturing_Practices__GMP__3.4-1_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Gowning__Hand_Washing_and_Conduct_3.5.2_Rev.01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Packaging_Line_Clearance_Procedure_7.3.1_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Personnel and Training New - Obsolate",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Personnel_and_Training_New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Premise cleaning and sanitation - Obsolate",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Premise_cleaning_and_sanitation_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Production_Line_Clearance_Procedure_7.2.2.1_Rev._New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Production_and_Process_Control_of_Packaging_Process_7.3.2_Rev._New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP Visitor Policy 3.6-1 ",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Visitor_Policy_3.6-1_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP_ APS-106_108 Wrap-around label applicator 5.1.6",
+      "file_path": "Level2/Production/Production_associate_II/SOP__APS-106_108_Wrap-around_label_applicator_5.1.6.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP_ Kaishan Rotary Screw Air Compressor",
+      "file_path": "Level2/Production/Production_associate_II/SOP__Kaishan_Rotary_Screw_Air_Compressor.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "SOP_Lot number machine_Videojet 1580 Inkjet printer",
+      "file_path": "Level2/Production/Production_associate_II/SOP_Lot_number_machine_Videojet_1580_Inkjet_printer.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate II",
+      "display_name": "_SOP Pest Control",
+      "file_path": "Level2/Production/Production_associate_II/_SOP_Pest_Control.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Equipment_Cleaning_and_Sanitation_5.6.1_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Good Documentation Practices 17.4 Rev. New",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Good_Documentation_Practices_17.4_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Good_Manufacturing_Practices__GMP__3.4-1_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Gowning__Hand_Washing_and_Conduct_3.5.2_Rev.01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Packaging_Line_Clearance_Procedure_7.3.1_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Personnel and Training New - Obsolate",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Personnel_and_Training_New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Premise cleaning and sanitation - Obsolate",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Premise_cleaning_and_sanitation_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Equipment Maintenance",
+      "file_path": "Level2/QC/Quality_Control/SOP_Equipment_Maintenance.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Production_Line_Clearance_Procedure_7.2.2.1_Rev._New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Production_and_Process_Control_of_Packaging_Process_7.3.2_Rev._New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP Visitor Policy 3.6-1 ",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Visitor_Policy_3.6-1_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP_ APS-106_108 Wrap-around label applicator 5.1.6",
+      "file_path": "Level2/Production/Production_associate_III/SOP__APS-106_108_Wrap-around_label_applicator_5.1.6.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP_ Kaishan Rotary Screw Air Compressor",
+      "file_path": "Level2/Production/Production_associate_III/SOP__Kaishan_Rotary_Screw_Air_Compressor.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "SOP_Lot number machine_Videojet 1580 Inkjet printer",
+      "file_path": "Level2/Production/Production_associate_III/SOP_Lot_number_machine_Videojet_1580_Inkjet_printer.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Production associate III",
+      "display_name": "_SOP Pest Control",
+      "file_path": "Level2/Production/Production_associate_III/_SOP_Pest_Control.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Equipment_Cleaning_and_Sanitation_5.6.1_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP Good Documentation Practices 17.4 Rev. New",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Good_Documentation_Practices_17.4_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Good_Manufacturing_Practices__GMP__3.4-1_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Gowning__Hand_Washing_and_Conduct_3.5.2_Rev.01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP Personnel and Training New - Obsolate",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Personnel_and_Training_New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP Premise cleaning and sanitation - Obsolate",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Premise_cleaning_and_sanitation_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP Production and Process Control of Batching Process 7.2.3 Rev.01 - Obsolate",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Production_and_Process_Control_of_Batching_Process_7.2.3_Rev.01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP Production Pre Weigh Process 7.2.1 Rev01 - Obsolate",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Production_Pre_Weigh_Process_7.2.1_Rev01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP Visitor Policy 3.6-1 ",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Visitor_Policy_3.6-1_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP_ APS-106_108 Wrap-around label applicator 5.1.6",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP__APS-106_108_Wrap-around_label_applicator_5.1.6.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP_ In Line High Shear Batch Mixer 5.1.7 Rev. New ",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP__In_Line_High_Shear_Batch_Mixer_5.1.7_Rev._New_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP_ Kaishan Rotary Screw Air Compressor",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP__Kaishan_Rotary_Screw_Air_Compressor.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP_ Silverson High Shear Batch Mixer FX60",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP__Silverson_High_Shear_Batch_Mixer_FX60.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "SOP_Lot number machine_Videojet 1580 Inkjet printer",
+      "file_path": "Level2/Compounder_I/Compounder_I/SOP_Lot_number_machine_Videojet_1580_Inkjet_printer.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Compounder I",
+      "display_name": "_SOP Pest Control",
+      "file_path": "Level2/Compounder_I/Compounder_I/_SOP_Pest_Control.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "Calibration Record ",
+      "file_path": "Level2/QC/Quality_Control/Calibration_Record_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "Packaging in-Process Inspection 7.3.6 - Obsolete",
+      "file_path": "Level2/QC/Quality_Control/Packaging_in-Process_Inspection_7.3.6_-_Obsolete.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Acceptance and Control Subcontracting ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Acceptance_and_Control_Subcontracting_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Change Control Process 15.1.2",
+      "file_path": "Level2/QC/Quality_Control/SOP_Change_Control_Process_15.1.2.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Cleaning and washing of laboratory glassware",
+      "file_path": "Level2/QC/Quality_Control/SOP_Cleaning_and_washing_of_laboratory_glassware.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Complaint and Reject Handling Process ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Complaint_and_Reject_Handling_Process_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Control of Measuring and Test Instruments 5.4 Rev. New ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Control_of_Measuring_and_Test_Instruments_5.4_Rev._New_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Control of Non-Conforming Product 10.1.1 ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Control_of_Non-Conforming_Product_10.1.1_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Corrective and Preventive Action System Procedure - Obslolate ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Corrective_and_Preventive_Action_System_Procedure_-_Obslolate_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Creating and Changing Specification 15.1",
+      "file_path": "Level2/QC/Quality_Control/SOP_Creating_and_Changing_Specification_15.1.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Customer Returns 8.5.1",
+      "file_path": "Level2/QC/Quality_Control/SOP_Customer_Returns_8.5.1.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Deviation Procedure - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Deviation_Procedure_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Deviation Procedure 13.1 Rev New",
+      "file_path": "Level2/QC/Quality_Control/SOP_Deviation_Procedure_13.1_Rev_New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Document Control and Data Control Procedure",
+      "file_path": "Level2/QC/Quality_Control/SOP_Document_Control_and_Data_Control_Procedure.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Equipment_Cleaning_and_Sanitation_5.6.1_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Equipment Installation Qualification ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Equipment_Installation_Qualification_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Good Documentation Practices 17.4 Rev. New",
+      "file_path": "Level2/QC/Quality_Control/SOP_Good_Documentation_Practices_17.4_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New",
+      "file_path": "Level2/QC/Quality_Control/SOP_Good_Manufacturing_Practices__GMP__3.4-1_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Gowning__Hand_Washing_and_Conduct_3.5.2_Rev.01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Handling Storage, Treatment and Disposal of Wastes - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Handling_Storage__Treatment_and_Disposal_of_Wastes_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Identification & Traceability of Raw Materials, Manufactured, and Packaged Products ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Identification___Traceability_of_Raw_Materials__Manufactured__and_Packaged_Products_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Incoming Inspection 6.3 Rev. New - Obsolate ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Incoming_Inspection_6.3_Rev._New_-_Obsolate_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Internal Audits Procedure 16.2 Rev.01 - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Internal_Audits_Procedure_16.2_Rev.01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Laboratory Basic Safety Rules",
+      "file_path": "Level2/QC/Quality_Control/SOP_Laboratory_Basic_Safety_Rules.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Non-Conforming Event Procedure 10.1.2 New - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Non-Conforming_Event_Procedure_10.1.2_New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Out-of-Specification (OOS) Procedure",
+      "file_path": "Level2/QC/Quality_Control/SOP_Out-of-Specification__OOS__Procedure.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Packaging Line Clearance Procedure 7.3.1 - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Packaging_Line_Clearance_Procedure_7.3.1_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Performance Evaluation of Suppliers of Significant Materials and Services",
+      "file_path": "Level2/QC/Quality_Control/SOP_Performance_Evaluation_of_Suppliers_of_Significant_Materials_and_Services.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Personnel and Training New - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Personnel_and_Training_New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Pest Control 4.13 Revision 01",
+      "file_path": "Level2/QC/Quality_Control/SOP_Pest_Control_4.13_Revision_01.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Premise cleaning and sanitation - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Premise_cleaning_and_sanitation_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Preparation and Standardization of pH Solutions",
+      "file_path": "Level2/QC/Quality_Control/SOP_Preparation_and_Standardization_of_pH_Solutions.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Production and Process Control of Batching Process 7.2.3 Rev.01 - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Production_and_Process_Control_of_Batching_Process_7.2.3_Rev.01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Production and Process Control of Packaging Process 7.3.2 Rev. New - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Production_and_Process_Control_of_Packaging_Process_7.3.2_Rev._New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Production Line Clearance Procedure 7.2.2.1 Rev. New - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Production_Line_Clearance_Procedure_7.2.2.1_Rev._New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Production Pre Weigh Process 7.2.1 Rev01 - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Production_Pre_Weigh_Process_7.2.1_Rev01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Purchasing and Assessment of Suppliers 6.2-1",
+      "file_path": "Level2/QC/Quality_Control/SOP_Purchasing_and_Assessment_of_Suppliers_6.2-1.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Receipt and Storage of Chemicals",
+      "file_path": "Level2/QC/Quality_Control/SOP_Receipt_and_Storage_of_Chemicals.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Response Plan for Incidents Involving Biohazards",
+      "file_path": "Level2/QC/Quality_Control/SOP_Response_Plan_for_Incidents_Involving_Biohazards.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Retains 9.8 Rev New",
+      "file_path": "Level2/QC/Quality_Control/SOP_Retains_9.8_Rev_New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Retention of Finished Products 8.1 Rev. New",
+      "file_path": "Level2/QC/Quality_Control/SOP_Retention_of_Finished_Products_8.1_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Retention of Raw Materials 9.7.3 Rev New",
+      "file_path": "Level2/QC/Quality_Control/SOP_Retention_of_Raw_Materials_9.7.3_Rev_New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Rework Procedure  ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Rework_Procedure__.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Risk Assessment 15.2 Rev. New - Obsolate",
+      "file_path": "Level2/QC/Quality_Control/SOP_Risk_Assessment_15.2_Rev._New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Root Cause Analysis (RCA) Procedure",
+      "file_path": "Level2/QC/Quality_Control/SOP_Root_Cause_Analysis__RCA__Procedure.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Sampling Procedure 9.7.1 - Obsolete",
+      "file_path": "Level2/QC/Quality_Control/SOP_Sampling_Procedure_9.7.1_-_Obsolete.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Shipping Procedure 8.4 Rev.01",
+      "file_path": "Level2/QC/Quality_Control/SOP_Shipping_Procedure_8.4_Rev.01.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Signature Authority for Controlled Documents ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Signature_Authority_for_Controlled_Documents_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Supplier Audits",
+      "file_path": "Level2/QC/Quality_Control/SOP_Supplier_Audits.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Supplier Control",
+      "file_path": "Level2/QC/Quality_Control/SOP_Supplier_Control.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Supplier Corrective Action Request (SCAR) 6.2.3",
+      "file_path": "Level2/QC/Quality_Control/SOP_Supplier_Corrective_Action_Request__SCAR__6.2.3.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Visitor Policy 3.6-1 ",
+      "file_path": "Level2/QC/Quality_Control/SOP_Visitor_Policy_3.6-1_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP Water System 6.5 Revision 01",
+      "file_path": "Level2/QC/Quality_Control/SOP_Water_System_6.5_Revision_01.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP_ APS-106_108 Wrap-around label applicator 5.1.6",
+      "file_path": "Level2/QC/Quality_Control/SOP__APS-106_108_Wrap-around_label_applicator_5.1.6.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP_ Kaishan Rotary Screw Air Compressor",
+      "file_path": "Level2/QC/Quality_Control/SOP__Kaishan_Rotary_Screw_Air_Compressor.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP_ Silverson High Shear Batch Mixer FX60",
+      "file_path": "Level2/QC/Quality_Control/SOP__Silverson_High_Shear_Batch_Mixer_FX60.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP_ Thermo Scientific Thermoflex 2500 Recirculating chiller",
+      "file_path": "Level2/QC/Quality_Control/SOP__Thermo_Scientific_Thermoflex_2500_Recirculating_chiller.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "SOP_Lot number machine_Videojet 1580 Inkjet printer",
+      "file_path": "Level2/QC/Quality_Control/SOP_Lot_number_machine_Videojet_1580_Inkjet_printer.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "Work Instruction Piston Filler (1)",
+      "file_path": "Level2/QC/Quality_Control/Work_Instruction_Piston_Filler__1_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Control",
+      "display_name": "Work Instruction Piston Filler",
+      "file_path": "Level2/QC/Quality_Control/Work_Instruction_Piston_Filler.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Control of Measuring and Test Instruments 5.4 Rev. New ",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Control_of_Measuring_and_Test_Instruments_5.4_Rev._New_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Equipment Cleaning and Sanitation 5.6.1 - Obsolate",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Equipment_Cleaning_and_Sanitation_5.6.1_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Equipment Installation Qualification ",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Equipment_Installation_Qualification_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Equipment Maintenance",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Equipment_Maintenance.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Good Manufacturing Practices (GMP) 3.4-1 Rev. New",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Good_Manufacturing_Practices__GMP__3.4-1_Rev._New.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Gowning, Hand Washing and Conduct 3.5.2 Rev.01 - Obsolate",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Gowning__Hand_Washing_and_Conduct_3.5.2_Rev.01_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Matrix Quality Assurance",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Matrix_Quality_Assurance.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Personnel and Training New - Obsolate",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Personnel_and_Training_New_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Pest Control 4.13 Revision 01",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Pest_Control_4.13_Revision_01.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Premise cleaning and sanitation - Obsolate",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Premise_cleaning_and_sanitation_-_Obsolate.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Response Plan for Incidents Involving Biohazards",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Response_Plan_for_Incidents_Involving_Biohazards.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP Visitor Policy 3.6-1 ",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Visitor_Policy_3.6-1_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP_ APS-106_108 Wrap-around label applicator 5.1.6",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP__APS-106_108_Wrap-around_label_applicator_5.1.6.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP_ Kaishan Rotary Screw Air Compressor",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP__Kaishan_Rotary_Screw_Air_Compressor.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP_ Thermo Scientific Thermoflex 2500 Recirculating chiller",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP__Thermo_Scientific_Thermoflex_2500_Recirculating_chiller.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "SOP_Lot number machine_Videojet 1580 Inkjet printer",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/SOP_Lot_number_machine_Videojet_1580_Inkjet_printer.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "Work Instruction Piston Filler (1)",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/Work_Instruction_Piston_Filler__1_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Quality Assurance",
+      "display_name": "Work Instruction Piston Filler",
+      "file_path": "Level2/Quality_Assurance/Quality_Assurance/Work_Instruction_Piston_Filler.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Shipping & Recieving",
+      "display_name": "SOP Customer Returns 8.5.1",
+      "file_path": "Level2/Shipping___Recieving/Shipping___Recieving/SOP_Customer_Returns_8.5.1.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Shipping & Recieving",
+      "display_name": "SOP Shipping Procedure 8.4 Rev.01",
+      "file_path": "Level2/Shipping___Recieving/Shipping___Recieving/SOP_Shipping_Procedure_8.4_Rev.01.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Purchase",
+      "display_name": "SOP Incoming Inspection 6.3 Rev. 02 ",
+      "file_path": "Level2/Purchase/Purchase/SOP_Incoming_Inspection_6.3_Rev._02_.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Purchase",
+      "display_name": "SOP Performance Evaluation of Suppliers of Significant Materials and Services",
+      "file_path": "Level2/Purchase/Purchase/SOP_Performance_Evaluation_of_Suppliers_of_Significant_Materials_and_Services.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Purchase",
+      "display_name": "SOP Purchasing and Assessment of Suppliers 6.2-1",
+      "file_path": "Level2/Purchase/Purchase/SOP_Purchasing_and_Assessment_of_Suppliers_6.2-1.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Purchase",
+      "display_name": "SOP Supplier Audits",
+      "file_path": "Level2/Purchase/Purchase/SOP_Supplier_Audits.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Purchase",
+      "display_name": "SOP Supplier Control",
+      "file_path": "Level2/Purchase/Purchase/SOP_Supplier_Control.pdf"
+    },
+    {
+      "level": 2,
+      "category": "Purchase",
+      "display_name": "SOP Supplier Corrective Action Request (SCAR) 6.2.3",
+      "file_path": "Level2/Purchase/Purchase/SOP_Supplier_Corrective_Action_Request__SCAR__6.2.3.pdf"
+    }
+  ],
+  "spanish": [
+    {
+      "level": 1,
+      "category": "Pest Control",
+      "display_name": "Pest Control",
+      "file_path": "Spanish/Level1/Pest Control 4.13 - Training Material rev101124.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Gowning, Hand washing and Conduct",
+      "display_name": "Vestimenta, Lavado de Manos y Conducta",
+      "file_path": "Spanish/Level1/Vestimenta, Lavado de Manos y Conducta 3.5.2 - Training Material rev.101424.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Premises Cleaning and Sanitation",
+      "display_name": "Limpieza y Saneamiento de Instalaciones",
+      "file_path": "Spanish/Level1/Limpieza y Saneamiento de Instalaciones 4.10.0 - Training Material rev.101424.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Pest Control",
+      "display_name": "Control de Plagas",
+      "file_path": "Spanish/Level1/Control de Plagas 4.13 - Training Material rev101524.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Personnel and Training",
+      "display_name": "Personnel and Training",
+      "file_path": "Spanish/Level1/Personnel and Training 3.4-2 - Training Material rev.101024.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Visitor Policy",
+      "display_name": "Visitor Policy",
+      "file_path": "Spanish/Level1/Visitor Policy - Training Material rev.101124.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Gowning, Hand washing and Conduct",
+      "display_name": "Gowning, Hand washing and Conduct",
+      "file_path": "Spanish/Level1/Gowning, Hand washing and Conduct 3.5.2 - Training Material rev.112524.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Premises Cleaning and Sanitation",
+      "display_name": "Premises Cleaning and Sanitation",
+      "file_path": "Spanish/Level1/Premises Cleaning and Sanitation - Training Material rev.030425.pdf"
+    },
+    {
+      "level": 1,
+      "category": "Biohazard Response",
+      "display_name": "Biohazard Response",
+      "file_path": "Spanish/Level1/Biohazard Response - Training Material rev.101124.pdf"
+    },
+    {
+      "level": 1,
+      "category": "GMP Training Presentation",
+      "display_name": "GMP Presentation (Short, Feb 2025)",
+      "file_path": "Spanish/Level1/GMP_presentation_short_updated_02202025.pdf"
+    },
+    {
+      "level": 1,
+      "category": "GMP Training Presentation",
+      "display_name": "GMP Presentation (Aug 2024)",
+      "file_path": "Spanish/Level1/GMP_presentation_updated_08012024.pdf"
+    },
+    {
+      "level": 1,
+      "category": "GMP Training Presentation",
+      "display_name": "GMP Presentation (Dec 2024)",
+      "file_path": "Spanish/Level1/GMP_presentation_updated_12162024.pdf"
+    }
+  ]
+}

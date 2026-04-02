@@ -37,14 +37,15 @@ export const EmployeeDetailView: React.FC = () => {
     const [isProcessingLeave, setIsProcessingLeave] = useState<string | null>(null);
     const [selectedTrainingRole, setSelectedTrainingRole] = useState<string | null>(null);
     const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>([]);
+    const [trainingLanguage, setTrainingLanguage] = useState<'en' | 'es'>('en');
 
     useEffect(() => {
         const fetchTrainings = async () => {
-            const materials = await trainingService.getAllMaterials();
+            const materials = await trainingService.getAllMaterials(trainingLanguage);
             setTrainingMaterials(materials);
         };
         fetchTrainings();
-    }, []);
+    }, [trainingLanguage]);
 
     const fetchLeaveRequests = async (employeeId: string) => {
         const { data } = await supabase
@@ -198,7 +199,7 @@ export const EmployeeDetailView: React.FC = () => {
             // 2. If approved, deduct balance
             if (status === 'approved') {
                 const balanceField = request.type === 'pto' ? 'pto_balance' : 'sick_balance';
-                const currentBalance = parseFloat(employee![balanceField] || '0');
+                const currentBalance = parseFloat((employee as any)?.[balanceField] || '0');
                 const newBalance = (currentBalance - request.hours_requested).toFixed(2);
 
                 // Update balance on user
@@ -225,8 +226,8 @@ export const EmployeeDetailView: React.FC = () => {
 
             setToast({ message: t('leave.actions.success', { status: t(`leave.filters.${status}`) }), type: 'success' });
             setTimeout(() => setToast(null), 3000);
-            fetchEmployee(); 
-            fetchLeaveRequests(employee!.id);
+            fetchEmployee();
+            if (employee?.id) fetchLeaveRequests(employee.id);
         } catch (err: any) {
             setToast({ message: err.message || t('leave.actions.error', { message: '' }), type: 'error' });
             setTimeout(() => setToast(null), 3000);
@@ -382,8 +383,20 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="section-title-row">
                                 <i className="fa-solid fa-graduation-cap"></i>
                                 <h2>{t('employeeDetail.training.title')}</h2>
-                                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t('employeeDetail.training.viewingRole')}</span>
+                                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', padding: '0.4rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                        <i className="fa-solid fa-language" style={{ color: 'var(--primary)', fontSize: '1rem' }}></i>
+                                        <select 
+                                            value={trainingLanguage} 
+                                            onChange={(e) => setTrainingLanguage(e.target.value as any)}
+                                            style={{ background: 'transparent', border: 'none', color: '#1e1b4b', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
+                                        >
+                                            <option value="en">English</option>
+                                            <option value="es">Español</option>
+                                        </select>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t('employeeDetail.training.viewingRole')}</span>
                                     <select 
                                         value={role} 
                                         onChange={(e) => setSelectedTrainingRole(e.target.value)}
@@ -402,6 +415,7 @@ export const EmployeeDetailView: React.FC = () => {
                                             <option key={r} value={r}>{r}</option>
                                         ))}
                                     </select>
+                                    </div>
                                 </div>
                             </div>
                             

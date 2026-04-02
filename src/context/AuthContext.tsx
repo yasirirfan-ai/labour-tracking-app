@@ -20,9 +20,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [authError, setAuthError] = useState<string | null>(null);
 
     useEffect(() => {
-        const savedUser = localStorage.getItem('bt_user');
-        if (savedUser) {
-            setUser(JSON.parse(savedUser));
+        try {
+            const savedUser = localStorage.getItem('bt_user');
+            if (savedUser) {
+                setUser(JSON.parse(savedUser));
+            }
+        } catch (e) {
+            console.error('Failed to parse saved user session, clearing:', e);
+            localStorage.removeItem('bt_user');
         }
         setLoading(false);
 

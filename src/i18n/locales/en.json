@@ -84,6 +84,9 @@
       "systemSubtitle": "Mandatory Standard Operating Procedures & Safety Training",
       "level1Title": "Level 1: Core Operations",
       "level1Subtitle": "Essential safety and process documents for all personnel",
+      "level2Title": "Level 2: Role-Specific SOPs",
+      "level2Subtitle": "Department-specific standard operating procedures",
+      "documents": "Documents",
       "progress": "Overall Progress",
       "completed": "COMPLETED",
       "inProgress": "IN PROGRESS",
@@ -373,6 +376,14 @@
       "phoneNumeric": "Phone must be numeric"
     },
     "training": {
+      "title": "Training & Development",
+      "viewingRole": "VIEWING ROLE:",
+      "level1Progress": "Level 1 Progress",
+      "level2Progress": "Level 2 Progress",
+      "totalCompleted": "Total Completed",
+      "overall": "Overall",
+      "coreTitle": "Core Orientation (Level 1)",
+      "roleTitle": "Role SOPs — Level 2: {{role}}",
       "roleSops": "Role SOPs (Level 2: {{role}})",
       "completed": "COMPLETED",
       "pending": "PENDING"

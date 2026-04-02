@@ -10,6 +10,15 @@ import type { User } from '../types';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 
+const getViewerUrl = (fileUrl: string): string => {
+    if (/\.(pptx|ppt)$/i.test(fileUrl)) {
+        return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
+    }
+    return `${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
+};
+
+const isPptx = (fileUrl: string): boolean => /\.(pptx|ppt)$/i.test(fileUrl);
+
 export const WorkerPortalPage: React.FC = () => {
     const { t, i18n } = useTranslation();
     const { toggleTheme, setLanguage, currentTheme } = useTheme();
@@ -41,6 +50,7 @@ export const WorkerPortalPage: React.FC = () => {
     const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
     const [completedTrainings, setCompletedTrainings] = useState<string[]>([]);
+    const [trainingLanguage, setTrainingLanguage] = useState<'en' | 'es'>('en');
     const [showBreakOverlay, setShowBreakOverlay] = useState(false);
     const [readingTimer, setReadingTimer] = useState(0);
     const [isTimerActive, setIsTimerActive] = useState(false);
@@ -51,7 +61,7 @@ export const WorkerPortalPage: React.FC = () => {
 
     useEffect(() => {
         const fetchTrainings = async () => {
-            const materials = await trainingService.getAllMaterials();
+            const materials = await trainingService.getAllMaterials(trainingLanguage);
             setTrainingMaterials(materials);
             
             // Set initial selected section for SOPs if available
@@ -62,7 +72,7 @@ export const WorkerPortalPage: React.FC = () => {
             }
         };
         fetchTrainings();
-    }, [user?.id]);
+    }, [user?.id, trainingLanguage]);
 
     useEffect(() => {
         if (user) {
@@ -114,11 +124,12 @@ export const WorkerPortalPage: React.FC = () => {
 
     const fetchLeaveRequests = async () => {
         if (!user) return;
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('leave_requests')
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
+        if (error) { console.error('Error fetching leave requests:', error); return; }
         if (data) setLeaveRequests(data);
     };
 
@@ -127,6 +138,10 @@ export const WorkerPortalPage: React.FC = () => {
         if (!user) return;
         if (!leaveFormData.start_date || !leaveFormData.end_date || leaveFormData.hours_requested <= 0) {
             alert('Please fill in all required fields correctly.');
+            return;
+        }
+        if (leaveFormData.end_date < leaveFormData.start_date) {
+            alert('End date cannot be before start date.');
             return;
         }
 
@@ -253,22 +268,32 @@ export const WorkerPortalPage: React.FC = () => {
     }, [user?.id, authLoading]);
 
 
+    // Clock tick – runs once, never torn down
     useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrentTime(new Date());
-
-            // Check for 5-hour work limit
-            if (localUser?.status === 'present' && localUser?.availability === 'available' && localUser?.last_status_change) {
-                const workStarted = new Date(localUser.last_status_change).getTime();
-                const now = new Date().getTime();
-                const elapsedSeconds = Math.floor((now - workStarted) / 1000);
-
-                if (elapsedSeconds >= MAX_WORK_SECONDS) {
-                    handleTakeBreak(true); // Trigger automatic break
-                }
-            }
-        }, 1000);
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
+    }, []);
+
+    // 5-hour auto-break check – re-runs only when localUser changes
+    useEffect(() => {
+        if (
+            localUser?.status !== 'present' ||
+            localUser?.availability !== 'available' ||
+            !localUser?.last_status_change
+        ) return;
+
+        const workStarted = new Date(localUser.last_status_change).getTime();
+        const elapsed = Math.floor((Date.now() - workStarted) / 1000);
+        if (elapsed >= MAX_WORK_SECONDS) {
+            handleTakeBreak(true);
+            return;
+        }
+
+        // Schedule the break at exactly the right moment
+        const remaining = (MAX_WORK_SECONDS - elapsed) * 1000;
+        const breakTimer = setTimeout(() => handleTakeBreak(true), remaining);
+        return () => clearTimeout(breakTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [localUser]);
 
     const handleSaveProfile = async () => {
@@ -384,9 +409,9 @@ export const WorkerPortalPage: React.FC = () => {
                 .subscribe();
 
             return () => {
-                supabase.removeChannel(userChannel);
-                supabase.removeChannel(taskChannel);
-                supabase.removeChannel(disciplineChannel);
+                userChannel.unsubscribe();
+                taskChannel.unsubscribe();
+                disciplineChannel.unsubscribe();
             };
         }
     }, [user?.id]);
@@ -394,17 +419,19 @@ export const WorkerPortalPage: React.FC = () => {
 
     const fetchUserStatus = async () => {
         if (!user) return;
-        const { data } = await supabase.from('users').select('*').eq('id', user.id).single();
+        const { data, error } = await supabase.from('users').select('*').eq('id', user.id).single();
+        if (error) { console.error('Error fetching user status:', error); return; }
         if (data) setLocalUser(data);
     };
 
     const fetchActiveTasks = async () => {
         if (!user) return;
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('tasks')
             .select('*')
             .eq('assigned_to_id', user.id)
             .neq('status', 'completed');
+        if (error) { console.error('Error fetching tasks:', error); return; }
         if (data) setActiveTasks(data);
     };
 
@@ -1912,6 +1939,17 @@ export const WorkerPortalPage: React.FC = () => {
                                     <h3 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.03em' }}>{t('workerPortal.training.systemName')}</h3>
                                     <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontWeight: 600, fontSize: '1.1rem' }}>{t('workerPortal.training.systemSubtitle')}</p>
                                 </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'var(--bg-card)', padding: '0.5rem 1.25rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                                    <i className="fa-solid fa-language" style={{ color: 'var(--primary)', fontSize: '1.2rem' }}></i>
+                                    <select 
+                                        value={trainingLanguage} 
+                                        onChange={(e) => setTrainingLanguage(e.target.value as any)}
+                                        style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', outline: 'none' }}
+                                    >
+                                        <option value="en">English</option>
+                                        <option value="es">Español</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div style={{ marginBottom: '3rem' }}>
@@ -1931,84 +1969,119 @@ export const WorkerPortalPage: React.FC = () => {
                                 </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
-                                    {/* Group Level 1 materials by category */}
-                                    {Array.from(new Set(trainingMaterials.filter(m => m.level === 1).map(m => m.category))).map((categoryName, idx) => {
-                                        const materials = trainingMaterials.filter(m => m.level === 1 && m.category === categoryName);
-                                        const isCompleted = completedTrainings.includes(categoryName);
-                                        return (
-                                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', padding: '1.75rem', borderRadius: '24px', border: '1px solid var(--border)', transition: 'all 0.3s', boxShadow: 'var(--shadow-sm)' }}>
-                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', marginBottom: '1.5rem' }}>
-                                                    <div style={{ 
-                                                        width: '48px', 
-                                                        height: '48px', 
-                                                        background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-main)', 
-                                                        color: isCompleted ? 'var(--success)' : 'var(--text-muted)', 
-                                                        borderRadius: '14px', 
-                                                        display: 'flex', 
-                                                        alignItems: 'center', 
-                                                        justifyContent: 'center', 
-                                                        flexShrink: 0, 
-                                                        border: isCompleted ? 'none' : '1px solid var(--border)',
-                                                        fontSize: '1.2rem'
-                                                    }}>
-                                                        {isCompleted ? <i className="fa-solid fa-circle-check"></i> : <i className="fa-solid fa-display"></i>}
-                                                    </div>
-                                                    <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.4 }}>{categoryName}</div>
-                                                </div>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: 'auto', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('workerPortal.training.materials')}</div>
-                                                        <span style={{ 
-                                                            fontSize: '0.7rem', 
-                                                            fontWeight: 900, 
-                                                            color: isCompleted ? 'var(--success)' : 'var(--primary)', 
-                                                            background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(79, 70, 229, 0.1)', 
-                                                            padding: '0.4rem 1rem', 
-                                                            borderRadius: '99px',
-                                                            textTransform: 'uppercase'
+                                    {trainingLanguage === 'es' ? (
+                                        /* Spanish: one card per individual PPT file */
+                                        trainingMaterials.filter(m => m.level === 1).map((mat, idx) => {
+                                            const isCompleted = completedTrainings.includes(mat.display_name);
+                                            return (
+                                                <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', padding: '1.75rem', borderRadius: '24px', border: '1px solid var(--border)', transition: 'all 0.3s', boxShadow: 'var(--shadow-sm)' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                                                        <div style={{
+                                                            width: '48px', height: '48px',
+                                                            background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-main)',
+                                                            color: isCompleted ? 'var(--success)' : 'var(--text-muted)',
+                                                            borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            flexShrink: 0, border: isCompleted ? 'none' : '1px solid var(--border)', fontSize: '1.2rem'
                                                         }}>
-                                                            {isCompleted ? t('workerPortal.training.completed') : t('workerPortal.training.inProgress')}
-                                                        </span>
+                                                            {isCompleted ? <i className="fa-solid fa-circle-check"></i> : <i className="fa-solid fa-file-powerpoint"></i>}
+                                                        </div>
+                                                        <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.4 }}>{mat.display_name}</div>
                                                     </div>
-
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                                                        {materials.map((mat, mIdx) => (
-                                                            <button
-                                                                key={mIdx}
-                                                                onClick={() => {
-                                                                    setSelectedPdf(trainingService.getPublicUrl(mat.file_path));
-                                                                    setCurrentTrainingName(mat.category);
-                                                                }}
-                                                                style={{
-                                                                    flex: 1,
-                                                                    minWidth: materials.length > 1 ? '140px' : '100%',
-                                                                    padding: '0.8rem 1rem',
-                                                                    borderRadius: '12px',
-                                                                    border: '1.5px solid var(--border)',
-                                                                    background: 'var(--bg-main)',
-                                                                    color: 'var(--primary)',
-                                                                    fontWeight: 800,
-                                                                    fontSize: '0.85rem',
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    gap: '0.6rem'
-                                                                }}
-                                                            >
-                                                                <i className="fa-solid fa-file-pdf"></i>
-                                                                {materials.length > 1 ? `${t('workerPortal.training.part')} ${mIdx + 1}` : t('workerPortal.training.viewSlides')}
-                                                            </button>
-                                                        ))}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: 'auto', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('workerPortal.training.materials')}</div>
+                                                            <span style={{
+                                                                fontSize: '0.7rem', fontWeight: 900,
+                                                                color: isCompleted ? 'var(--success)' : 'var(--primary)',
+                                                                background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(79, 70, 229, 0.1)',
+                                                                padding: '0.4rem 1rem', borderRadius: '99px', textTransform: 'uppercase'
+                                                            }}>
+                                                                {isCompleted ? t('workerPortal.training.completed') : t('workerPortal.training.inProgress')}
+                                                            </span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedPdf(trainingService.getPublicUrl(mat.file_path));
+                                                                setCurrentTrainingName(mat.display_name);
+                                                            }}
+                                                            style={{
+                                                                width: '100%', padding: '0.8rem 1rem', borderRadius: '12px',
+                                                                border: '1.5px solid var(--border)', background: 'var(--bg-main)',
+                                                                color: 'var(--primary)', fontWeight: 800, fontSize: '0.85rem',
+                                                                cursor: 'pointer', transition: 'all 0.2s',
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem'
+                                                            }}
+                                                        >
+                                                            <i className="fa-solid fa-file-powerpoint"></i>
+                                                            {t('workerPortal.training.viewSlides')}
+                                                        </button>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })
+                                    ) : (
+                                        /* English: group by category, show Part 1 / Part 2 buttons */
+                                        Array.from(new Set(trainingMaterials.filter(m => m.level === 1).map(m => m.category))).map((categoryName, idx) => {
+                                            const materials = trainingMaterials.filter(m => m.level === 1 && m.category === categoryName);
+                                            const isCompleted = completedTrainings.includes(categoryName);
+                                            return (
+                                                <div key={idx} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', padding: '1.75rem', borderRadius: '24px', border: '1px solid var(--border)', transition: 'all 0.3s', boxShadow: 'var(--shadow-sm)' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                                                        <div style={{
+                                                            width: '48px', height: '48px',
+                                                            background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-main)',
+                                                            color: isCompleted ? 'var(--success)' : 'var(--text-muted)',
+                                                            borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            flexShrink: 0, border: isCompleted ? 'none' : '1px solid var(--border)', fontSize: '1.2rem'
+                                                        }}>
+                                                            {isCompleted ? <i className="fa-solid fa-circle-check"></i> : <i className="fa-solid fa-display"></i>}
+                                                        </div>
+                                                        <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '1.1rem', lineHeight: 1.4 }}>{categoryName}</div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: 'auto', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('workerPortal.training.materials')}</div>
+                                                            <span style={{
+                                                                fontSize: '0.7rem', fontWeight: 900,
+                                                                color: isCompleted ? 'var(--success)' : 'var(--primary)',
+                                                                background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(79, 70, 229, 0.1)',
+                                                                padding: '0.4rem 1rem', borderRadius: '99px', textTransform: 'uppercase'
+                                                            }}>
+                                                                {isCompleted ? t('workerPortal.training.completed') : t('workerPortal.training.inProgress')}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                                            {materials.map((mat, mIdx) => (
+                                                                <button
+                                                                    key={mIdx}
+                                                                    onClick={() => {
+                                                                        setSelectedPdf(trainingService.getPublicUrl(mat.file_path));
+                                                                        setCurrentTrainingName(mat.category);
+                                                                    }}
+                                                                    style={{
+                                                                        flex: 1,
+                                                                        minWidth: materials.length > 1 ? '140px' : '100%',
+                                                                        padding: '0.8rem 1rem', borderRadius: '12px',
+                                                                        border: '1.5px solid var(--border)', background: 'var(--bg-main)',
+                                                                        color: 'var(--primary)', fontWeight: 800, fontSize: '0.85rem',
+                                                                        cursor: 'pointer', transition: 'all 0.2s',
+                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem'
+                                                                    }}
+                                                                >
+                                                                    <i className={mat.file_path.endsWith('.pptx') ? 'fa-solid fa-file-powerpoint' : 'fa-solid fa-file-pdf'}></i>
+                                                                    {materials.length > 1 ? `${t('workerPortal.training.part')} ${mIdx + 1}` : t('workerPortal.training.viewSlides')}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
 
+                            {trainingLanguage !== 'es' && (
                             <div style={{ paddingTop: '2rem', borderTop: '2px solid var(--border)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -2134,6 +2207,7 @@ export const WorkerPortalPage: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
+                            )}
                         </div>
                     )}
 
@@ -2350,9 +2424,9 @@ export const WorkerPortalPage: React.FC = () => {
                                         if (loader) loader.style.display = 'none';
                                     }}
                                     scrolling="no"
-                                    style={{ 
-                                        width: '100%', 
-                                        height: `${unlockedHeight}px`, 
+                                    style={{
+                                        width: '100%',
+                                        height: `${unlockedHeight}px`,
                                         border: 'none',
                                         pointerEvents: 'none',
                                         userSelect: 'none',
@@ -2413,13 +2487,26 @@ export const WorkerPortalPage: React.FC = () => {
                                             setCompletedTrainings(newCompleted);
 
                                             // Persist to Supabase
-                                            await ((supabase as any)
+                                            const { error: saveErr } = await (supabase as any)
                                                 .from('users')
                                                 .update({ completed_trainings: newCompleted })
-                                                .eq('id', user.id));
+                                                .eq('id', user.id);
+
+                                            if (saveErr) {
+                                                console.error('Failed to save training completion:', saveErr);
+                                                // Revert optimistic update on failure
+                                                setCompletedTrainings(completedTrainings);
+                                                alert('Could not save training progress. Please try again.');
+                                                return;
+                                            }
+
+                                            // Update localStorage to keep session in sync
+                                            const updatedUser = { ...user, completed_trainings: newCompleted };
+                                            localStorage.setItem('bt_user', JSON.stringify(updatedUser));
                                         }
                                         setSelectedPdf(null);
                                         setCurrentTrainingName(null);
+                                        setIsEndOfPdf(false);
                                     }}
                                     disabled={isTimerActive || !isEndOfPdf}
                                     style={{ 
@@ -2449,9 +2536,9 @@ export const WorkerPortalPage: React.FC = () => {
                         <div style={{ width: '80px', height: '80px', background: 'var(--accent-bg)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem' }}>
                             <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: '2.5rem', color: 'var(--accent)' }}></i>
                         </div>
-                        <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '1rem' }}>{t('break.title')}</h2>
+                        <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '1rem' }}>{t('workerPortal.break.title')}</h2>
                         <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '2.5rem' }}>
-                            {t('break.message')}
+                            {t('workerPortal.break.message')}
                         </p>
                         <button
                             onClick={handleEndBreak}
@@ -2469,7 +2556,7 @@ export const WorkerPortalPage: React.FC = () => {
                                 boxShadow: 'var(--shadow-md)'
                             }}
                         >
-                            {t('break.return')}
+                            {t('workerPortal.break.return')}
                         </button>
                     </div>
                 </div>

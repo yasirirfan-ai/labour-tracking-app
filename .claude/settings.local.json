@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsx:*)",
+      "Bash(wc -l /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/src/i18n/locales/*.json)"
+    ]
+  }
+}
