@@ -20,10 +20,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [authError, setAuthError] = useState<string | null>(null);
 
     useEffect(() => {
+        let savedUserExists = false;
         try {
             const savedUser = localStorage.getItem('bt_user');
             if (savedUser) {
                 setUser(JSON.parse(savedUser));
+                savedUserExists = true;
             }
         } catch (e) {
             console.error('Failed to parse saved user session, clearing:', e);
@@ -82,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-                if (!savedUser && session) {
+                if (!savedUserExists && session) {
                     handleGoogleSession(session);
                 }
             }

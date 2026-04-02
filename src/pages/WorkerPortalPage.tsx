@@ -10,15 +10,6 @@ import type { User } from '../types';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 
-const getViewerUrl = (fileUrl: string): string => {
-    if (/\.(pptx|ppt)$/i.test(fileUrl)) {
-        return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
-    }
-    return `${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
-};
-
-const isPptx = (fileUrl: string): boolean => /\.(pptx|ppt)$/i.test(fileUrl);
-
 export const WorkerPortalPage: React.FC = () => {
     const { t, i18n } = useTranslation();
     const { toggleTheme, setLanguage, currentTheme } = useTheme();
