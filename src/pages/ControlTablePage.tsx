@@ -139,7 +139,7 @@ export const ControlTablePage: React.FC = () => {
                 const sortedMos = sortManufacturingOrders(moData as any[]);
                 setMos(sortedMos);
             }
-            if (opData) setOperations(opData);
+            if (opData) setOperations(opData.map((o: any) => o.name));
 
         } catch (err) {
             console.error('Error fetching table data:', err);
