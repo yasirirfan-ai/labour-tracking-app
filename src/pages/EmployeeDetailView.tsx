@@ -21,7 +21,7 @@ export const EmployeeDetailView: React.FC = () => {
     const [employee, setEmployee] = useState<User | null>(null);
     const [initialEmployee, setInitialEmployee] = useState<User | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+    const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Personal');
@@ -75,7 +75,7 @@ export const EmployeeDetailView: React.FC = () => {
 
     useEffect(() => {
         if (id) fetchEmployee();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
     /** Auto-sync + fetch history whenever the Time Off tab becomes active */
@@ -93,7 +93,7 @@ export const EmployeeDetailView: React.FC = () => {
             fetchLeaveHistory(employee.id).then((rows: LeaveHistoryRow[]) => setLeaveHistory(rows));
             fetchLeaveRequests(employee.id);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, !!employee]);
 
     if (loading) return <div className="loading-screen">{t('common.loading')}</div>;
@@ -126,12 +126,12 @@ export const EmployeeDetailView: React.FC = () => {
 
             // Map each field to the tab it lives on so we can auto-navigate.
             const fieldTabMap: Record<string, string> = {
-                worker_id:               'Personal',
-                first_name:              'Personal',
-                phone:                   'Personal',
-                work_phone:              'Personal',
-                mobile_phone:            'Personal',
-                home_phone:              'Personal',
+                worker_id: 'Personal',
+                first_name: 'Personal',
+                phone: 'Personal',
+                work_phone: 'Personal',
+                mobile_phone: 'Personal',
+                home_phone: 'Personal',
                 emergency_contact_phone: 'Emergency',
             };
 
@@ -142,12 +142,12 @@ export const EmployeeDetailView: React.FC = () => {
 
             // Build a helpful message.
             const fieldLabels: Record<string, string> = {
-                worker_id:               t('employeeDetail.personal.employeeNum'),
-                first_name:              t('employeeDetail.personal.firstName'),
-                phone:                   t('employeeDetail.personal.phone'),
-                work_phone:              t('employeeDetail.personal.workPhone'),
-                mobile_phone:            t('employeeDetail.personal.mobilePhone'),
-                home_phone:              t('employeeDetail.personal.homePhone'),
+                worker_id: t('employeeDetail.personal.employeeNum'),
+                first_name: t('employeeDetail.personal.firstName'),
+                phone: t('employeeDetail.personal.phone'),
+                work_phone: t('employeeDetail.personal.workPhone'),
+                mobile_phone: t('employeeDetail.personal.mobilePhone'),
+                home_phone: t('employeeDetail.personal.homePhone'),
                 emergency_contact_phone: t('employeeDetail.emergency.phone'),
             };
             const missingLabels = Object.keys(errors)
@@ -183,12 +183,12 @@ export const EmployeeDetailView: React.FC = () => {
         if (adminNotes === null) return;
 
         setIsProcessingLeave(request.id);
-        
+
         try {
             // 1. Update request status
             const { error: reqError } = await (supabase.from('leave_requests') as any)
-                .update({ 
-                    status, 
+                .update({
+                    status,
                     admin_notes: adminNotes,
                     processed_at: new Date().toISOString()
                 })
@@ -262,7 +262,7 @@ export const EmployeeDetailView: React.FC = () => {
         "Sales Workers"
     ];
 
-    const filteredOptions = (options: string[]) => 
+    const filteredOptions = (options: string[]) =>
         options.filter(opt => opt.toLowerCase().includes(eeoSearch.toLowerCase()));
 
     return (
@@ -273,7 +273,7 @@ export const EmployeeDetailView: React.FC = () => {
                         <i className="fa-solid fa-arrow-left"></i> {t('common.backToPeople')}
                     </button>
                 </div>
-                
+
                 <div className="header-main">
                     <div className="profile-photo-container">
                         {employee.photo_url ? (
@@ -292,8 +292,8 @@ export const EmployeeDetailView: React.FC = () => {
 
                 <nav className="profile-nav">
                     {tabs.map(tab => (
-                        <button 
-                            key={tab} 
+                        <button
+                            key={tab}
                             className={`nav-tab ${activeTab === tab ? 'active' : ''}`}
                             onClick={() => setActiveTab(tab)}
                         >
@@ -310,7 +310,7 @@ export const EmployeeDetailView: React.FC = () => {
                         <div className="vitals-list">
                             <div className="vital-item"><i className="fa-solid fa-phone"></i> {employee.phone || t('common.notAvailable')}</div>
                             <div className="vital-item"><i className="fa-solid fa-envelope"></i> {employee.email || employee.username}</div>
-                            <div className="vital-item"><i className="fa-solid fa-briefcase"></i> {employee.job_title || t('employeeDetail.job.defaultTitle')} <br/> {t('hire.options.employment.fullTime')}</div>
+                            <div className="vital-item"><i className="fa-solid fa-briefcase"></i> {employee.job_title || t('employeeDetail.job.defaultTitle')} <br /> {t('hire.options.employment.fullTime')}</div>
                             <div className="vital-item"><i className="fa-solid fa-building"></i> {employee.department || t('employeeDetail.job.defaultDepartment')}</div>
                         </div>
                     </section>
@@ -318,9 +318,9 @@ export const EmployeeDetailView: React.FC = () => {
                     <section className="sidebar-section">
                         <h3>{t('employeeDetail.hireDate')}</h3>
                         <div className="vital-item">
-                            <i className="fa-solid fa-calendar"></i> 
-                            {employee.hire_date || '—'} 
-                            <br/> 
+                            <i className="fa-solid fa-calendar"></i>
+                            {employee.hire_date || '—'}
+                            <br />
                             {employee.hire_date ? (
                                 (() => {
                                     const m = getTenureMonths(employee.hire_date);
@@ -350,10 +350,10 @@ export const EmployeeDetailView: React.FC = () => {
                 <main className="main-details">
                     {activeTab === 'Training' && (() => {
                         const completed = employee.completed_trainings || [];
-                        
+
                         const l1Materials = trainingMaterials.filter(m => m.level === 1);
                         const l1Categories = Array.from(new Set(l1Materials.map(m => m.category)));
-                        
+
                         // Level 1 Progress
                         const l1CompletedCount = completed.filter(t => l1Categories.includes(t)).length;
                         const l1Total = l1Categories.length;
@@ -363,433 +363,433 @@ export const EmployeeDetailView: React.FC = () => {
                         const l2Roles = Array.from(new Set(trainingMaterials.filter(m => m.level === 2).map(m => m.department))).filter(Boolean) as string[];
 
                         // Level 2 Progress (using role-based SOPs)
-                        const autoRole = (employee.job_title?.includes('QC') || employee.department === 'QC') ? 'QC' : 
-                                     (employee.job_title?.includes('Compounder')) ? 'Compounder I' :
-                                     (employee.job_title?.includes('QA') || employee.department === 'QA') ? 'Quality Assurance' :
-                                     (employee.department?.toLowerCase().includes('shipp')) ? 'Shipping & Recieving' :
-                                     (employee.department?.toLowerCase().includes('purchas')) ? 'Purchase' : 'Production';
-                                     
+                        const autoRole = (employee.job_title?.includes('QC') || employee.department === 'QC') ? 'QC' :
+                            (employee.job_title?.includes('Compounder')) ? 'Compounder I' :
+                                (employee.job_title?.includes('QA') || employee.department === 'QA') ? 'Quality Assurance' :
+                                    (employee.department?.toLowerCase().includes('shipp')) ? 'Shipping & Recieving' :
+                                        (employee.department?.toLowerCase().includes('purchas')) ? 'Purchase' : 'Production';
+
                         const role = selectedTrainingRole || autoRole;
-                                     
+
                         const roleMaterials = trainingMaterials.filter(m => m.level === 2 && m.department === role);
-                        
+
                         const l2Total = roleMaterials.length;
                         const l2CompletedCount = completed.filter(t => roleMaterials.some(m => m.display_name === t)).length;
                         const l2Percent = l2Total > 0 ? Math.round((l2CompletedCount / l2Total) * 100) : 0;
                         const totalPercent = Math.round((l1Percent + l2Percent) / 2);
 
                         return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                            <div className="section-title-row">
-                                <i className="fa-solid fa-graduation-cap"></i>
-                                <h2>{t('employeeDetail.training.title')}</h2>
-                                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', padding: '0.4rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                        <i className="fa-solid fa-language" style={{ color: 'var(--primary)', fontSize: '1rem' }}></i>
-                                        <select 
-                                            value={trainingLanguage} 
-                                            onChange={(e) => setTrainingLanguage(e.target.value as any)}
-                                            style={{ background: 'transparent', border: 'none', color: '#1e1b4b', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
-                                        >
-                                            <option value="en">English</option>
-                                            <option value="es">Español</option>
-                                        </select>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                                <div className="section-title-row">
+                                    <i className="fa-solid fa-graduation-cap"></i>
+                                    <h2>{t('employeeDetail.training.title')}</h2>
+                                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', padding: '0.4rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                            <i className="fa-solid fa-language" style={{ color: 'var(--primary)', fontSize: '1rem' }}></i>
+                                            <select
+                                                value={trainingLanguage}
+                                                onChange={(e) => setTrainingLanguage(e.target.value as any)}
+                                                style={{ background: 'transparent', border: 'none', color: '#1e1b4b', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
+                                            >
+                                                <option value="en">English</option>
+                                                <option value="es">Español</option>
+                                            </select>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t('employeeDetail.training.viewingRole')}</span>
+                                            <select
+                                                value={role}
+                                                onChange={(e) => setSelectedTrainingRole(e.target.value)}
+                                                style={{
+                                                    padding: '0.4rem 0.8rem',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #e2e8f0',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 700,
+                                                    color: '#1e1b4b',
+                                                    cursor: 'pointer',
+                                                    background: '#f8fafc'
+                                                }}
+                                            >
+                                                {l2Roles.map(r => (
+                                                    <option key={r} value={r}>{r}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t('employeeDetail.training.viewingRole')}</span>
-                                    <select 
-                                        value={role} 
-                                        onChange={(e) => setSelectedTrainingRole(e.target.value)}
-                                        style={{ 
-                                            padding: '0.4rem 0.8rem', 
-                                            borderRadius: '8px', 
-                                            border: '1px solid #e2e8f0', 
-                                            fontSize: '0.8rem', 
-                                            fontWeight: 700, 
-                                            color: '#1e1b4b',
-                                            cursor: 'pointer',
-                                            background: '#f8fafc'
-                                        }}
-                                    >
-                                        {l2Roles.map(r => (
-                                            <option key={r} value={r}>{r}</option>
-                                        ))}
-                                    </select>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="training-summary-row" style={{ 
-                                display: 'grid', 
-                                gridTemplateColumns: 'repeat(3, 1fr)', 
-                                gap: '2rem',
-                                background: 'white',
-                                padding: '2.5rem',
-                                borderRadius: '24px',
-                                border: '1px solid #e2e8f0',
-                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-                            }}>
-                                {/* Level 1 Circle */}
-                                <div style={{ textAlign: 'center' }}>
-                                    <div className="progress-circle-mid" style={{ marginBottom: '1.25rem' }}>
-                                        <svg viewBox="0 0 36 36">
-                                            <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                            <path className="circle" style={{ stroke: l1Percent === 100 ? '#10b981' : '#f59e0b' }} strokeDasharray={`${l1Percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                            <text x="18" y="20.35" className="progress-percentage-mid">{l1Percent}%</text>
-                                        </svg>
-                                    </div>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('employeeDetail.training.level1Progress')}</div>
-                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.5rem' }}>{l1CompletedCount} / {l1Total} SOPs</div>
                                 </div>
 
-                                {/* Level 2 Circle */}
-                                <div style={{ textAlign: 'center' }}>
-                                    <div className="progress-circle-mid" style={{ marginBottom: '1.25rem' }}>
-                                        <svg viewBox="0 0 36 36">
-                                            <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                            <path className="circle" style={{ stroke: l2Percent === 100 ? '#10b981' : '#4f46e5' }} strokeDasharray={`${l2Percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                            <text x="18" y="20.35" className="progress-percentage-mid">{l2Percent}%</text>
-                                        </svg>
+                                <div className="training-summary-row" style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(3, 1fr)',
+                                    gap: '2rem',
+                                    background: 'white',
+                                    padding: '2.5rem',
+                                    borderRadius: '24px',
+                                    border: '1px solid #e2e8f0',
+                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                                }}>
+                                    {/* Level 1 Circle */}
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div className="progress-circle-mid" style={{ marginBottom: '1.25rem' }}>
+                                            <svg viewBox="0 0 36 36">
+                                                <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                <path className="circle" style={{ stroke: l1Percent === 100 ? '#10b981' : '#f59e0b' }} strokeDasharray={`${l1Percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                <text x="18" y="20.35" className="progress-percentage-mid">{l1Percent}%</text>
+                                            </svg>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('employeeDetail.training.level1Progress')}</div>
+                                        <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.5rem' }}>{l1CompletedCount} / {l1Total} SOPs</div>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Level 2 Progress</div>
-                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{l2CompletedCount} / {l2Total} SOPs</div>
+
+                                    {/* Level 2 Circle */}
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div className="progress-circle-mid" style={{ marginBottom: '1.25rem' }}>
+                                            <svg viewBox="0 0 36 36">
+                                                <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                <path className="circle" style={{ stroke: l2Percent === 100 ? '#10b981' : '#4f46e5' }} strokeDasharray={`${l2Percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                <text x="18" y="20.35" className="progress-percentage-mid">{l2Percent}%</text>
+                                            </svg>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Level 2 Progress</div>
+                                        <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{l2CompletedCount} / {l2Total} SOPs</div>
+                                    </div>
+
+                                    {/* Total Circle */}
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div className="progress-circle-mid" style={{ marginBottom: '1.25rem' }}>
+                                            <svg viewBox="0 0 36 36">
+                                                <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                <path className="circle" style={{ stroke: totalPercent === 100 ? '#10b981' : '#1e1b4b' }} strokeDasharray={`${totalPercent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                <text x="18" y="20.35" className="progress-percentage-mid">{l1CompletedCount + l2CompletedCount}</text>
+                                            </svg>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('employeeDetail.training.totalCompleted')}</div>
+                                        <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{Math.round(((l1CompletedCount + l2CompletedCount) / (l1Total + l2Total)) * 100)}% {t('employeeDetail.training.overall')}</div>
+                                    </div>
                                 </div>
 
-                                {/* Total Circle */}
-                                <div style={{ textAlign: 'center' }}>
-                                    <div className="progress-circle-mid" style={{ marginBottom: '1.25rem' }}>
-                                        <svg viewBox="0 0 36 36">
-                                            <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                            <path className="circle" style={{ stroke: totalPercent === 100 ? '#10b981' : '#1e1b4b' }} strokeDasharray={`${totalPercent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                            <text x="18" y="20.35" className="progress-percentage-mid">{l1CompletedCount + l2CompletedCount}</text>
-                                        </svg>
-                                    </div>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('employeeDetail.training.totalCompleted')}</div>
-                                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginTop: '0.5rem' }}>{Math.round(((l1CompletedCount + l2CompletedCount) / (l1Total + l2Total)) * 100)}% {t('employeeDetail.training.overall')}</div>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>{t('employeeDetail.training.coreTitle')}</h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-                                    {l1Categories.map((tName, idx) => {
-                                        const isDone = completed.includes(tName);
-                                        return (
-                                            <div key={idx} style={{ 
-                                                background: 'white', 
-                                                padding: '1.25rem', 
-                                                borderRadius: '16px', 
-                                                border: '1px solid #e2e8f0',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '1rem'
-                                            }}>
-                                                <div style={{ 
-                                                    width: '40px', height: '40px', borderRadius: '10px', 
-                                                    background: isDone ? '#dcfce7' : '#f1f5f9',
-                                                    color: isDone ? '#10b981' : '#94a3b8',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>{t('employeeDetail.training.coreTitle')}</h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                                        {l1Categories.map((tName, idx) => {
+                                            const isDone = completed.includes(tName);
+                                            return (
+                                                <div key={idx} style={{
+                                                    background: 'white',
+                                                    padding: '1.25rem',
+                                                    borderRadius: '16px',
+                                                    border: '1px solid #e2e8f0',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '1rem'
                                                 }}>
-                                                    <i className={`fa-solid ${isDone ? 'fa-check' : 'fa-clock'}`}></i>
-                                                </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b' }}>{tName}</div>
-                                                    <div style={{ fontSize: '0.75rem', color: isDone ? '#10b981' : '#64748b', fontWeight: 700 }}>
-                                                        {isDone ? t('employeeDetail.training.completed') : t('employeeDetail.training.pending')}
+                                                    <div style={{
+                                                        width: '40px', height: '40px', borderRadius: '10px',
+                                                        background: isDone ? '#dcfce7' : '#f1f5f9',
+                                                        color: isDone ? '#10b981' : '#94a3b8',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                    }}>
+                                                        <i className={`fa-solid ${isDone ? 'fa-check' : 'fa-clock'}`}></i>
+                                                    </div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b' }}>{tName}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: isDone ? '#10b981' : '#64748b', fontWeight: 700 }}>
+                                                            {isDone ? t('employeeDetail.training.completed') : t('employeeDetail.training.pending')}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>{t('employeeDetail.training.roleTitle', { role })}</h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-                                    {roleMaterials.map((doc, idx) => {
-                                        const isDone = completed.includes(doc.display_name);
-                                        return (
-                                            <div key={`${doc.category}-${idx}`} style={{ 
-                                                background: 'white', 
-                                                padding: '1.25rem', 
-                                                borderRadius: '16px', 
-                                                border: '1px solid #e2e8f0',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '1rem'
-                                            }}>
-                                                <div style={{ 
-                                                    width: '40px', height: '40px', borderRadius: '10px', 
-                                                    background: isDone ? '#dcfce7' : '#f1f5f9',
-                                                    color: isDone ? '#10b981' : '#94a3b8',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>{t('employeeDetail.training.roleTitle', { role })}</h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                                        {roleMaterials.map((doc, idx) => {
+                                            const isDone = completed.includes(doc.display_name);
+                                            return (
+                                                <div key={`${doc.category}-${idx}`} style={{
+                                                    background: 'white',
+                                                    padding: '1.25rem',
+                                                    borderRadius: '16px',
+                                                    border: '1px solid #e2e8f0',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '1rem'
                                                 }}>
-                                                    <i className={`fa-solid ${isDone ? 'fa-check' : 'fa-book'}`}></i>
-                                                </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{doc.display_name}</div>
-                                                    <div style={{ fontSize: '0.75rem', color: isDone ? '#10b981' : '#64748b', fontWeight: 700 }}>
-                                                        {isDone ? t('employeeDetail.training.completed') : t('employeeDetail.training.pending')}
+                                                    <div style={{
+                                                        width: '40px', height: '40px', borderRadius: '10px',
+                                                        background: isDone ? '#dcfce7' : '#f1f5f9',
+                                                        color: isDone ? '#10b981' : '#94a3b8',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                    }}>
+                                                        <i className={`fa-solid ${isDone ? 'fa-check' : 'fa-book'}`}></i>
+                                                    </div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e1b4b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{doc.display_name}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: isDone ? '#10b981' : '#64748b', fontWeight: 700 }}>
+                                                            {isDone ? t('employeeDetail.training.completed') : t('employeeDetail.training.pending')}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    );
-                })()}
+                        );
+                    })()}
 
                     {activeTab === 'Time Off' && (() => {
-                        const hireDate    = employee.hire_date || '';
+                        const hireDate = employee.hire_date || '';
                         const tenureMonths = hireDate ? getTenureMonths(hireDate) : 0;
-                        const ptoRate     = getPtoRate(tenureMonths);
-                        const sickUsable  = hireDate ? isSickLeaveUsable(hireDate) : false;
-                        const ptoBalance  = parseFloat(employee.pto_balance  || '0');
+                        const ptoRate = getPtoRate(tenureMonths);
+                        const sickUsable = hireDate ? isSickLeaveUsable(hireDate) : false;
+                        const ptoBalance = parseFloat(employee.pto_balance || '0');
                         const sickBalance = parseFloat(employee.sick_balance || '0');
 
                         /** Filter real leave history by selected type */
                         const displayRows = leaveHistory.filter(r => r.type === accrualHistoryType);
 
                         return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
-                            {/* Header */}
-                            <div className="section-title-row">
-                                <i className="fa-solid fa-calendar-alt"></i>
-                                <h2>{t('employeeDetail.timeOff.title')}</h2>
-                                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#94a3b8' }}>
-                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 3px rgba(34,197,94,0.2)' }}></span>
-                                    {t('common.live', 'Live')}
-                                </div>
-                            </div>
-
-
-                            {/* Balance Cards */}
-                            <div className="time-off-grid">
-                                {/* PTO Card */}
-                                <div className="time-off-card">
-                                    <div className="card-icon"><i className="fa-solid fa-palm-tree"></i></div>
-                                    <div className="card-value">
-                                        <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
-                                            {ptoBalance.toFixed(2)}
-                                        </span>
-                                        <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
+                                {/* Header */}
+                                <div className="section-title-row">
+                                    <i className="fa-solid fa-calendar-alt"></i>
+                                    <h2>{t('employeeDetail.timeOff.title')}</h2>
+                                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 3px rgba(34,197,94,0.2)' }}></span>
+                                        {t('common.live', 'Live')}
                                     </div>
-                                    <div className="card-label">{t('employeeDetail.timeOff.ptoLabel')}</div>
-                                    <div className="card-sublabel">{ptoRate.toFixed(2)} {t('employeeDetail.timeOff.payPeriod')}</div>
                                 </div>
 
-                                {/* Sick Card */}
-                                <div className="time-off-card">
-                                    <div className="card-icon">
-                                        <i className="fa-solid fa-hospital"></i>
-                                        {!sickUsable && (
-                                            <span style={{
-                                                fontSize: '0.65rem', fontWeight: 700, background: '#fef3c7',
-                                                color: '#92400e', padding: '0.15rem 0.5rem',
-                                                borderRadius: '20px', marginLeft: '0.5rem',
-                                            }}>{t('employeeDetail.timeOff.waitPeriod')}</span>
-                                        )}
-                                    </div>
-                                    <div className="card-value">
-                                        <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
-                                            {sickBalance.toFixed(2)}
-                                        </span>
-                                        <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
-                                    </div>
-                                    <div className="card-label">{t('employeeDetail.timeOff.sickLabel')}</div>
-                                    <div className="card-sublabel">{t('employeeDetail.timeOff.sickCap')}</div>
-                                </div>
-                            </div>
 
-                            {/* Upcoming & Pending Requests */}
-                            <div className="upcoming-section">
-                                <h3><i className="fa-solid fa-clock"></i> {t('employeeDetail.timeOff.requests')}</h3>
-                                {leaveRequests.length > 0 ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-                                        {leaveRequests.map(req => (
-                                            <div key={req.id} style={{ 
-                                                background: 'white', 
-                                                padding: '1.25rem', 
-                                                borderRadius: '16px', 
-                                                border: '1px solid #e2e8f0',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center'
-                                            }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                                                    <div style={{ 
-                                                        width: '45px', 
-                                                        height: '45px', 
-                                                        borderRadius: '12px', 
-                                                        background: req.type === 'pto' ? '#e0f2fe' : '#f0fdf4',
-                                                        color: req.type === 'pto' ? '#0369a1' : '#15803d',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        fontSize: '1.2rem'
-                                                    }}>
-                                                        <i className={`fa-solid ${req.type === 'pto' ? 'fa-umbrella-beach' : 'fa-briefcase-medical'}`}></i>
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1rem' }}>
-                                                            {req.type.toUpperCase()} Request • {req.hours_requested} hrs
-                                                        </div>
-                                                        <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
-                                                            {new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}
-                                                        </div>
-                                                        {req.reason && <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '0.25rem' }}>"{req.reason}"</div>}
-                                                    </div>
-                                                </div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                                    <span style={{ 
-                                                        padding: '4px 10px', 
-                                                        borderRadius: '6px', 
-                                                        fontSize: '0.7rem', 
-                                                        fontWeight: 800,
-                                                        textTransform: 'uppercase',
-                                                        background: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
-                                                        color: req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#991b1b' : '#92400e'
-                                                    }}>
-                                                        {String(t(`leave.filters.${req.status}`, req.status))}
-                                                    </span>
-                                                    {req.status === 'pending' && (
-                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                            <button 
-                                                                onClick={() => handleLeaveAction(req, 'approved')}
-                                                                disabled={isProcessingLeave === req.id}
-                                                                className="small-action-btn"
-                                                                style={{ background: '#10b981', color: 'white', border: 'none' }}
-                                                            >
-                                                                {t('leave.actions.approve')}
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => handleLeaveAction(req, 'rejected')}
-                                                                disabled={isProcessingLeave === req.id}
-                                                                className="small-action-btn"
-                                                                style={{ background: '#ef4444', color: 'white', border: 'none' }}
-                                                            >
-                                                                {t('leave.actions.reject')}
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
+                                {/* Balance Cards */}
+                                <div className="time-off-grid">
+                                    {/* PTO Card */}
+                                    <div className="time-off-card">
+                                        <div className="card-icon"><i className="fa-solid fa-palm-tree"></i></div>
+                                        <div className="card-value">
+                                            <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
+                                                {ptoBalance.toFixed(2)}
+                                            </span>
+                                            <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
+                                        </div>
+                                        <div className="card-label">{t('employeeDetail.timeOff.ptoLabel')}</div>
+                                        <div className="card-sublabel">{ptoRate.toFixed(2)} {t('employeeDetail.timeOff.payPeriod')}</div>
                                     </div>
-                                ) : (
-                                    <div className="empty-state">
-                                        <i className="fa-solid fa-calendar-xmark" style={{ fontSize: '3rem', color: '#e2e8f0' }}></i>
-                                        <p>{t('employeeDetail.timeOff.noRequests')}</p>
-                                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{t('employeeDetail.timeOff.getAway')}</span>
-                                    </div>
-                                )}
-                            </div>
 
-                            {/* History */}
-                            <div className="history-section">
-                                <div className="history-header">
-                                    <span className="history-title"><i className="fa-solid fa-clock-rotate-left"></i> {t('employeeDetail.timeOff.history')}</span>
-                                    <div className="history-filters">
-                                        <div className="custom-dropdown-container">
-                                            <div
-                                                className={`custom-dropdown-header ${openDropdown === 'type' ? 'active' : ''}`}
-                                                onClick={() => setOpenDropdown(openDropdown === 'type' ? null : 'type')}
-                                            >
-                                                {accrualHistoryType === 'pto' ? 'Paid Time Off (PTO)' : 'Sick Time'}
-                                                <i className="fa-solid fa-chevron-down"></i>
-                                            </div>
-                                            {openDropdown === 'type' && (
-                                                <div className="dropdown-menu">
-                                                    <div
-                                                        className={`dropdown-item ${accrualHistoryType === 'pto' ? 'selected' : ''}`}
-                                                        onClick={() => { setAccrualHistoryType('pto'); setOpenDropdown(null); }}
-                                                    >Paid Time Off (PTO)</div>
-                                                    <div
-                                                        className={`dropdown-item ${accrualHistoryType === 'sick' ? 'selected' : ''}`}
-                                                        onClick={() => { setAccrualHistoryType('sick'); setOpenDropdown(null); }}
-                                                    >Sick Time</div>
-                                                </div>
+                                    {/* Sick Card */}
+                                    <div className="time-off-card">
+                                        <div className="card-icon">
+                                            <i className="fa-solid fa-hospital"></i>
+                                            {!sickUsable && (
+                                                <span style={{
+                                                    fontSize: '0.65rem', fontWeight: 700, background: '#fef3c7',
+                                                    color: '#92400e', padding: '0.15rem 0.5rem',
+                                                    borderRadius: '20px', marginLeft: '0.5rem',
+                                                }}>{t('employeeDetail.timeOff.waitPeriod')}</span>
                                             )}
                                         </div>
-
-                                        <div className="custom-dropdown-container">
-                                            <div
-                                                className={`custom-dropdown-header small ${openDropdown === 'year' ? 'active' : ''}`}
-                                                onClick={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
-                                            >
-                                                All <i className="fa-solid fa-chevron-down"></i>
-                                            </div>
-                                            {openDropdown === 'year' && (
-                                                <div className="dropdown-menu has-search">
-                                                    <div className="dropdown-search">
-                                                        <i className="fa-solid fa-magnifying-glass"></i>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Search..."
-                                                            value={historySearch}
-                                                            onChange={(e) => setHistorySearch(e.target.value)}
-                                                            autoFocus
-                                                        />
-                                                    </div>
-                                                    <div className="dropdown-item">2026</div>
-                                                    <div className="dropdown-item">2025</div>
-                                                    <div className="dropdown-item selected">All</div>
-                                                </div>
-                                            )}
+                                        <div className="card-value">
+                                            <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
+                                                {sickBalance.toFixed(2)}
+                                            </span>
+                                            <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
                                         </div>
-
-                                        <div className="custom-dropdown-container">
-                                            <div
-                                                className={`custom-dropdown-header ${openDropdown === 'view' ? 'active' : ''}`}
-                                                onClick={() => setOpenDropdown(openDropdown === 'view' ? null : 'view')}
-                                            >
-                                                Balance History <i className="fa-solid fa-chevron-down"></i>
-                                            </div>
-                                            {openDropdown === 'view' && (
-                                                <div className="dropdown-menu">
-                                                    <div className="dropdown-item">{t('employeeDetail.timeOff.requests')}</div>
-                                                    <div className="dropdown-item selected">{t('employeeDetail.timeOff.balanceHistory')}</div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <div className="card-label">{t('employeeDetail.timeOff.sickLabel')}</div>
+                                        <div className="card-sublabel">{t('employeeDetail.timeOff.sickCap')}</div>
                                     </div>
                                 </div>
 
-                                {displayRows.length === 0 ? (
-                                    <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                                        <i className="fa-solid fa-inbox" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }}></i>
-                                        {t('employeeDetail.timeOff.noHistory')}
+                                {/* Upcoming & Pending Requests */}
+                                <div className="upcoming-section">
+                                    <h3><i className="fa-solid fa-clock"></i> {t('employeeDetail.timeOff.requests')}</h3>
+                                    {leaveRequests.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                                            {leaveRequests.map(req => (
+                                                <div key={req.id} style={{
+                                                    background: 'white',
+                                                    padding: '1.25rem',
+                                                    borderRadius: '16px',
+                                                    border: '1px solid #e2e8f0',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center'
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                                                        <div style={{
+                                                            width: '45px',
+                                                            height: '45px',
+                                                            borderRadius: '12px',
+                                                            background: req.type === 'pto' ? '#e0f2fe' : '#f0fdf4',
+                                                            color: req.type === 'pto' ? '#0369a1' : '#15803d',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            fontSize: '1.2rem'
+                                                        }}>
+                                                            <i className={`fa-solid ${req.type === 'pto' ? 'fa-umbrella-beach' : 'fa-briefcase-medical'}`}></i>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontWeight: 800, color: '#1e1b4b', fontSize: '1rem' }}>
+                                                                {req.type.toUpperCase()} Request • {req.hours_requested} hrs
+                                                            </div>
+                                                            <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                                                                {new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}
+                                                            </div>
+                                                            {req.reason && <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '0.25rem' }}>"{req.reason}"</div>}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                        <span style={{
+                                                            padding: '4px 10px',
+                                                            borderRadius: '6px',
+                                                            fontSize: '0.7rem',
+                                                            fontWeight: 800,
+                                                            textTransform: 'uppercase',
+                                                            background: req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                                                            color: req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#991b1b' : '#92400e'
+                                                        }}>
+                                                            {String(t(`leave.filters.${req.status}`, req.status))}
+                                                        </span>
+                                                        {req.status === 'pending' && (
+                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                <button
+                                                                    onClick={() => handleLeaveAction(req, 'approved')}
+                                                                    disabled={isProcessingLeave === req.id}
+                                                                    className="small-action-btn"
+                                                                    style={{ background: '#10b981', color: 'white', border: 'none' }}
+                                                                >
+                                                                    {t('leave.actions.approve')}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleLeaveAction(req, 'rejected')}
+                                                                    disabled={isProcessingLeave === req.id}
+                                                                    className="small-action-btn"
+                                                                    style={{ background: '#ef4444', color: 'white', border: 'none' }}
+                                                                >
+                                                                    {t('leave.actions.reject')}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="empty-state">
+                                            <i className="fa-solid fa-calendar-xmark" style={{ fontSize: '3rem', color: '#e2e8f0' }}></i>
+                                            <p>{t('employeeDetail.timeOff.noRequests')}</p>
+                                            <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{t('employeeDetail.timeOff.getAway')}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* History */}
+                                <div className="history-section">
+                                    <div className="history-header">
+                                        <span className="history-title"><i className="fa-solid fa-clock-rotate-left"></i> {t('employeeDetail.timeOff.history')}</span>
+                                        <div className="history-filters">
+                                            <div className="custom-dropdown-container">
+                                                <div
+                                                    className={`custom-dropdown-header ${openDropdown === 'type' ? 'active' : ''}`}
+                                                    onClick={() => setOpenDropdown(openDropdown === 'type' ? null : 'type')}
+                                                >
+                                                    {accrualHistoryType === 'pto' ? 'Paid Time Off (PTO)' : 'Sick Time'}
+                                                    <i className="fa-solid fa-chevron-down"></i>
+                                                </div>
+                                                {openDropdown === 'type' && (
+                                                    <div className="dropdown-menu">
+                                                        <div
+                                                            className={`dropdown-item ${accrualHistoryType === 'pto' ? 'selected' : ''}`}
+                                                            onClick={() => { setAccrualHistoryType('pto'); setOpenDropdown(null); }}
+                                                        >Paid Time Off (PTO)</div>
+                                                        <div
+                                                            className={`dropdown-item ${accrualHistoryType === 'sick' ? 'selected' : ''}`}
+                                                            onClick={() => { setAccrualHistoryType('sick'); setOpenDropdown(null); }}
+                                                        >Sick Time</div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="custom-dropdown-container">
+                                                <div
+                                                    className={`custom-dropdown-header small ${openDropdown === 'year' ? 'active' : ''}`}
+                                                    onClick={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
+                                                >
+                                                    All <i className="fa-solid fa-chevron-down"></i>
+                                                </div>
+                                                {openDropdown === 'year' && (
+                                                    <div className="dropdown-menu has-search">
+                                                        <div className="dropdown-search">
+                                                            <i className="fa-solid fa-magnifying-glass"></i>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Search..."
+                                                                value={historySearch}
+                                                                onChange={(e) => setHistorySearch(e.target.value)}
+                                                                autoFocus
+                                                            />
+                                                        </div>
+                                                        <div className="dropdown-item">2026</div>
+                                                        <div className="dropdown-item">2025</div>
+                                                        <div className="dropdown-item selected">All</div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="custom-dropdown-container">
+                                                <div
+                                                    className={`custom-dropdown-header ${openDropdown === 'view' ? 'active' : ''}`}
+                                                    onClick={() => setOpenDropdown(openDropdown === 'view' ? null : 'view')}
+                                                >
+                                                    Balance History <i className="fa-solid fa-chevron-down"></i>
+                                                </div>
+                                                {openDropdown === 'view' && (
+                                                    <div className="dropdown-menu">
+                                                        <div className="dropdown-item">{t('employeeDetail.timeOff.requests')}</div>
+                                                        <div className="dropdown-item selected">{t('employeeDetail.timeOff.balanceHistory')}</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                ) : (
-                                <table className="history-table">
-                                    <thead>
-                                        <tr>
-                                            <th>{t('employeeDetail.timeOff.date')} <i className="fa-solid fa-arrow-up"></i></th>
-                                            <th>{t('employeeDetail.timeOff.description')}</th>
-                                            <th>{t('employeeDetail.timeOff.usedHours')}</th>
-                                            <th>{t('employeeDetail.timeOff.earnedHours')}</th>
-                                            <th>{t('employeeDetail.timeOff.balance')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {displayRows.map((item) => (
-                                            <tr key={item.id}>
-                                                <td>{new Date(item.entry_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</td>
-                                                <td>{item.description}</td>
-                                                <td className="used-cell">{item.used_hours != null ? item.used_hours.toFixed(2) : ''}</td>
-                                                <td className="earned-cell">{item.earned_hours != null ? item.earned_hours.toFixed(2) : ''}</td>
-                                                <td className="balance-cell">{Number(item.balance).toFixed(2)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                )}
+
+                                    {displayRows.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                                            <i className="fa-solid fa-inbox" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }}></i>
+                                            {t('No History')}
+                                        </div>
+                                    ) : (
+                                        <table className="history-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>{t('employeeDetail.timeOff.date')} <i className="fa-solid fa-arrow-up"></i></th>
+                                                    <th>{t('employeeDetail.timeOff.description')}</th>
+                                                    <th>{t('employeeDetail.timeOff.usedHours')}</th>
+                                                    <th>{t('employeeDetail.timeOff.earnedHours')}</th>
+                                                    <th>{t('employeeDetail.timeOff.balance')}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {displayRows.map((item) => (
+                                                    <tr key={item.id}>
+                                                        <td>{new Date(item.entry_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</td>
+                                                        <td>{item.description}</td>
+                                                        <td className="used-cell">{item.used_hours != null ? item.used_hours.toFixed(2) : ''}</td>
+                                                        <td className="earned-cell">{item.earned_hours != null ? item.earned_hours.toFixed(2) : ''}</td>
+                                                        <td className="balance-cell">{Number(item.balance).toFixed(2)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
                             </div>
-                        </div>
                         );
                     })()}
 
@@ -911,12 +911,12 @@ export const EmployeeDetailView: React.FC = () => {
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-address-book"></i>
-                                    <h3>{t('contact.title')}</h3>
+                                    <h3>{t('contact')}</h3>
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field">
                                         <label>{t('contact.workPhone')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.work_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_phone: e.target.value } : null)} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-phone" style={{ color: "var(--text-muted)" }}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{ flex: 1 }} value={employee.work_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_phone: e.target.value } : null)} /></div>
                                         {validationErrors.work_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.work_phone}</span>}
                                     </div>
                                     <div className="info-field">
@@ -925,21 +925,21 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
                                     <div className="info-field">
                                         <label>Mobile Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-mobile-screen" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.mobile_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, mobile_phone: e.target.value } : null)} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-mobile-screen" style={{ color: "var(--text-muted)" }}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{ flex: 1 }} value={employee.mobile_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, mobile_phone: e.target.value } : null)} /></div>
                                         {validationErrors.mobile_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.mobile_phone}</span>}
                                     </div>
                                     <div className="info-field">
                                         <label>Home Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{flex: 1}} value={employee.home_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_phone: e.target.value } : null)} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-phone" style={{ color: "var(--text-muted)" }}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{ flex: 1 }} value={employee.home_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_phone: e.target.value } : null)} /></div>
                                         {validationErrors.home_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.home_phone}</span>}
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('contact.workEmail')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "var(--text-muted)"}}></i><input type="email" className="info-input" style={{flex: 1}} value={employee.work_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_email: e.target.value } : null)} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-envelope" style={{ color: "var(--text-muted)" }}></i><input type="email" className="info-input" style={{ flex: 1 }} value={employee.work_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_email: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('contact.homeEmail')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "var(--text-muted)"}}></i><input type="email" className="info-input" style={{flex: 1}} value={employee.home_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_email: e.target.value } : null)} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-envelope" style={{ color: "var(--text-muted)" }}></i><input type="email" className="info-input" style={{ flex: 1 }} value={employee.home_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_email: e.target.value } : null)} /></div>
                                     </div>
                                 </div>
                             </div>
@@ -953,15 +953,15 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field full-width">
                                         <label>{t('common.linkedin', 'LinkedIn')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-linkedin" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={employee.linkedin_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, linkedin_url: e.target.value } : null)} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-linkedin" style={{ color: "#94a3b8" }}></i><input type="text" className="info-input" style={{ flex: 1 }} value={employee.linkedin_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, linkedin_url: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('common.twitter', 'Twitter Username')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-twitter" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={employee.twitter_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, twitter_url: e.target.value } : null)} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-twitter" style={{ color: "#94a3b8" }}></i><input type="text" className="info-input" style={{ flex: 1 }} value={employee.twitter_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, twitter_url: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('common.facebook', 'Facebook')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-facebook" style={{color: "#94a3b8"}}></i><input type="text" className="info-input" style={{flex: 1}} value={employee.facebook_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, facebook_url: e.target.value } : null)} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-facebook" style={{ color: "#94a3b8" }}></i><input type="text" className="info-input" style={{ flex: 1 }} value={employee.facebook_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, facebook_url: e.target.value } : null)} /></div>
                                     </div>
                                 </div>
                             </div>
@@ -1017,12 +1017,12 @@ export const EmployeeDetailView: React.FC = () => {
                                         <label>{t('employeeDetail.job.annualPay')}</label>
                                         <div className="info-icon-value">
                                             <span>$</span>
-                                            <input 
-                                                type="number" 
-                                                className="info-input" 
-                                                style={{ border: 'none', background: 'transparent', width: '80px', padding: '0', fontSize: 'inherit' }} 
-                                                value={employee.hourly_rate || ''} 
-                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, hourly_rate: parseFloat(e.target.value) } : null)} 
+                                            <input
+                                                type="number"
+                                                className="info-input"
+                                                style={{ border: 'none', background: 'transparent', width: '80px', padding: '0', fontSize: 'inherit' }}
+                                                value={employee.hourly_rate || ''}
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, hourly_rate: parseFloat(e.target.value) } : null)}
                                             />
                                             <span>USD</span>
                                         </div>
@@ -1143,7 +1143,7 @@ export const EmployeeDetailView: React.FC = () => {
                                     <div className="info-field half-width">
                                         <label>{t('eeo.ethnicity')}</label>
                                         <div className="custom-eeo-dropdown">
-                                            <div 
+                                            <div
                                                 className={`eeo-select-trigger ${openDropdown === 'ethnicity' ? 'active' : ''}`}
                                                 onClick={() => {
                                                     setOpenDropdown(openDropdown === 'ethnicity' ? null : 'ethnicity');
@@ -1158,9 +1158,9 @@ export const EmployeeDetailView: React.FC = () => {
                                                 <div className="eeo-dropdown-menu">
                                                     <div className="eeo-search-box">
                                                         <i className="fa-solid fa-magnifying-glass"></i>
-                                                        <input 
-                                                            type="text" 
-                                                            placeholder="Search..." 
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search..."
                                                             value={eeoSearch}
                                                             onChange={(e) => setEeoSearch(e.target.value)}
                                                             autoFocus
@@ -1168,8 +1168,8 @@ export const EmployeeDetailView: React.FC = () => {
                                                     </div>
                                                     <div className="eeo-options-list">
                                                         {filteredOptions(ethnicityOptions).map(opt => (
-                                                            <div 
-                                                                key={opt} 
+                                                            <div
+                                                                key={opt}
                                                                 className={`eeo-option ${employee.ethnicity === opt ? 'selected' : ''}`}
                                                                 onClick={async () => {
                                                                     setEmployee(prev => prev ? { ...prev, ethnicity: opt } : null);
@@ -1187,7 +1187,7 @@ export const EmployeeDetailView: React.FC = () => {
                                     <div className="info-field half-width">
                                         <label>{t('eeo.category')}</label>
                                         <div className="custom-eeo-dropdown">
-                                            <div 
+                                            <div
                                                 className={`eeo-select-trigger ${openDropdown === 'eeo_category' ? 'active' : ''}`}
                                                 onClick={() => {
                                                     setOpenDropdown(openDropdown === 'eeo_category' ? null : 'eeo_category');
@@ -1202,9 +1202,9 @@ export const EmployeeDetailView: React.FC = () => {
                                                 <div className="eeo-dropdown-menu">
                                                     <div className="eeo-search-box">
                                                         <i className="fa-solid fa-magnifying-glass"></i>
-                                                        <input 
-                                                            type="text" 
-                                                            placeholder="Search..." 
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search..."
                                                             value={eeoSearch}
                                                             onChange={(e) => setEeoSearch(e.target.value)}
                                                             autoFocus
@@ -1212,8 +1212,8 @@ export const EmployeeDetailView: React.FC = () => {
                                                     </div>
                                                     <div className="eeo-options-list">
                                                         {filteredOptions(eeoCategoryOptions).map(opt => (
-                                                            <div 
-                                                                key={opt} 
+                                                            <div
+                                                                key={opt}
                                                                 className={`eeo-option ${employee.eeo_job_category === opt ? 'selected' : ''}`}
                                                                 onClick={async () => {
                                                                     setEmployee(prev => prev ? { ...prev, eeo_job_category: opt } : null);
@@ -1232,8 +1232,8 @@ export const EmployeeDetailView: React.FC = () => {
                                         <label>{t('eeo.veteranStatus')}</label>
                                         <div className="veteran-status-list">
                                             <label className="custom-checkbox-container">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     checked={!!employee.is_active_duty_veteran}
                                                     onChange={async (e) => {
                                                         const val = e.target.checked;
@@ -1244,8 +1244,8 @@ export const EmployeeDetailView: React.FC = () => {
                                                 {t('eeo.activeDuty')}
                                             </label>
                                             <label className="custom-checkbox-container">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     checked={!!employee.is_armed_forces_medal_veteran}
                                                     onChange={async (e) => {
                                                         const val = e.target.checked;
@@ -1256,8 +1256,8 @@ export const EmployeeDetailView: React.FC = () => {
                                                 {t('eeo.armedForces')}
                                             </label>
                                             <label className="custom-checkbox-container">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     checked={!!employee.is_disabled_veteran}
                                                     onChange={async (e) => {
                                                         const val = e.target.checked;
@@ -1268,8 +1268,8 @@ export const EmployeeDetailView: React.FC = () => {
                                                 {t('eeo.disabled')}
                                             </label>
                                             <label className="custom-checkbox-container">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     checked={!!employee.is_recently_separated_veteran}
                                                     onChange={async (e) => {
                                                         const val = e.target.checked;
@@ -1294,8 +1294,8 @@ export const EmployeeDetailView: React.FC = () => {
                                     <div className="info-field">
                                         <label>{t('bonus.percentage')}</label>
                                         <div className="bonus-input-wrapper bonus-percentage">
-                                            <input 
-                                                type="number" 
+                                            <input
+                                                type="number"
                                                 value={employee.annual_bonus_percentage ?? ''}
                                                 onChange={async (e) => {
                                                     const val = parseFloat(e.target.value);
@@ -1310,8 +1310,8 @@ export const EmployeeDetailView: React.FC = () => {
                                         <label>{t('bonus.amount')}</label>
                                         <div className="bonus-input-wrapper amount">
                                             <span className="prefix">$</span>
-                                            <input 
-                                                type="number" 
+                                            <input
+                                                type="number"
                                                 value={employee.annual_bonus_amount ?? ''}
                                                 onChange={async (e) => {
                                                     const val = parseFloat(e.target.value);
@@ -1428,91 +1428,91 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field full-width">
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.5rem 0' }}>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={employee.is_primary_contact !== false} 
+                                            <input
+                                                type="checkbox"
+                                                checked={employee.is_primary_contact !== false}
                                                 onChange={(e) => setEmployee(prev => prev ? { ...prev, is_primary_contact: e.target.checked } : null)}
-                                                style={{ transform: 'scale(1.2)' }} 
+                                                style={{ transform: 'scale(1.2)' }}
                                             />
                                             <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>{t('emergency.primary')}</span>
                                         </div>
                                     </div>
                                     <div className="info-field half-width">
                                         <label>Contact Name</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.emergency_contact_name || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_name: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.emergency_contact_name || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_name: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field half-width">
                                         <label>Relationship</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.emergency_contact_relationship || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_relationship: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.emergency_contact_relationship || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_relationship: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field">
                                         <label>Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
-                                            <i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i>
-                                            <input 
-                                                type="text" 
-                                                className="info-input" 
-                                                style={{flex: 1}} 
-                                                value={employee.emergency_contact_phone || ''} 
-                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_phone: e.target.value } : null)} 
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                                            <i className="fa-solid fa-phone" style={{ color: "#94a3b8" }}></i>
+                                            <input
+                                                type="text"
+                                                className="info-input"
+                                                style={{ flex: 1 }}
+                                                value={employee.emergency_contact_phone || ''}
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_phone: e.target.value } : null)}
                                             />
                                         </div>
                                     </div>
                                     <div className="info-field">
                                         <label>Ext</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.emergency_contact_phone_ext || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_phone_ext: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.emergency_contact_phone_ext || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_phone_ext: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field">
                                         <label>Home Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
-                                            <i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i>
-                                            <input 
-                                                type="text" 
-                                                className="info-input" 
-                                                style={{flex: 1}} 
-                                                value={employee.emergency_contact_home_phone || ''} 
-                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_home_phone: e.target.value } : null)} 
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                                            <i className="fa-solid fa-phone" style={{ color: "#94a3b8" }}></i>
+                                            <input
+                                                type="text"
+                                                className="info-input"
+                                                style={{ flex: 1 }}
+                                                value={employee.emergency_contact_home_phone || ''}
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_home_phone: e.target.value } : null)}
                                             />
                                         </div>
                                     </div>
                                     <div className="info-field">
                                         <label>Mobile Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
-                                            <i className="fa-solid fa-mobile-screen" style={{color: "#94a3b8"}}></i>
-                                            <input 
-                                                type="text" 
-                                                className="info-input" 
-                                                style={{flex: 1}} 
-                                                value={employee.emergency_contact_mobile_phone || ''} 
-                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_mobile_phone: e.target.value } : null)} 
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                                            <i className="fa-solid fa-mobile-screen" style={{ color: "#94a3b8" }}></i>
+                                            <input
+                                                type="text"
+                                                className="info-input"
+                                                style={{ flex: 1 }}
+                                                value={employee.emergency_contact_mobile_phone || ''}
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_mobile_phone: e.target.value } : null)}
                                             />
                                         </div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('common.email', 'Email')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
-                                            <i className="fa-solid fa-envelope" style={{color: "#94a3b8"}}></i>
-                                            <input 
-                                                type="email" 
-                                                className="info-input" 
-                                                style={{flex: 1}} 
-                                                value={employee.emergency_contact_email || ''} 
-                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_email: e.target.value } : null)} 
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                                            <i className="fa-solid fa-envelope" style={{ color: "#94a3b8" }}></i>
+                                            <input
+                                                type="email"
+                                                className="info-input"
+                                                style={{ flex: 1 }}
+                                                value={employee.emergency_contact_email || ''}
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_email: e.target.value } : null)}
                                             />
                                         </div>
                                     </div>
@@ -1528,56 +1528,56 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field full-width">
                                         <label>{t('employeeDetail.personal.street1')}</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.emergency_contact_address_street1 || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_street1: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.emergency_contact_address_street1 || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_street1: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('employeeDetail.personal.street2')}</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.emergency_contact_address_street2 || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_street2: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.emergency_contact_address_street2 || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_street2: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field">
                                         <label>{t('employeeDetail.personal.city')}</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.emergency_contact_address_city || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_city: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.emergency_contact_address_city || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_city: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field">
                                         <label>{t('employeeDetail.personal.state')}</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.emergency_contact_address_state || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_state: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.emergency_contact_address_state || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_state: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field">
                                         <label>{t('employeeDetail.personal.zip')}</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.emergency_contact_address_zip || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_zip: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.emergency_contact_address_zip || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_zip: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field">
                                         <label>{t('employeeDetail.personal.country')}</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.emergency_contact_address_country || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_country: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.emergency_contact_address_country || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, emergency_contact_address_country: e.target.value } : null)}
                                         />
                                     </div>
                                 </div>
@@ -1592,32 +1592,32 @@ export const EmployeeDetailView: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field half-width">
                                         <label>Contact Name</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.secondary_contact_name || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, secondary_contact_name: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.secondary_contact_name || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, secondary_contact_name: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field half-width">
                                         <label>Relationship</label>
-                                        <input 
-                                            type="text" 
-                                            className="info-input" 
-                                            value={employee.secondary_contact_relationship || ''} 
-                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, secondary_contact_relationship: e.target.value } : null)} 
+                                        <input
+                                            type="text"
+                                            className="info-input"
+                                            value={employee.secondary_contact_relationship || ''}
+                                            onChange={(e) => setEmployee(prev => prev ? { ...prev, secondary_contact_relationship: e.target.value } : null)}
                                         />
                                     </div>
                                     <div className="info-field full-width">
                                         <label>Phone</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
-                                            <i className="fa-solid fa-phone" style={{color: "#94a3b8"}}></i>
-                                            <input 
-                                                type="text" 
-                                                className="info-input" 
-                                                style={{flex: 1}} 
-                                                value={employee.secondary_contact_phone || ''} 
-                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, secondary_contact_phone: e.target.value } : null)} 
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                                            <i className="fa-solid fa-phone" style={{ color: "#94a3b8" }}></i>
+                                            <input
+                                                type="text"
+                                                className="info-input"
+                                                style={{ flex: 1 }}
+                                                value={employee.secondary_contact_phone || ''}
+                                                onChange={(e) => setEmployee(prev => prev ? { ...prev, secondary_contact_phone: e.target.value } : null)}
                                             />
                                         </div>
                                     </div>
@@ -1649,7 +1649,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="modal-divider"></div>
-                                    
+
                                     <div className="modal-form">
                                         <div className="modal-form-field">
                                             <label>Date</label>
@@ -1818,11 +1818,11 @@ export const EmployeeDetailView: React.FC = () => {
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field">
-                                        <label>{t('emergency.contactName')}</label>
-                                        <input 
-                                            type="text" 
+                                        <label>{t('contact Name')}</label>
+                                        <input
+                                            type="text"
                                             className="info-input"
-                                            value={employee.emergency_contact_name || ''} 
+                                            value={employee.emergency_contact_name || ''}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setEmployee(prev => prev ? { ...prev, emergency_contact_name: val } : null);
@@ -1831,10 +1831,10 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
                                     <div className="info-field">
                                         <label>Relationship</label>
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             className="info-input"
-                                            value={employee.emergency_contact_relationship || ''} 
+                                            value={employee.emergency_contact_relationship || ''}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setEmployee(prev => prev ? { ...prev, emergency_contact_relationship: val } : null);
@@ -1843,10 +1843,10 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
                                     <div className="info-field">
                                         <label>Contact Phone</label>
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             className="info-input"
-                                            value={employee.emergency_contact_phone || ''} 
+                                            value={employee.emergency_contact_phone || ''}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setEmployee(prev => prev ? { ...prev, emergency_contact_phone: val } : null);
@@ -1855,10 +1855,10 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
                                     <div className="info-field">
                                         <label>Contact Email</label>
-                                        <input 
-                                            type="email" 
+                                        <input
+                                            type="email"
                                             className="info-input"
-                                            value={employee.emergency_contact_email || ''} 
+                                            value={employee.emergency_contact_email || ''}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setEmployee(prev => prev ? { ...prev, emergency_contact_email: val } : null);
@@ -1876,14 +1876,14 @@ export const EmployeeDetailView: React.FC = () => {
             {isDirty && (
                 <div className="sticky-footer" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', padding: '1rem 2rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', zIndex: 100 }}>
                     <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Unsaved changes</span>
-                    <button 
-                        onClick={() => { setEmployee(initialEmployee); setValidationErrors({}); }} 
+                    <button
+                        onClick={() => { setEmployee(initialEmployee); setValidationErrors({}); }}
                         style={{ padding: '0.5rem 1rem', background: '#f1f5f9', color: '#334155', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
                     >
                         Cancel
                     </button>
-                    <button 
-                        onClick={handleSave} 
+                    <button
+                        onClick={handleSave}
                         disabled={isSaving}
                         style={{ padding: '0.5rem 1.5rem', background: 'var(--primary, #2563eb)', color: 'white', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
@@ -1892,7 +1892,7 @@ export const EmployeeDetailView: React.FC = () => {
                     </button>
                 </div>
             )}
-            
+
             {toast && (
                 <div style={{ position: 'fixed', bottom: '80px', right: '2rem', padding: '1rem 1.5rem', background: toast.type === 'error' ? '#fee2e2' : '#dcfce3', color: toast.type === 'error' ? '#991b1b' : '#166534', border: `1px solid ${toast.type === 'error' ? '#f87171' : '#4ade80'}`, borderRadius: '8px', zIndex: 101, display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
                     <i className={toast.type === 'error' ? "fa-solid fa-triangle-exclamation" : "fa-solid fa-circle-check"}></i>
