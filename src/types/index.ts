@@ -40,6 +40,7 @@ export interface User {
     department?: string;
     division?: string;
     location?: string;
+    staff_type?: string;
     pay_schedule?: string;
     pay_type?: string;
     pay_period?: string;
