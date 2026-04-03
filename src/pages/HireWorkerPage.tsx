@@ -35,6 +35,7 @@ export const HireWorkerPage: React.FC = () => {
         home_email: '',
         username: '', 
         employment_status: '',
+        staff_type: 'Permanent Staff',
         job_title: '',
         reporting_to: '',
         department: '',
@@ -75,6 +76,18 @@ export const HireWorkerPage: React.FC = () => {
             nextId = `W-${num.toString().padStart(3, '0')}`;
         }
         setFormData(prev => ({ ...prev, worker_id: nextId }));
+    };
+
+    const handlePayScheduleChange = (value: string) => {
+        let updates: any = { pay_schedule: value };
+        if (value === 'Monthly') {
+            updates.pay_type = 'Salary';
+            updates.pay_period = 'Year';
+        } else if (value === 'Twice a month') {
+            updates.pay_type = 'Hourly';
+            updates.pay_period = 'Hour';
+        }
+        setFormData(prev => ({ ...prev, ...updates }));
     };
 
     const handleSave = async () => {
@@ -162,6 +175,7 @@ export const HireWorkerPage: React.FC = () => {
                                     <option value="">{t('common.select')}</option>
                                     <option value="Male">{t('hire.options.gender.male')}</option>
                                     <option value="Female">{t('hire.options.gender.female')}</option>
+                                    <option value="Not specified">{t('hire.options.gender.notSpecified')}</option>
                                 </select>
                             </div>
                             <div className="form-field">
@@ -192,6 +206,13 @@ export const HireWorkerPage: React.FC = () => {
                             <div className="form-field half-width">
                                 <label>{t('hire.fields.jobTitle')}</label>
                                 <input type="text" value={formData.job_title} onChange={e => setFormData(prev => ({...prev, job_title: e.target.value}))} placeholder="e.g. Production Associate" />
+                            </div>
+                            <div className="form-field">
+                                <label>{t('hire.fields.staffType')}</label>
+                                <select value={formData.staff_type} onChange={e => setFormData(prev => ({...prev, staff_type: e.target.value}))}>
+                                    <option value="Permanent Staff">{t('hire.options.staffType.permanent')}</option>
+                                    <option value="Temporary Staff">{t('hire.options.staffType.temporary')}</option>
+                                </select>
                             </div>
                         </div>
                     </section>
@@ -263,8 +284,9 @@ export const HireWorkerPage: React.FC = () => {
                         <div className="form-grid">
                             <div className="form-field half-width">
                                 <label>{t('hire.fields.paySchedule')}</label>
-                                <select value={formData.pay_schedule} onChange={e => setFormData(prev => ({...prev, pay_schedule: e.target.value}))}>
+                                <select value={formData.pay_schedule} onChange={e => handlePayScheduleChange(e.target.value)}>
                                     <option value="">{t('common.select')}</option>
+                                    <option value="Monthly">{t('hire.options.paySchedule.monthly')}</option>
                                     <option value="Twice a month">{t('hire.options.paySchedule.twiceMonth')}</option>
                                     <option value="Weekly">{t('hire.options.paySchedule.weekly')}</option>
                                 </select>
@@ -277,7 +299,7 @@ export const HireWorkerPage: React.FC = () => {
                                 </select>
                             </div>
                             <div className="form-field full-width">
-                                <label>{t('hire.fields.payRate')}</label>
+                                <label>{formData.pay_type === 'Salary' ? t('hire.fields.salary') : t('hire.fields.payRate')}</label>
                                 <div className="rate-row">
                                     <span className="currency-symbol">$</span>
                                     <input type="number" step="0.01" value={formData.pay_rate} onChange={e => setFormData(prev => ({...prev, pay_rate: e.target.value}))} />
@@ -395,9 +417,14 @@ export const HireWorkerPage: React.FC = () => {
                 .section-header i { color: var(--primary); }
                 .section-header h3 { margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-main); }
                 
-                .form-grid { padding: 1.5rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
-                .form-field { display: flex; flex-direction: column; gap: 6px; }
-                .full-width { grid-column: span 4; }
+                .form-grid { 
+                    padding: 1.5rem; 
+                    display: grid; 
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+                    gap: 1.5rem; 
+                }
+                .form-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+                .full-width { grid-column: 1 / -1; }
                 .half-width { grid-column: span 2; }
                 .quarter-width { grid-column: span 1; }
                 .eighth-width { grid-column: span 0.5; }

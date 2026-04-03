@@ -807,7 +807,7 @@ export const EmployeeDetailView: React.FC = () => {
                                     <h3>{t('employeeDetail.personal.basicInfo')}</h3>
                                 </div>
                                 <div className="card-grid">
-                                    <div className="info-field">
+                                    <div className="info-field full-width">
                                         <label>{t('employeeDetail.personal.employeeNum')}</label>
                                         <input type="text" className={`info-input ${validationErrors.worker_id ? 'error' : ''}`} value={employee.worker_id || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, worker_id: e.target.value } : null)} />
                                         {validationErrors.worker_id && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.worker_id}</span>}
@@ -846,6 +846,7 @@ export const EmployeeDetailView: React.FC = () => {
                                             <option value="">{t('common.select')}</option>
                                             <option value="Male">{t('common.male')}</option>
                                             <option value="Female">{t('common.female')}</option>
+                                            <option value="Not specified">{t('hire.options.gender.notSpecified')}</option>
                                             <option value="Other">{t('common.other')}</option>
                                         </select>
                                     </div>
@@ -998,6 +999,14 @@ export const EmployeeDetailView: React.FC = () => {
                                             <option value="">-Select-</option>
                                             <option value="Twice a month">Twice a month</option>
                                             <option value="Monthly">Monthly</option>
+                                            <option value="Weekly">Weekly</option>
+                                        </select>
+                                    </div>
+                                    <div className="info-field">
+                                        <label>{t('hire.fields.staffType')}</label>
+                                        <select className="info-input" value={employee.staff_type || 'Permanent Staff'} onChange={(e) => setEmployee(prev => prev ? { ...prev, staff_type: e.target.value } : null)}>
+                                            <option value="Permanent Staff">{t('hire.options.staffType.permanent')}</option>
+                                            <option value="Temporary Staff">{t('hire.options.staffType.temporary')}</option>
                                         </select>
                                     </div>
                                     <div className="info-field half-width">

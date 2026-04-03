@@ -507,6 +507,7 @@
       "gender": "Género",
       "maritalStatus": "Estado Civil",
       "hireDate": "Fecha de Contratación",
+      "staffType": "Tipo de Personal*",
       "street1": "Calle 1",
       "street2": "Calle 2",
       "city": "Ciudad",
@@ -528,12 +529,14 @@
       "paySchedule": "Horario de Pago",
       "payType": "Tipo de Pago",
       "payRate": "Tasa de Pago",
+      "salary": "Salario",
       "payPeriod": "Período de Pago"
     },
     "options": {
       "gender": {
         "male": "Masculino",
-        "female": "Femenino"
+        "female": "Femenino",
+        "notSpecified": "No especificado"
       },
       "marital": {
         "single": "Soltero/a",
@@ -545,7 +548,12 @@
         "partTime": "Tiempo Parcial",
         "contract": "Contrato"
       },
+      "staffType": {
+        "permanent": "Personal Permanente",
+        "temporary": "Personal Temporal"
+      },
       "paySchedule": {
+        "monthly": "Mensual",
         "twiceMonth": "Dos veces al mes",
         "weekly": "Semanal"
       },
@@ -623,5 +631,14 @@
       "signed": "El trabajador {{name}} ha firmado su reporte de incidente.",
       "active": "Monitor del Sistema: El seguimiento de incidentes en tiempo real está activo."
     }
+  },
+  "pagination": {
+    "showing": "Mostrando",
+    "to": "a",
+    "of": "de",
+    "entries": "entradas",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "recordsPerPage": "Registros por página"
   }
 }

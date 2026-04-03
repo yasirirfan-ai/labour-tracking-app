@@ -580,6 +580,7 @@
       "gender": "Gender",
       "maritalStatus": "Marital Status",
       "hireDate": "Hire Date",
+      "staffType": "Staff Type*",
       "street1": "Street 1",
       "street2": "Street 2",
       "city": "City",
@@ -600,13 +601,15 @@
       "location": "Location",
       "paySchedule": "Pay Schedule",
       "payType": "Pay Type",
-      "payRate": "Pay Rate",
+      "payRate": "Hourly Rate",
+      "salary": "Salary",
       "payPeriod": "Pay Period"
     },
     "options": {
       "gender": {
         "male": "Male",
-        "female": "Female"
+        "female": "Female",
+        "notSpecified": "Not Specified"
       },
       "marital": {
         "single": "Single",
@@ -618,7 +621,12 @@
         "partTime": "Part Time",
         "contract": "Contract"
       },
+      "staffType": {
+        "permanent": "Permanent Staff",
+        "temporary": "Temporary Staff"
+      },
       "paySchedule": {
+        "monthly": "Monthly",
         "twiceMonth": "Twice a month",
         "weekly": "Weekly"
       },
@@ -696,5 +704,14 @@
       "signed": "Worker {{name}} has signed their incident report.",
       "active": "System Monitor: Real-time incident tracking is active."
     }
+  },
+  "pagination": {
+    "showing": "Showing",
+    "to": "to",
+    "of": "of",
+    "entries": "entries",
+    "previous": "Previous",
+    "next": "Next",
+    "recordsPerPage": "Records per page"
   }
 }

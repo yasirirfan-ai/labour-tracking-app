@@ -9,10 +9,17 @@ export const Dashboard: React.FC = () => {
     const [activeMos, setActiveMos] = useState<any[]>([]);
     const [tasks, setTasks] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     useEffect(() => {
         fetchDashboardData();
     }, []);
+
+    // Reset page to 1 when total records or page size changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeMos.length, pageSize]);
 
     const fetchDashboardData = async () => {
         setIsLoading(true);
@@ -60,6 +67,11 @@ export const Dashboard: React.FC = () => {
     const getActiveCountForMo = (moRef: string) => {
         return tasks.filter(t => t.mo_reference === moRef && t.status === 'active').length;
     };
+
+    // Pagination logic
+    const totalPages = Math.ceil(activeMos.length / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedMos = activeMos.slice(startIndex, startIndex + pageSize);
 
     return (
         <>
@@ -115,15 +127,15 @@ export const Dashboard: React.FC = () => {
             </div>
 
             <div className="content-grid" style={{ gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-                <div className="section-card">
-                    <div className="section-header">
-                        <h2 className="section-title">{t('dashboard.activeOrders')}</h2>
-                        <Link to="/manufacturing-orders" className="view-link">{t('dashboard.viewAll')} <i className="fa-solid fa-arrow-right"></i></Link>
+                <div className="section-card" style={{ paddingBottom: '0' }}>
+                    <div className="section-header" style={{ padding: '0 1.25rem 1.25rem 1.25rem', borderBottom: '1px solid var(--border)', margin: '0 -1.25rem 1.25rem -1.25rem' }}>
+                        <h2 className="section-title" style={{ paddingLeft: '1.25rem' }}>{t('dashboard.activeOrders')}</h2>
+                        <Link to="/manufacturing-orders" className="view-link" style={{ paddingRight: '1.25rem' }}>{t('dashboard.viewAll')} <i className="fa-solid fa-arrow-right"></i></Link>
                     </div>
 
                     <div className="list-container">
-                        {activeMos.length > 0 ? (
-                            activeMos.map(mo => (
+                        {paginatedMos.length > 0 ? (
+                            paginatedMos.map(mo => (
                                 <Link key={mo.id} to={`/control-matrix#mo-${mo.mo_number}`} className="list-item" style={{ textDecoration: 'none', color: 'inherit' }}>
                                     <div className="item-main">
                                         <div style={{ width: '40px', height: '40px', background: 'var(--bg-main)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', fontWeight: 800, fontSize: '0.75rem', border: '1.5px solid var(--border)', flexShrink: 0 }}>
@@ -144,9 +156,53 @@ export const Dashboard: React.FC = () => {
                                 </Link>
                             ))
                         ) : (
-                            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem' }}>{t('dashboard.noActiveOrders')}</div>
+                            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>{t('dashboard.noActiveOrders')}</div>
                         )}
                     </div>
+
+                    {/* Pagination Footer */}
+                    {activeMos.length > 0 && (
+                        <div className="pagination-container" style={{ margin: '0 -1.25rem' }}>
+                            <div className="pagination-left">
+                                <div className="pagination-page-size">
+                                    <span>{t('pagination.recordsPerPage')}:</span>
+                                    <select 
+                                        className="pagination-select" 
+                                        value={pageSize} 
+                                        onChange={(e) => setPageSize(Number(e.target.value))}
+                                    >
+                                        <option value={10}>10</option>
+                                        <option value={30}>30</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                    </select>
+                                </div>
+                                <div className="pagination-info">
+                                    {t('pagination.showing')} {startIndex + 1} {t('pagination.to')} {Math.min(startIndex + pageSize, activeMos.length)} {t('pagination.of')} {activeMos.length} {t('pagination.entries')}
+                                </div>
+                            </div>
+                            <div className="pagination-right">
+                                <div className="pagination-btns">
+                                    <button 
+                                        className="pagination-btn" 
+                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1}
+                                        title={t('pagination.previous')}
+                                    >
+                                        <i className="fa-solid fa-chevron-left"></i> {t('pagination.previous')}
+                                    </button>
+                                    <button 
+                                        className="pagination-btn" 
+                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages || totalPages === 0}
+                                        title={t('pagination.next')}
+                                    >
+                                        {t('pagination.next')} <i className="fa-solid fa-chevron-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </>

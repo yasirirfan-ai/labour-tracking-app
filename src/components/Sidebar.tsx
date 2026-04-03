@@ -2,7 +2,6 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../context/ThemeContext';
 
 export const Sidebar: React.FC<{
     isCollapsed: boolean,
@@ -11,12 +10,7 @@ export const Sidebar: React.FC<{
     setIsMobileOpen?: (o: boolean) => void
 }> = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen }) => {
     const { logout } = useAuth();
-    const { t, i18n } = useTranslation();
-    const { currentTheme: theme, toggleTheme } = useTheme();
-
-    const changeLanguage = (lng: string) => {
-        i18n.changeLanguage(lng);
-    };
+    const { t } = useTranslation();
 
     const toggleSidebar = () => {
         setIsCollapsed(!isCollapsed);
@@ -97,18 +91,6 @@ export const Sidebar: React.FC<{
 
             <div className="bottom-menu">
                 <ul className="nav-menu">
-                    <li>
-                        <div className="nav-item" onClick={toggleTheme}>
-                            <i className={`fa-solid ${theme === 'light' ? 'fa-moon' : 'fa-sun'}`}></i>
-                            <span>{theme === 'light' ? t('themes.dark') : t('themes.light')}</span>
-                        </div>
-                    </li>
-                    <li>
-                        <div className="nav-item" onClick={() => changeLanguage(i18n.language === 'en' ? 'es' : 'en')}>
-                            <i className="fa-solid fa-language"></i>
-                            <span>{i18n.language === 'en' ? 'Español' : 'English'}</span>
-                        </div>
-                    </li>
                     <li>
                         <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); logout(); }}>
                             <i className="fa-solid fa-arrow-right-from-bracket"></i> <span>{t('sidebar.logout')}</span>
