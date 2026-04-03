@@ -31,6 +31,7 @@ export const EmployeeDetailView: React.FC = () => {
     const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
     const [isCommissionModalOpen, setIsCommissionModalOpen] = useState(false);
     const [isEquityModalOpen, setIsEquityModalOpen] = useState(false);
+    const [isOrgChartModalOpen, setIsOrgChartModalOpen] = useState(false);
     const [accrualHistoryType, setAccrualHistoryType] = useState<'pto' | 'sick'>('pto');
     const [leaveHistory, setLeaveHistory] = useState<LeaveHistoryRow[]>([]);
     const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
@@ -343,7 +344,7 @@ export const EmployeeDetailView: React.FC = () => {
                                 <p>Chief Technology Officer</p>
                             </div>
                         </div>
-                        <button className="text-link">{t('employeeDetail.viewInOrgChart')}</button>
+                        <button className="text-link" onClick={() => setIsOrgChartModalOpen(true)}>{t('employeeDetail.viewInOrgChart')}</button>
                     </section>
                 </aside>
 
@@ -800,7 +801,28 @@ export const EmployeeDetailView: React.FC = () => {
                                 <h2>{t('employeeDetail.tabs.personal')}</h2>
                             </div>
 
-                            {/* Basic Information */}
+                            {isOrgChartModalOpen && (
+                        <div className="modal-overlay" onClick={() => setIsOrgChartModalOpen(false)}>
+                            <div className="modal-content org-chart-modal" onClick={e => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h2>{t('employeeDetail.viewInOrgChart')}</h2>
+                                    <button className="close-modal" onClick={() => setIsOrgChartModalOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                                </div>
+                                <div className="modal-body" style={{ padding: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f8fafc' }}>
+                                    <img 
+                                        src="/images/org_chart.png" 
+                                        alt="Organizational Chart" 
+                                        style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
+                                    />
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="modal-save-btn" onClick={() => setIsOrgChartModalOpen(false)}>{t('common.close', 'Close')}</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Basic Information */}
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-id-card"></i>
@@ -3301,6 +3323,11 @@ export const EmployeeDetailView: React.FC = () => {
                     background: #1b4332;
                     transform: translateY(-1px);
                     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                }
+
+                .org-chart-modal {
+                    max-width: 90vw !important;
+                    width: fit-content !important;
                 }
             `}</style>
         </div>
