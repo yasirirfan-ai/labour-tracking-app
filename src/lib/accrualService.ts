@@ -1,20 +1,16 @@
 import { supabase } from './supabase';
-import type { User } from '../types';
+import type { User, LeaveRequest } from '../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** PTO is paid out twice a month (24 periods/year). */
-const SEMI_MONTHLY_PERIOD_DAYS = 15;
-
-/** PTO accrual rates per pay-period (hours), keyed by tenure tier. */
 const PTO_TIERS = [
-    { minMonths: 0,  maxMonths: 25, rate: 1.67 }, // Tier 1: 0–2 years (inclusive of anniversary)
-    { minMonths: 25, maxMonths: Infinity, rate: 4.00 }, // Tier 2: After 2 years
+    { minMonths: 0,  maxMonths: 12, rate: 0.8335, annualMax: 20, carryover: 20 },
+    { minMonths: 12, maxMonths: 24, rate: 1.3335, annualMax: 32, carryover: 32 },
+    { minMonths: 24, maxMonths: 36, rate: 2.0,    annualMax: 48, carryover: 48 },
+    { minMonths: 36, maxMonths: Infinity, rate: 4.0, annualMax: 48, carryover: 48 },
 ];
-
-console.log("ACCRUAL_ENGINE_V2.5_ACTIVE: Policy = 1.67 for first 2 years.");
 
 /** Sick leave: 1 hour per every 30 hours worked (108 000 seconds). */
 const SICK_SECONDS_PER_HOUR = 30 * 3600; // 108 000 s
@@ -30,7 +26,7 @@ const SICK_USAGE_WAITING_DAYS = 90;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Calculate the number of complete months between hireDate and a reference date (defaults to now).
+ * Calculate the number of complete months between hireDate and a reference date.
  */
 export function getTenureMonths(hireDate: string, referenceDate: Date = new Date()): number {
     const hire = new Date(hireDate);
@@ -39,46 +35,48 @@ export function getTenureMonths(hireDate: string, referenceDate: Date = new Date
     let months = (ref.getFullYear() - hire.getFullYear()) * 12;
     months    += ref.getMonth() - hire.getMonth();
 
-    // If we haven't yet reached the anniversary day of the ref month, subtract 1.
     if (ref.getDate() < hire.getDate()) months--;
 
     return Math.max(0, months);
 }
 
-// ... existing getPtoRate and getPtoTierLabel functions remain the same ...
-
 /**
- * Returns the PTO accrual rate (hrs/pay-period) for the given tenure in months.
+ * Gets the current tier based on tenure months.
  */
-export function getPtoRate(tenureMonths: number): number {
+export function getPtoTier(tenureMonths: number) {
     for (const tier of PTO_TIERS) {
         if (tenureMonths >= tier.minMonths && tenureMonths < tier.maxMonths) {
-            return tier.rate;
+            return tier;
         }
     }
-    return PTO_TIERS[PTO_TIERS.length - 1].rate;
+    return PTO_TIERS[PTO_TIERS.length - 1];
+}
+
+/**
+ * Returns the PTO accrual rate.
+ */
+export function getPtoRate(tenureMonths: number): number {
+    return getPtoTier(tenureMonths).rate;
 }
 
 /**
  * Returns a human-readable tier label.
  */
-export function getPtoTierLabel(tenureMonths: number): string {
-    if (tenureMonths < 24)  return 'Tier 1 (0–24 months) · 1.67 hrs/period';
-    return 'Tier 2 (24+ months) · 4.00 hrs/period';
+export function getPtoTierLabel(tenureMonths: number, paySchedule: string): string {
+    const tier = getPtoTier(tenureMonths);
+    const period = (paySchedule || '').toLowerCase().includes('semi') ? '15 days' : '30 days';
+    if (tenureMonths < 12) return `Tier 1 (0–12 months) · ${tier.rate} hrs / ${period}`;
+    if (tenureMonths < 24) return `Tier 2 (12–24 months) · ${tier.rate} hrs / ${period}`;
+    if (tenureMonths < 36) return `Tier 3 (24–36 months) · ${tier.rate} hrs / ${period}`;
+    return `Tier 4 (36+ months) · ${tier.rate} hrs / ${period}`;
 }
 
-/**
- * Returns whether today is past the 90-day waiting period for sick-leave usage.
- */
 export function isSickLeaveUsable(hireDate: string): boolean {
     const hire     = new Date(hireDate);
     const eligible = new Date(hire.getTime() + SICK_USAGE_WAITING_DAYS * 86_400_000);
     return new Date() >= eligible;
 }
 
-/**
- * Returns the date the sick-leave usage waiting period ends.
- */
 export function getSickLeaveEligibleDate(hireDate: string): Date {
     const hire = new Date(hireDate);
     return new Date(hire.getTime() + SICK_USAGE_WAITING_DAYS * 86_400_000);
@@ -97,50 +95,66 @@ interface AccrualResult {
     sickEarned:               number;
 }
 
-/**
- * Calculate the new PTO and Sick balances for a given employee.
- */
 export function calculateAccruals(user: User, totalWorkedSeconds: number): AccrualResult {
     const now    = new Date();
     const nowIso = now.toISOString();
 
-    // ── PTO (Tier-Aware Calculation) ─────────────────────────────────────────
-    const hireDate         = user.hire_date || nowIso;
+    const hireDate = user.hire_date || nowIso;
     const currentPtoBalance = parseFloat(user.pto_balance || '0');
     
     const lastAccrual = user.last_pto_accrual
         ? new Date(user.last_pto_accrual)
         : new Date(hireDate);
 
+    const isSemiMonthly = (user.pay_schedule || '').toLowerCase().includes('semi');
+    const periodDays = isSemiMonthly ? 15 : 30;
+
     const daysSinceLastAccrual = (now.getTime() - lastAccrual.getTime()) / 86_400_000;
-    const periodsElapsed       = Math.floor(daysSinceLastAccrual / SEMI_MONTHLY_PERIOD_DAYS);
+    const periodsElapsed       = Math.floor(daysSinceLastAccrual / periodDays);
     
     let ptoEarned = 0;
+    let newPtoBalance = currentPtoBalance;
+
     if (periodsElapsed > 0) {
-        // Step through each 15-day period and find the rate CURRENT at that time
         const runner = new Date(lastAccrual);
         for (let i = 0; i < periodsElapsed; i++) {
-            runner.setDate(runner.getDate() + SEMI_MONTHLY_PERIOD_DAYS);
+            runner.setDate(runner.getDate() + periodDays);
             const tenureAtPeriodEnd = getTenureMonths(hireDate, runner);
-            ptoEarned += getPtoRate(tenureAtPeriodEnd);
+            const tier = getPtoTier(tenureAtPeriodEnd);
+            
+            // Check annual cap
+            if (newPtoBalance < tier.annualMax) {
+                const availableSpace = tier.annualMax - newPtoBalance;
+                const earnedThisPeriod = Math.min(tier.rate, availableSpace);
+                ptoEarned += earnedThisPeriod;
+                newPtoBalance += earnedThisPeriod;
+            }
         }
     }
 
-    const newPtoBalance     = Math.round((currentPtoBalance + ptoEarned) * 100) / 100;
-    const newLastPtoAccrual = periodsElapsed > 0 ? nowIso : (user.last_pto_accrual || hireDate);
+    newPtoBalance = Math.round(newPtoBalance * 100) / 100;
+    const newLastPtoAccrual = periodsElapsed > 0 
+        ? new Date(lastAccrual.getTime() + periodsElapsed * periodDays * 86400000).toISOString()
+        : (user.last_pto_accrual || hireDate);
 
     // ── SICK ─────────────────────────────────────────────────────────────────
-    const alreadyProcessed   = user.processed_sick_seconds || 0;
-    const newWorkedSeconds   = Math.max(0, totalWorkedSeconds - alreadyProcessed);
-    const sickHoursToAdd     = Math.floor(newWorkedSeconds / SICK_SECONDS_PER_HOUR);
+    let sickEarned = 0;
+    let newSickBalance = parseFloat(user.sick_balance || '0');
+    let newProcessedSickSeconds = user.processed_sick_seconds || 0;
 
-    const currentSickBalance = parseFloat(user.sick_balance || '0');
-    let   newSickBalance     = currentSickBalance + sickHoursToAdd;
+    // Sick leave only accrues for semi-monthly workers
+    if (isSemiMonthly) {
+        const alreadyProcessed = user.processed_sick_seconds || 0;
+        const newWorkedSeconds = Math.max(0, totalWorkedSeconds - alreadyProcessed);
+        const sickHoursToAdd = Math.floor(newWorkedSeconds / SICK_SECONDS_PER_HOUR);
 
-    if (newSickBalance > SICK_BALANCE_CAP_HOURS) newSickBalance = SICK_BALANCE_CAP_HOURS;
-    newSickBalance = Math.round(newSickBalance * 100) / 100;
+        newSickBalance = newSickBalance + sickHoursToAdd;
+        if (newSickBalance > SICK_BALANCE_CAP_HOURS) newSickBalance = SICK_BALANCE_CAP_HOURS;
+        newSickBalance = Math.round(newSickBalance * 100) / 100;
 
-    const newProcessedSickSeconds = alreadyProcessed + (sickHoursToAdd * SICK_SECONDS_PER_HOUR);
+        newProcessedSickSeconds = alreadyProcessed + (sickHoursToAdd * SICK_SECONDS_PER_HOUR);
+        sickEarned = sickHoursToAdd;
+    }
 
     return {
         newPtoBalance,
@@ -148,19 +162,14 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
         newLastPtoAccrual,
         newProcessedSickSeconds,
         ptoEarned,
-        sickEarned: sickHoursToAdd,
+        sickEarned,
     };
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SYNC TO SUPABASE
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Fetch the employee's total worked seconds from all tasks, run the accrual
- * calculation, persist the result, write history rows, and return updated numbers.
- */
 export async function syncLeaveBalances(user: User): Promise<{
     pto: number;
     sick: number;
@@ -169,7 +178,6 @@ export async function syncLeaveBalances(user: User): Promise<{
     error?: string;
 }> {
     try {
-        // 1. Sum all active_seconds from tasks for this employee.
         const { data: tasks, error: taskError } = await (supabase
             .from('tasks')
             .select('active_seconds')
@@ -182,10 +190,7 @@ export async function syncLeaveBalances(user: User): Promise<{
             0
         );
 
-        // 2. Run pure calculation.
         const result = calculateAccruals(user, totalWorkedSeconds);
-
-        // 3. Persist only if something actually changed.
         const hasChange = result.ptoEarned > 0 || result.sickEarned > 0;
 
         if (hasChange) {
@@ -203,7 +208,6 @@ export async function syncLeaveBalances(user: User): Promise<{
 
             if (updateError) throw updateError;
 
-            // 4. Write history rows for each type of accrual earned.
             const historyRows: any[] = [];
             const today = new Date().toISOString().split('T')[0];
 
@@ -213,12 +217,12 @@ export async function syncLeaveBalances(user: User): Promise<{
                     user_id:      user.id,
                     type:         'pto',
                     entry_date:   today,
-                    description:  `PTO accrual — ${getPtoTierLabel(getTenureMonths(user.hire_date || today))}`,
+                    description:  `PTO accrual — ${getPtoTierLabel(getTenureMonths(user.hire_date || today), user.pay_schedule || '')}`,
                     used_hours:   null,
                     earned_hours: Math.round(result.ptoEarned * 100) / 100,
                     balance:      result.newPtoBalance,
                 });
-                // First-time eligibility notice
+                
                 if (prevPto === 0 && result.ptoEarned > 0) {
                     historyRows.unshift({
                         user_id:      user.id,
@@ -278,9 +282,6 @@ export interface LeaveHistoryRow {
     created_at: string;
 }
 
-/**
- * Fetch leave history for a given user, ordered by date ascending.
- */
 export async function fetchLeaveHistory(userId: string, type?: 'pto' | 'sick'): Promise<LeaveHistoryRow[]> {
     try {
         let query = (supabase as any)

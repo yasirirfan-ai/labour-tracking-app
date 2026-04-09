@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l src/pages/*.tsx)",
+      "Bash(grep -r \"export\" src/pages/*.tsx)",
+      "Bash(node --input-type=module --eval ':*)",
+      "Bash(node scripts/full-bamboohr-migration.mjs)"
+    ]
+  }
+}

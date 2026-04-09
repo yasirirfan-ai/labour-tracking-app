@@ -9,6 +9,7 @@ import type { TrainingMaterial } from '../lib/trainingService';
 import type { User } from '../types';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
+import emailjs from '@emailjs/browser';
 
 export const WorkerPortalPage: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -21,6 +22,7 @@ export const WorkerPortalPage: React.FC = () => {
     const [disciplinaryIncidents, setDisciplinaryIncidents] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'dashboard' | 'personal_info' | 'conduct' | 'settings' | 'training' | 'timeoff'>('dashboard');
     const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+    const [leaveHistory, setLeaveHistory] = useState<any[]>([]);
     const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
     const [leaveFormData, setLeaveFormData] = useState({
         type: 'pto' as 'pto' | 'sick',
@@ -54,7 +56,7 @@ export const WorkerPortalPage: React.FC = () => {
         const fetchTrainings = async () => {
             const materials = await trainingService.getAllMaterials(trainingLanguage);
             setTrainingMaterials(materials);
-            
+
             // Set initial selected section for SOPs if available
             const initialRole = user?.role === 'manager' ? 'Quality Assurance' : 'Production';
             const initialMaterials = materials.filter(m => m.level === 2 && m.department === initialRole);
@@ -71,8 +73,21 @@ export const WorkerPortalPage: React.FC = () => {
             const initialCompleted = (user as any).completed_trainings || ['GMP and Quality Awareness'];
             setCompletedTrainings(initialCompleted);
             fetchLeaveRequests();
+            fetchLeaveHistory();
         }
     }, [user?.id]);
+
+    const fetchLeaveHistory = async () => {
+        if (!user) return;
+        const { data, error } = await supabase
+            .from('leave_history')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('entry_date', { ascending: false })
+            .order('created_at', { ascending: false });
+        if (error) { console.error('Error fetching leave history:', error); return; }
+        if (data) setLeaveHistory(data);
+    };
 
     useEffect(() => {
         let interval: any;
@@ -146,9 +161,29 @@ export const WorkerPortalPage: React.FC = () => {
         if (error) {
             alert('Error submitting request: ' + error.message);
         } else {
+            // Send email notification to admin
+            try {
+                await emailjs.send(
+                    import.meta.env.VITE_EMAILJS_SERVICE_ID,
+                    import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+                    {
+                        to_email: 'omair.khan@babylonllc.com',
+                        worker_name: (user as any)?.name || (user as any)?.email || 'A worker',
+                        leave_type: leaveFormData.type === 'pto' ? 'PTO (Paid Time Off)' : 'Sick Leave',
+                        start_date: leaveFormData.start_date,
+                        end_date: leaveFormData.end_date,
+                        hours_requested: leaveFormData.hours_requested,
+                        reason: leaveFormData.reason || 'No reason provided',
+                    },
+                    import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+                );
+            } catch (emailError) {
+                console.error('Email notification failed:', emailError);
+            }
             alert('Request submitted successfully!');
             setLeaveFormData({ type: 'pto', start_date: '', end_date: '', hours_requested: 8, reason: '' });
             fetchLeaveRequests();
+            fetchLeaveHistory();
         }
         setIsSubmittingLeave(false);
     };
@@ -284,7 +319,7 @@ export const WorkerPortalPage: React.FC = () => {
         const remaining = (MAX_WORK_SECONDS - elapsed) * 1000;
         const breakTimer = setTimeout(() => handleTakeBreak(true), remaining);
         return () => clearTimeout(breakTimer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [localUser]);
 
     const handleSaveProfile = async () => {
@@ -1333,24 +1368,24 @@ export const WorkerPortalPage: React.FC = () => {
                     <div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('workerPortal.title')}</div>
                         <h2 style={{ margin: 0, fontWeight: 900, color: 'var(--text-main)', fontSize: '1.75rem' }}>
-                            {activeTab === 'dashboard' ? t('workerPortal.overview') : 
-                             activeTab === 'personal_info' ? t('workerPortal.tabs.personalInfo') : 
-                             activeTab === 'conduct' ? t('workerPortal.conduct.title') : 
-                             activeTab === 'settings' ? t('workerPortal.settings.title') : 
-                             activeTab === 'training' ? t('workerPortal.tabs.training') : t('workerPortal.tabs.timeOff')}
+                            {activeTab === 'dashboard' ? t('workerPortal.overview') :
+                                activeTab === 'personal_info' ? t('workerPortal.tabs.personalInfo') :
+                                    activeTab === 'conduct' ? t('workerPortal.conduct.title') :
+                                        activeTab === 'settings' ? t('workerPortal.settings.title') :
+                                            activeTab === 'training' ? t('workerPortal.tabs.training') : t('workerPortal.tabs.timeOff')}
                         </h2>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
                         {/* Quick Access Settings */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.4rem', background: 'var(--bg-main)', borderRadius: '16px', border: '1px solid var(--border)' }}>
                             <div style={{ display: 'flex', gap: '4px' }}>
-                                <button 
+                                <button
                                     onClick={() => setLanguage('en')}
                                     style={{ padding: '0.4rem 0.8rem', borderRadius: '10px', border: 'none', background: i18n.language === 'en' ? 'var(--primary)' : 'transparent', color: i18n.language === 'en' ? 'white' : 'var(--text-muted)', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem' }}
                                 >
                                     EN
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => setLanguage('es')}
                                     style={{ padding: '0.4rem 0.8rem', borderRadius: '10px', border: 'none', background: i18n.language === 'es' ? 'var(--primary)' : 'transparent', color: i18n.language === 'es' ? 'white' : 'var(--text-muted)', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem' }}
                                 >
@@ -1358,7 +1393,7 @@ export const WorkerPortalPage: React.FC = () => {
                                 </button>
                             </div>
                             <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
-                            <button 
+                            <button
                                 onClick={toggleTheme}
                                 style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '1rem', padding: '0 0.5rem' }}
                                 title={t('workerPortal.settings.theme')}
@@ -1670,7 +1705,7 @@ export const WorkerPortalPage: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field">
                                         <label>{t('hire.fields.workPhone')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.work_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_phone: e.target.value }))} disabled={!editMode} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-phone" style={{ color: "var(--text-muted)" }}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{ flex: 1 }} value={formData.work_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_phone: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field">
                                         <label>{t('hire.fields.ext')}</label>
@@ -1678,19 +1713,19 @@ export const WorkerPortalPage: React.FC = () => {
                                     </div>
                                     <div className="info-field">
                                         <label>{t('hire.fields.mobilePhone')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-mobile-screen" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.mobile_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, mobile_phone: e.target.value }))} disabled={!editMode} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-mobile-screen" style={{ color: "var(--text-muted)" }}></i><input type="text" className={`info-input ${validationErrors.mobile_phone ? 'error' : ''}`} style={{ flex: 1 }} value={formData.mobile_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, mobile_phone: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field">
                                         <label>{t('hire.fields.homePhone')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-phone" style={{color: "var(--text-muted)"}}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{flex: 1}} value={formData.home_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_phone: e.target.value }))} disabled={!editMode} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-phone" style={{ color: "var(--text-muted)" }}></i><input type="text" className={`info-input ${validationErrors.home_phone ? 'error' : ''}`} style={{ flex: 1 }} value={formData.home_phone || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_phone: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('hire.fields.workEmail')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "var(--text-muted)"}}></i><input type="email" className="info-input" style={{flex: 1}} value={formData.work_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_email: e.target.value }))} disabled={!editMode} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-envelope" style={{ color: "var(--text-muted)" }}></i><input type="email" className="info-input" style={{ flex: 1 }} value={formData.work_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, work_email: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('hire.fields.homeEmail')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-envelope" style={{color: "var(--text-muted)"}}></i><input type="email" className="info-input" style={{flex: 1}} value={formData.home_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_email: e.target.value }))} disabled={!editMode} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-envelope" style={{ color: "var(--text-muted)" }}></i><input type="email" className="info-input" style={{ flex: 1 }} value={formData.home_email || ''} onChange={(e) => setFormData(prev => ({ ...prev, home_email: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                 </div>
                             </div>
@@ -1704,15 +1739,15 @@ export const WorkerPortalPage: React.FC = () => {
                                 <div className="card-grid">
                                     <div className="info-field full-width">
                                         <label>{t('common.linkedin')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-linkedin" style={{color: "var(--text-muted)"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.linkedin_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, linkedin_url: e.target.value }))} disabled={!editMode} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-linkedin" style={{ color: "var(--text-muted)" }}></i><input type="text" className="info-input" style={{ flex: 1 }} value={formData.linkedin_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, linkedin_url: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('common.twitter')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-twitter" style={{color: "var(--text-muted)"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.twitter_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, twitter_url: e.target.value }))} disabled={!editMode} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-twitter" style={{ color: "var(--text-muted)" }}></i><input type="text" className="info-input" style={{ flex: 1 }} value={formData.twitter_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, twitter_url: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                     <div className="info-field full-width">
                                         <label>{t('common.facebook')}</label>
-                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}><i className="fa-solid fa-facebook" style={{color: "var(--text-muted)"}}></i><input type="text" className="info-input" style={{flex: 1}} value={formData.facebook_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, facebook_url: e.target.value }))} disabled={!editMode} /></div>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-facebook" style={{ color: "var(--text-muted)" }}></i><input type="text" className="info-input" style={{ flex: 1 }} value={formData.facebook_url || ''} onChange={(e) => setFormData(prev => ({ ...prev, facebook_url: e.target.value }))} disabled={!editMode} /></div>
                                     </div>
                                 </div>
                             </div>
@@ -1858,15 +1893,15 @@ export const WorkerPortalPage: React.FC = () => {
                                                 <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{t('workerPortal.settings.theme')}</div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('themes.light')} / {t('themes.dark')}</div>
                                             </div>
-                                            <button 
+                                            <button
                                                 onClick={toggleTheme}
-                                                style={{ 
-                                                    padding: '0.6rem 1.25rem', 
-                                                    borderRadius: '12px', 
-                                                    border: '1px solid var(--border)', 
-                                                    background: 'var(--bg-main)', 
-                                                    color: 'var(--text-main)', 
-                                                    fontWeight: 700, 
+                                                style={{
+                                                    padding: '0.6rem 1.25rem',
+                                                    borderRadius: '12px',
+                                                    border: '1px solid var(--border)',
+                                                    background: 'var(--bg-main)',
+                                                    color: 'var(--text-main)',
+                                                    fontWeight: 700,
                                                     cursor: 'pointer',
                                                     display: 'flex',
                                                     alignItems: 'center',
@@ -1885,30 +1920,30 @@ export const WorkerPortalPage: React.FC = () => {
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>English / Español</div>
                                             </div>
                                             <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-main)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                                <button 
+                                                <button
                                                     onClick={() => setLanguage('en')}
-                                                    style={{ 
-                                                        padding: '0.5rem 1rem', 
-                                                        borderRadius: '8px', 
-                                                        border: 'none', 
-                                                        background: i18n.language === 'en' ? 'var(--primary)' : 'transparent', 
-                                                        color: i18n.language === 'en' ? 'white' : 'var(--text-main)', 
-                                                        fontWeight: 800, 
+                                                    style={{
+                                                        padding: '0.5rem 1rem',
+                                                        borderRadius: '8px',
+                                                        border: 'none',
+                                                        background: i18n.language === 'en' ? 'var(--primary)' : 'transparent',
+                                                        color: i18n.language === 'en' ? 'white' : 'var(--text-main)',
+                                                        fontWeight: 800,
                                                         cursor: 'pointer',
                                                         fontSize: '0.85rem'
                                                     }}
                                                 >
                                                     EN
                                                 </button>
-                                                <button 
+                                                <button
                                                     onClick={() => setLanguage('es')}
-                                                    style={{ 
-                                                        padding: '0.5rem 1rem', 
-                                                        borderRadius: '8px', 
-                                                        border: 'none', 
-                                                        background: i18n.language === 'es' ? 'var(--primary)' : 'transparent', 
-                                                        color: i18n.language === 'es' ? 'white' : 'var(--text-main)', 
-                                                        fontWeight: 800, 
+                                                    style={{
+                                                        padding: '0.5rem 1rem',
+                                                        borderRadius: '8px',
+                                                        border: 'none',
+                                                        background: i18n.language === 'es' ? 'var(--primary)' : 'transparent',
+                                                        color: i18n.language === 'es' ? 'white' : 'var(--text-main)',
+                                                        fontWeight: 800,
                                                         cursor: 'pointer',
                                                         fontSize: '0.85rem'
                                                     }}
@@ -1932,8 +1967,8 @@ export const WorkerPortalPage: React.FC = () => {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'var(--bg-card)', padding: '0.5rem 1.25rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
                                     <i className="fa-solid fa-language" style={{ color: 'var(--primary)', fontSize: '1.2rem' }}></i>
-                                    <select 
-                                        value={trainingLanguage} 
+                                    <select
+                                        value={trainingLanguage}
                                         onChange={(e) => setTrainingLanguage(e.target.value as any)}
                                         style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', outline: 'none' }}
                                     >
@@ -2073,131 +2108,131 @@ export const WorkerPortalPage: React.FC = () => {
                             </div>
 
                             {trainingLanguage !== 'es' && (
-                            <div style={{ paddingTop: '2rem', borderTop: '2px solid var(--border)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                        <div style={{ width: '48px', height: '48px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--accent)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
-                                            <i className="fa-solid fa-rectangle-list"></i>
+                                <div style={{ paddingTop: '2rem', borderTop: '2px solid var(--border)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                            <div style={{ width: '48px', height: '48px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--accent)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
+                                                <i className="fa-solid fa-rectangle-list"></i>
+                                            </div>
+                                            <div>
+                                                <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{t('workerPortal.training.level2Title')}</h4>
+                                                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>{t('workerPortal.training.level2Subtitle')}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{t('workerPortal.training.level2Title')}</h4>
-                                            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>{t('workerPortal.training.level2Subtitle')}</p>
+
+                                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--bg-main)', padding: '4px', borderRadius: '14px', border: '1px solid var(--border)' }}>
+                                                {Array.from(new Set(trainingMaterials.filter(m => m.level === 2).map(m => m.department))).map(dept => dept && (
+                                                    <button
+                                                        key={dept}
+                                                        onClick={() => {
+                                                            setTrainingRole(dept as any);
+                                                            const rolesForDept = trainingMaterials.filter(m => m.level === 2 && m.department === dept);
+                                                            if (rolesForDept.length > 0) {
+                                                                setSelectedSOPSection(rolesForDept[0].category);
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            padding: '0.6rem 1.25rem',
+                                                            borderRadius: '10px',
+                                                            border: 'none',
+                                                            background: trainingRole === dept ? 'var(--primary)' : 'transparent',
+                                                            color: trainingRole === dept ? 'white' : 'var(--text-muted)',
+                                                            fontWeight: 800,
+                                                            cursor: 'pointer',
+                                                            fontSize: '0.85rem',
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                    >
+                                                        {dept}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--bg-main)', padding: '4px', borderRadius: '14px', border: '1px solid var(--border)' }}>
-                                            {Array.from(new Set(trainingMaterials.filter(m => m.level === 2).map(m => m.department))).map(dept => dept && (
+                                    <div style={{ display: 'flex', gap: '2.5rem', alignItems: 'flex-start' }}>
+                                        <div style={{ width: '300px', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.75rem', borderRadius: '20px', border: '1px solid var(--border)', flexShrink: 0 }}>
+                                            {Array.from(new Set(trainingMaterials.filter(m => m.level === 2 && m.department === trainingRole).map(m => m.category))).map(cat => (
                                                 <button
-                                                    key={dept}
-                                                    onClick={() => {
-                                                        setTrainingRole(dept as any);
-                                                        const rolesForDept = trainingMaterials.filter(m => m.level === 2 && m.department === dept);
-                                                        if (rolesForDept.length > 0) {
-                                                            setSelectedSOPSection(rolesForDept[0].category);
-                                                        }
-                                                    }}
+                                                    key={cat}
+                                                    onClick={() => setSelectedSOPSection(cat)}
                                                     style={{
-                                                        padding: '0.6rem 1.25rem',
-                                                        borderRadius: '10px',
+                                                        textAlign: 'left',
+                                                        padding: '1rem 1.25rem',
+                                                        borderRadius: '12px',
                                                         border: 'none',
-                                                        background: trainingRole === dept ? 'var(--primary)' : 'transparent',
-                                                        color: trainingRole === dept ? 'white' : 'var(--text-muted)',
+                                                        background: selectedSOPSection === cat ? 'var(--bg-card)' : 'transparent',
+                                                        color: selectedSOPSection === cat ? 'var(--primary)' : 'var(--text-muted)',
                                                         fontWeight: 800,
+                                                        fontSize: '0.9rem',
                                                         cursor: 'pointer',
-                                                        fontSize: '0.85rem',
-                                                        transition: 'all 0.2s'
+                                                        transition: 'all 0.2s',
+                                                        boxShadow: selectedSOPSection === cat ? '0 4px 6px -1px rgba(0, 0, 0, 0.05)' : 'none',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between'
                                                     }}
                                                 >
-                                                    {dept}
+                                                    {cat}
+                                                    {selectedSOPSection === cat && <i className="fa-solid fa-chevron-right" style={{ fontSize: '0.75rem' }}></i>}
                                                 </button>
                                             ))}
                                         </div>
-                                    </div>
-                                </div>
 
-                                <div style={{ display: 'flex', gap: '2.5rem', alignItems: 'flex-start' }}>
-                                    <div style={{ width: '300px', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.75rem', borderRadius: '20px', border: '1px solid var(--border)', flexShrink: 0 }}>
-                                        {Array.from(new Set(trainingMaterials.filter(m => m.level === 2 && m.department === trainingRole).map(m => m.category))).map(cat => (
-                                            <button
-                                                key={cat}
-                                                onClick={() => setSelectedSOPSection(cat)}
-                                                style={{
-                                                    textAlign: 'left',
-                                                    padding: '1rem 1.25rem',
-                                                    borderRadius: '12px',
-                                                    border: 'none',
-                                                    background: selectedSOPSection === cat ? 'var(--bg-card)' : 'transparent',
-                                                    color: selectedSOPSection === cat ? 'var(--primary)' : 'var(--text-muted)',
-                                                    fontWeight: 800,
-                                                    fontSize: '0.9rem',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s',
-                                                    boxShadow: selectedSOPSection === cat ? '0 4px 6px -1px rgba(0, 0, 0, 0.05)' : 'none',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between'
-                                                }}
-                                            >
-                                                {cat}
-                                                {selectedSOPSection === cat && <i className="fa-solid fa-chevron-right" style={{ fontSize: '0.75rem' }}></i>}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <div style={{ flex: 1 }}>
-                                        {selectedSOPSection ? (
-                                            <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem' }}>
-                                                    <div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>{trainingRole}</div>
-                                                        <h5 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{selectedSOPSection}</h5>
+                                        <div style={{ flex: 1 }}>
+                                            {selectedSOPSection ? (
+                                                <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem' }}>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>{trainingRole}</div>
+                                                            <h5 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{selectedSOPSection}</h5>
+                                                        </div>
+                                                        <div style={{ background: 'var(--bg-main)', color: 'var(--primary)', padding: '0.5rem 1.25rem', borderRadius: '12px', fontWeight: 800, fontSize: '0.9rem', border: '1px solid var(--border)' }}>
+                                                            {trainingMaterials.filter(m => m.level === 2 && m.department === trainingRole && m.category === selectedSOPSection).length} {t('workerPortal.training.documents')}
+                                                        </div>
                                                     </div>
-                                                    <div style={{ background: 'var(--bg-main)', color: 'var(--primary)', padding: '0.5rem 1.25rem', borderRadius: '12px', fontWeight: 800, fontSize: '0.9rem', border: '1px solid var(--border)' }}>
-                                                        {trainingMaterials.filter(m => m.level === 2 && m.department === trainingRole && m.category === selectedSOPSection).length} {t('workerPortal.training.documents')}
+
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem' }}>
+                                                        {trainingMaterials
+                                                            .filter(m => m.level === 2 && m.department === trainingRole && m.category === selectedSOPSection)
+                                                            .map((doc, dIdx) => (
+                                                                <button
+                                                                    key={dIdx}
+                                                                    onClick={() => {
+                                                                        setSelectedPdf(trainingService.getPublicUrl(doc.file_path));
+                                                                        setCurrentTrainingName(doc.display_name); // For SOPs, we track by doc name maybe? OR category?
+                                                                    }}
+                                                                    style={{
+                                                                        textAlign: 'left',
+                                                                        padding: '1.25rem',
+                                                                        background: 'var(--bg-main)',
+                                                                        border: '1.5px solid var(--border)',
+                                                                        borderRadius: '16px',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'all 0.2s',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '1.25rem'
+                                                                    }}
+                                                                >
+                                                                    <div style={{ width: '40px', height: '40px', background: 'white', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: '1.2rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', flexShrink: 0 }}>
+                                                                        <i className="fa-solid fa-file-pdf"></i>
+                                                                    </div>
+                                                                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: 1.4 }}>{doc.display_name}</div>
+                                                                </button>
+                                                            ))}
                                                     </div>
                                                 </div>
-
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem' }}>
-                                                    {trainingMaterials
-                                                        .filter(m => m.level === 2 && m.department === trainingRole && m.category === selectedSOPSection)
-                                                        .map((doc, dIdx) => (
-                                                            <button
-                                                                key={dIdx}
-                                                                onClick={() => {
-                                                                    setSelectedPdf(trainingService.getPublicUrl(doc.file_path));
-                                                                    setCurrentTrainingName(doc.display_name); // For SOPs, we track by doc name maybe? OR category?
-                                                                }}
-                                                                style={{
-                                                                    textAlign: 'left',
-                                                                    padding: '1.25rem',
-                                                                    background: 'var(--bg-main)',
-                                                                    border: '1.5px solid var(--border)',
-                                                                    borderRadius: '16px',
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '1.25rem'
-                                                                }}
-                                                            >
-                                                                <div style={{ width: '40px', height: '40px', background: 'white', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: '1.2rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', flexShrink: 0 }}>
-                                                                    <i className="fa-solid fa-file-pdf"></i>
-                                                                </div>
-                                                                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: 1.4 }}>{doc.display_name}</div>
-                                                            </button>
-                                                        ))}
+                                            ) : (
+                                                <div style={{ textAlign: 'center', padding: '5rem 2rem', background: 'var(--bg-main)', borderRadius: '24px', border: '1.5px dashed var(--border)', color: 'var(--text-muted)' }}>
+                                                    <i className="fa-solid fa-arrow-left" style={{ fontSize: '2rem', marginBottom: '1rem', display: 'block' }}></i>
+                                                    <p style={{ fontWeight: 700 }}>Select a section from the left to view training materials</p>
                                                 </div>
-                                            </div>
-                                        ) : (
-                                            <div style={{ textAlign: 'center', padding: '5rem 2rem', background: 'var(--bg-main)', borderRadius: '24px', border: '1.5px dashed var(--border)', color: 'var(--text-muted)' }}>
-                                                <i className="fa-solid fa-arrow-left" style={{ fontSize: '2rem', marginBottom: '1rem', display: 'block' }}></i>
-                                                <p style={{ fontWeight: 700 }}>Select a section from the left to view training materials</p>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
                             )}
                         </div>
                     )}
@@ -2243,7 +2278,7 @@ export const WorkerPortalPage: React.FC = () => {
                                     <form onSubmit={handleLeaveSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                                         <div className="info-field">
                                             <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.type')}</label>
-                                            <select 
+                                            <select
                                                 className="info-input"
                                                 style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                                                 value={leaveFormData.type}
@@ -2256,8 +2291,8 @@ export const WorkerPortalPage: React.FC = () => {
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                             <div className="info-field">
                                                 <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.startDate')}</label>
-                                                <input 
-                                                    type="date" 
+                                                <input
+                                                    type="date"
                                                     className="info-input"
                                                     style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                                                     value={leaveFormData.start_date}
@@ -2266,8 +2301,8 @@ export const WorkerPortalPage: React.FC = () => {
                                             </div>
                                             <div className="info-field">
                                                 <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.endDate')}</label>
-                                                <input 
-                                                    type="date" 
+                                                <input
+                                                    type="date"
                                                     className="info-input"
                                                     style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                                                     value={leaveFormData.end_date}
@@ -2277,8 +2312,8 @@ export const WorkerPortalPage: React.FC = () => {
                                         </div>
                                         <div className="info-field">
                                             <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.hoursRequested')}</label>
-                                            <input 
-                                                type="number" 
+                                            <input
+                                                type="number"
                                                 className="info-input"
                                                 style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                                                 placeholder="e.g. 8"
@@ -2288,7 +2323,7 @@ export const WorkerPortalPage: React.FC = () => {
                                         </div>
                                         <div className="info-field">
                                             <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.reason')}</label>
-                                            <textarea 
+                                            <textarea
                                                 className="info-input"
                                                 style={{ minHeight: '100px', resize: 'vertical', background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                                                 placeholder={t('workerPortal.timeOff.reasonPlaceholder')}
@@ -2296,9 +2331,9 @@ export const WorkerPortalPage: React.FC = () => {
                                                 onChange={e => setLeaveFormData(prev => ({ ...prev, reason: e.target.value }))}
                                             />
                                         </div>
-                                        <button 
-                                            type="submit" 
-                                            className="clock-btn" 
+                                        <button
+                                            type="submit"
+                                            className="clock-btn"
                                             disabled={isSubmittingLeave}
                                             style={{ background: 'var(--primary)', color: 'white', marginTop: '0.5rem' }}
                                         >
@@ -2307,50 +2342,38 @@ export const WorkerPortalPage: React.FC = () => {
                                     </form>
                                 </div>
 
-                                {/* History */}
+                                {/* History Ledger */}
                                 <div className="info-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                                     <div className="card-header">
-                                        <i className="fa-solid fa-history"></i>
-                                        <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.timeOff.historyTitle')}</h3>
+                                        <i className="fa-solid fa-clock-rotate-left"></i>
+                                        <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.timeOff.historyLedgerTitle', 'Detailed History')}</h3>
                                     </div>
                                     <div style={{ overflowX: 'auto' }}>
                                         <table className="info-table">
                                             <thead>
                                                 <tr>
-                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.type')}</th>
-                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.dates')}</th>
-                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.hours')}</th>
-                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.status')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.date')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.description')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.used')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.earned')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.balance')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {leaveRequests.length > 0 ? leaveRequests.map(req => (
-                                                    <tr key={req.id}>
-                                                        <td style={{ fontWeight: 800, color: 'var(--text-main)' }}>
-                                                            {req.type === 'pto' ? t('workerPortal.timeOff.pto') : t('workerPortal.timeOff.sick')}
+                                                {leaveHistory.length > 0 ? leaveHistory.map(item => (
+                                                    <tr key={item.id}>
+                                                        <td style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>
+                                                            {item.entry_date.includes('-') ? (() => { const [y, m, d] = item.entry_date.split('-'); return `${m}/${d}/${y}`; })() : item.entry_date}
                                                         </td>
-                                                        <td style={{ color: 'var(--text-main)' }}>
-                                                            <div style={{ fontSize: '0.85rem' }}>{new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}</div>
-                                                        </td>
-                                                        <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>{req.hours_requested} hrs</td>
-                                                        <td>
-                                                            <span style={{ 
-                                                                padding: '4px 8px', 
-                                                                borderRadius: '6px', 
-                                                                fontSize: '0.75rem', 
-                                                                fontWeight: 800,
-                                                                textTransform: 'uppercase',
-                                                                background: req.status === 'approved' ? 'var(--success-bg)' : req.status === 'rejected' ? 'var(--danger-bg)' : 'var(--warning-bg)',
-                                                                color: req.status === 'approved' ? 'var(--success)' : req.status === 'rejected' ? 'var(--danger)' : 'var(--warning)'
-                                                            }}>
-                                                                {req.status}
-                                                            </span>
-                                                        </td>
+                                                        <td style={{ color: 'var(--text-main)', fontWeight: 700 }}>{item.description}</td>
+                                                        <td style={{ color: 'var(--danger)', fontWeight: 800 }}>{item.used_hours != null ? `-${item.used_hours.toFixed(2)}` : ''}</td>
+                                                        <td style={{ color: 'var(--success)', fontWeight: 800 }}>{item.earned_hours != null ? `+${item.earned_hours.toFixed(2)}` : ''}</td>
+                                                        <td style={{ color: 'var(--text-main)', fontWeight: 900 }}>{Number(item.balance).toFixed(2)}</td>
                                                     </tr>
                                                 )) : (
                                                     <tr>
-                                                        <td colSpan={4} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                                            {t('workerPortal.timeOff.noRequests')}
+                                                        <td colSpan={5} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                                            {t('workerPortal.timeOff.noHistory')}
                                                         </td>
                                                     </tr>
                                                 )}
@@ -2364,7 +2387,6 @@ export const WorkerPortalPage: React.FC = () => {
                 </div>
             </main>
 
-            {/* PDF Viewer Modal */}
             {selectedPdf && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.95)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
                     <div style={{ background: 'var(--bg-card)', width: '100%', maxWidth: '1200px', borderRadius: '32px', overflow: 'hidden', boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', height: '90vh', border: '1px solid var(--border)' }}>
@@ -2382,17 +2404,17 @@ export const WorkerPortalPage: React.FC = () => {
                                     setSelectedPdf(null);
                                     setCurrentTrainingName(null);
                                 }}
-                                style={{ 
-                                    background: isTimerActive ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)', 
-                                    border: 'none', 
-                                    color: 'white', 
-                                    cursor: isTimerActive ? 'not-allowed' : 'pointer', 
-                                    width: '40px', 
-                                    height: '40px', 
-                                    borderRadius: '12px', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
+                                style={{
+                                    background: isTimerActive ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)',
+                                    border: 'none',
+                                    color: 'white',
+                                    cursor: isTimerActive ? 'not-allowed' : 'pointer',
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                     fontSize: '1.2rem',
                                     opacity: isTimerActive ? 0.3 : 1
                                 }}
@@ -2431,9 +2453,9 @@ export const WorkerPortalPage: React.FC = () => {
                             {!isTimerActive && (
                                 <div style={{ display: 'flex', justifyContent: 'flex-start', background: 'var(--bg-main)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '4px solid var(--accent)' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-main)', fontSize: '0.95rem', fontWeight: 600 }}>
-                                        <input 
-                                            type="checkbox" 
-                                            checked={isEndOfPdf} 
+                                        <input
+                                            type="checkbox"
+                                            checked={isEndOfPdf}
                                             onChange={(e) => setIsEndOfPdf(e.target.checked)}
                                             style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--success)' }}
                                         />
@@ -2450,13 +2472,13 @@ export const WorkerPortalPage: React.FC = () => {
                                 ) : (
                                     <button
                                         onClick={handleUnlockNext}
-                                        style={{ 
-                                            padding: '0.75rem 1.5rem', 
-                                            borderRadius: '12px', 
-                                            border: '1.5px solid var(--success)', 
-                                            background: 'transparent', 
-                                            color: 'var(--success)', 
-                                            fontWeight: 800, 
+                                        style={{
+                                            padding: '0.75rem 1.5rem',
+                                            borderRadius: '12px',
+                                            border: '1.5px solid var(--success)',
+                                            background: 'transparent',
+                                            color: 'var(--success)',
+                                            fontWeight: 800,
                                             cursor: 'pointer',
                                             display: 'flex',
                                             alignItems: 'center',
@@ -2500,14 +2522,14 @@ export const WorkerPortalPage: React.FC = () => {
                                         setIsEndOfPdf(false);
                                     }}
                                     disabled={isTimerActive || !isEndOfPdf}
-                                    style={{ 
-                                        padding: '0.75rem 2rem', 
-                                        borderRadius: '12px', 
-                                        border: 'none', 
-                                        background: (isTimerActive || !isEndOfPdf) ? 'var(--border)' : 'var(--success)', 
-                                        color: (isTimerActive || !isEndOfPdf) ? 'var(--text-muted)' : 'white', 
-                                        fontWeight: 800, 
-                                        cursor: (isTimerActive || !isEndOfPdf) ? 'not-allowed' : 'pointer', 
+                                    style={{
+                                        padding: '0.75rem 2rem',
+                                        borderRadius: '12px',
+                                        border: 'none',
+                                        background: (isTimerActive || !isEndOfPdf) ? 'var(--border)' : 'var(--success)',
+                                        color: (isTimerActive || !isEndOfPdf) ? 'var(--text-muted)' : 'white',
+                                        fontWeight: 800,
+                                        cursor: (isTimerActive || !isEndOfPdf) ? 'not-allowed' : 'pointer',
                                         boxShadow: (isTimerActive || !isEndOfPdf) ? 'none' : 'var(--shadow-sm)',
                                         transition: 'all 0.3s'
                                     }}

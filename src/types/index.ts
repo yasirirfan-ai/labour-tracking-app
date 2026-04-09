@@ -75,7 +75,7 @@ export interface User {
     
     // EEO Fields
     ethnicity?: string;
-    eeo_job_category?: string;
+    eeo_category?: string;
     
     // Bonus Fields
     annual_bonus_percentage?: number;

@@ -83,7 +83,7 @@ export const HireWorkerPage: React.FC = () => {
         if (value === 'Monthly') {
             updates.pay_type = 'Salary';
             updates.pay_period = 'Year';
-        } else if (value === 'Twice a month') {
+        } else if (value === 'Semi-monthly') {
             updates.pay_type = 'Hourly';
             updates.pay_period = 'Hour';
         }
@@ -149,7 +149,10 @@ export const HireWorkerPage: React.FC = () => {
                             </div>
                             <div className="form-field quarter-width">
                                 <label>{t('hire.fields.firstName')}</label>
-                                <input type="text" placeholder={t('hire.fields.firstName')} value={formData.first_name} onChange={e => setFormData(prev => ({...prev, first_name: e.target.value, name: `${e.target.value} ${prev.last_name}`}))} />
+                                <input type="text" placeholder={t('hire.fields.firstName')} value={formData.first_name} onChange={e => {
+                                    const newFirst = e.target.value;
+                                    setFormData(prev => ({...prev, first_name: newFirst, name: `${newFirst} ${prev.last_name}`.trim()}));
+                                }} />
                             </div>
                             <div className="form-field quarter-width">
                                 <label>{t('hire.fields.middleName')}</label>
@@ -157,7 +160,10 @@ export const HireWorkerPage: React.FC = () => {
                             </div>
                             <div className="form-field quarter-width">
                                 <label>{t('hire.fields.lastName')}</label>
-                                <input type="text" placeholder={t('hire.fields.lastName')} value={formData.last_name} onChange={e => setFormData(prev => ({...prev, last_name: e.target.value, name: `${prev.first_name} ${e.target.value}`}))} />
+                                <input type="text" placeholder={t('hire.fields.lastName')} value={formData.last_name} onChange={e => {
+                                    const newLast = e.target.value;
+                                    setFormData(prev => ({...prev, last_name: newLast, name: `${prev.first_name} ${newLast}`.trim()}));
+                                }} />
                             </div>
                             <div className="form-field quarter-width">
                                 <label>{t('hire.fields.preferredName')}</label>
@@ -287,8 +293,7 @@ export const HireWorkerPage: React.FC = () => {
                                 <select value={formData.pay_schedule} onChange={e => handlePayScheduleChange(e.target.value)}>
                                     <option value="">{t('common.select')}</option>
                                     <option value="Monthly">{t('hire.options.paySchedule.monthly')}</option>
-                                    <option value="Twice a month">{t('hire.options.paySchedule.twiceMonth')}</option>
-                                    <option value="Weekly">{t('hire.options.paySchedule.weekly')}</option>
+                                    <option value="Semi-monthly">{t('hire.options.paySchedule.semiMonthly')}</option>
                                 </select>
                             </div>
                             <div className="form-field half-width">

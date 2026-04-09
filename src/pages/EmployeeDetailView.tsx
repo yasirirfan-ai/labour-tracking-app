@@ -39,6 +39,10 @@ export const EmployeeDetailView: React.FC = () => {
     const [selectedTrainingRole, setSelectedTrainingRole] = useState<string | null>(null);
     const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>([]);
     const [trainingLanguage, setTrainingLanguage] = useState<'en' | 'es'>('en');
+    const [selectedHistoryYear, setSelectedHistoryYear] = useState<string>('All');
+    const [historyPage, setHistoryPage] = useState(1);
+    const [historyView, setHistoryView] = useState<'balance' | 'requests'>('balance');
+    const itemsPerPage = 20;
 
     useEffect(() => {
         const fetchTrainings = async () => {
@@ -79,23 +83,34 @@ export const EmployeeDetailView: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
-    /** Auto-sync + fetch history whenever the Time Off tab becomes active */
-    const isSyncingRef = React.useRef(false);
+    /** Auto-fetch history whenever the Time Off tab becomes active */
     useEffect(() => {
-        if (activeTab === 'Time Off' && employee && !isSyncingRef.current) {
-            isSyncingRef.current = true;
-            syncLeaveBalances(employee).then((result: any) => {
-                if (!result.error) {
-                    setEmployee(prev => prev ? { ...prev, pto_balance: String(result.pto), sick_balance: String(result.sick) } : null);
-                    setInitialEmployee(prev => prev ? { ...prev, pto_balance: String(result.pto), sick_balance: String(result.sick) } : null);
+        if (activeTab === 'Time Off' && employee) {
+            syncLeaveBalances(employee as any).then((res: any) => {
+                if (res && !res.error) {
+                    setEmployee(prev => prev ? { ...prev, pto_balance: String(res.pto), sick_balance: String(res.sick) } : null);
                 }
-                isSyncingRef.current = false;
             });
             fetchLeaveHistory(employee.id).then((rows: LeaveHistoryRow[]) => setLeaveHistory(rows));
             fetchLeaveRequests(employee.id);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, !!employee]);
+
+    /** Reset history page when filters change */
+    useEffect(() => {
+        setHistoryPage(1);
+    }, [accrualHistoryType, selectedHistoryYear, historySearch]);
+
+    /** Real-time name sync */
+    useEffect(() => {
+        if (employee && (employee.first_name || employee.last_name)) {
+            const newName = `${employee.first_name || ''} ${employee.last_name || ''}`.trim();
+            if (employee.name !== newName) {
+                setEmployee(prev => prev ? { ...prev, name: newName } : null);
+            }
+        }
+    }, [employee?.first_name, employee?.last_name]);
 
     if (loading) return <div className="loading-screen">{t('common.loading')}</div>;
     if (!employee || !initialEmployee) return <div>{t('common.notFound')}</div>;
@@ -199,7 +214,10 @@ export const EmployeeDetailView: React.FC = () => {
 
             // 2. If approved, deduct balance
             if (status === 'approved') {
-                const balanceField = request.type === 'pto' ? 'pto_balance' : 'sick_balance';
+                const isMonthly = (employee as any)?.pay_schedule?.toLowerCase().includes('monthly') && !(employee as any)?.pay_schedule?.toLowerCase().includes('semi');
+                const balanceField = (request.type === 'sick' && isMonthly) ? 'pto_balance' : (request.type === 'pto' ? 'pto_balance' : 'sick_balance');
+                const typeForHistory = (request.type === 'sick' && isMonthly) ? 'pto' : request.type;
+
                 const currentBalance = parseFloat((employee as any)?.[balanceField] || '0');
                 const newBalance = (currentBalance - request.hours_requested).toFixed(2);
 
@@ -211,13 +229,17 @@ export const EmployeeDetailView: React.FC = () => {
                 if (balanceError) throw balanceError;
 
                 // 3. Add to leave_history
+                const description = (request.type === 'sick' && isMonthly)
+                    ? `Sick leave approved – deducted from PTO for ${request.start_date} - ${request.end_date}`
+                    : `Approved ${request.type.toUpperCase()} for ${request.start_date} - ${request.end_date}`;
+
                 const { error: historyError } = await (supabase.from('leave_history') as any).insert([{
                     user_id: request.user_id,
-                    type: request.type,
+                    type: typeForHistory,
                     used_hours: request.hours_requested,
                     earned_hours: null,
                     balance: parseFloat(newBalance),
-                    description: `Approved ${request.type.toUpperCase()} for ${request.start_date} - ${request.end_date}`,
+                    description: description,
                     entry_date: request.start_date,
                     created_at: new Date().toISOString()
                 }]);
@@ -238,7 +260,7 @@ export const EmployeeDetailView: React.FC = () => {
     };
 
 
-    const tabs = ['Personal', 'Job', 'Training', 'Emergency', 'Time Off'];
+    const tabs = ['Personal', 'Job', 'Training', 'Emergency', 'Time Off', 'Benefits'];
 
     const ethnicityOptions = [
         "American Indian or Alaska Native",
@@ -309,8 +331,8 @@ export const EmployeeDetailView: React.FC = () => {
                     <section className="sidebar-section">
                         <h3>{t('employeeDetail.vitals')}</h3>
                         <div className="vitals-list">
-                            <div className="vital-item"><i className="fa-solid fa-phone"></i> {employee.phone || t('common.notAvailable')}</div>
-                            <div className="vital-item"><i className="fa-solid fa-envelope"></i> {employee.email || employee.username}</div>
+                            <div className="vital-item"><i className="fa-solid fa-phone"></i> {employee.work_phone || employee.phone || t('common.notAvailable')}</div>
+                            <div className="vital-item"><i className="fa-solid fa-envelope"></i> {employee.work_email || employee.email || employee.username}</div>
                             <div className="vital-item"><i className="fa-solid fa-briefcase"></i> {employee.job_title || t('employeeDetail.job.defaultTitle')} <br /> {t('hire.options.employment.fullTime')}</div>
                             <div className="vital-item"><i className="fa-solid fa-building"></i> {employee.department || t('employeeDetail.job.defaultDepartment')}</div>
                         </div>
@@ -550,9 +572,35 @@ export const EmployeeDetailView: React.FC = () => {
                         const sickUsable = hireDate ? isSickLeaveUsable(hireDate) : false;
                         const ptoBalance = parseFloat(employee.pto_balance || '0');
                         const sickBalance = parseFloat(employee.sick_balance || '0');
+                        
+                        const isMonthly = (employee as any)?.pay_schedule?.toLowerCase().includes('monthly') && !(employee as any)?.pay_schedule?.toLowerCase().includes('semi');
+                        const periodLabel = isMonthly ? '30 days' : '15 days';
 
-                        /** Filter real leave history by selected type */
-                        const displayRows = leaveHistory.filter(r => r.type === accrualHistoryType);
+                        /** Filter real leave history by selected type, year, and search */
+                        const displayRows = leaveHistory.filter(r => {
+                            const matchesType = r.type === accrualHistoryType;
+                            const matchesYear = selectedHistoryYear === 'All' || r.entry_date.startsWith(selectedHistoryYear);
+                            const matchesSearch = r.description.toLowerCase().includes(historySearch.toLowerCase());
+                            return matchesType && matchesYear && matchesSearch;
+                        });
+
+                        const totalPages = Math.ceil(displayRows.length / itemsPerPage);
+                        
+                        // Sort descending: newest first
+                        const sortedRows = [...displayRows].sort((a, b) => {
+                            if (b.entry_date !== a.entry_date) {
+                                return b.entry_date.localeCompare(a.entry_date);
+                            }
+                            // If entry dates are same, sort by created_at descending
+                            return (b.created_at || '').localeCompare(a.created_at || '');
+                        });
+
+                        const paginatedRows = sortedRows.slice(
+                            (historyPage - 1) * itemsPerPage,
+                            historyPage * itemsPerPage
+                        );
+
+                        const years = Array.from({ length: 12 }, (_, i) => String(2026 - i)); // 2026 to 2015
 
                         return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -580,14 +628,14 @@ export const EmployeeDetailView: React.FC = () => {
                                             <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
                                         </div>
                                         <div className="card-label">{t('employeeDetail.timeOff.ptoLabel')}</div>
-                                        <div className="card-sublabel">{ptoRate.toFixed(2)} {t('employeeDetail.timeOff.payPeriod')}</div>
+                                        <div className="card-sublabel">{ptoRate.toFixed(2)} hrs / {periodLabel}</div>
                                     </div>
 
                                     {/* Sick Card */}
-                                    <div className="time-off-card">
+                                    <div className={`time-off-card ${isMonthly ? 'monthly-sick' : ''}`} style={isMonthly ? { opacity: 0.7, background: '#f8fafc' } : {}}>
                                         <div className="card-icon">
-                                            <i className="fa-solid fa-hospital"></i>
-                                            {!sickUsable && (
+                                            <i className="fa-solid fa-hospital" style={isMonthly ? { color: '#94a3b8' } : {}}></i>
+                                            {!sickUsable && !isMonthly && (
                                                 <span style={{
                                                     fontSize: '0.65rem', fontWeight: 700, background: '#fef3c7',
                                                     color: '#92400e', padding: '0.15rem 0.5rem',
@@ -596,13 +644,21 @@ export const EmployeeDetailView: React.FC = () => {
                                             )}
                                         </div>
                                         <div className="card-value">
-                                            <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
-                                                {sickBalance.toFixed(2)}
-                                            </span>
-                                            <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
+                                            {isMonthly ? (
+                                                <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#64748b', lineHeight: 1.2 }}>
+                                                    Sick leave deducted from PTO
+                                                </span>
+                                            ) : (
+                                                <>
+                                                    <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
+                                                        {sickBalance.toFixed(2)}
+                                                    </span>
+                                                    <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
+                                                </>
+                                            )}
                                         </div>
                                         <div className="card-label">{t('employeeDetail.timeOff.sickLabel')}</div>
-                                        <div className="card-sublabel">{t('employeeDetail.timeOff.sickCap')}</div>
+                                        <div className="card-sublabel">{isMonthly ? 'No separate sick balance for Monthly workers' : t('employeeDetail.timeOff.sickCap')}</div>
                                     </div>
                                 </div>
 
@@ -722,7 +778,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                     className={`custom-dropdown-header small ${openDropdown === 'year' ? 'active' : ''}`}
                                                     onClick={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
                                                 >
-                                                    All <i className="fa-solid fa-chevron-down"></i>
+                                                    {selectedHistoryYear} <i className="fa-solid fa-chevron-down"></i>
                                                 </div>
                                                 {openDropdown === 'year' && (
                                                     <div className="dropdown-menu has-search">
@@ -736,9 +792,17 @@ export const EmployeeDetailView: React.FC = () => {
                                                                 autoFocus
                                                             />
                                                         </div>
-                                                        <div className="dropdown-item">2026</div>
-                                                        <div className="dropdown-item">2025</div>
-                                                        <div className="dropdown-item selected">All</div>
+                                                        <div
+                                                            className={`dropdown-item ${selectedHistoryYear === 'All' ? 'selected' : ''}`}
+                                                            onClick={() => { setSelectedHistoryYear('All'); setOpenDropdown(null); }}
+                                                        >All</div>
+                                                        {years.map(y => (
+                                                            <div
+                                                                key={y}
+                                                                className={`dropdown-item ${selectedHistoryYear === y ? 'selected' : ''}`}
+                                                                onClick={() => { setSelectedHistoryYear(y); setOpenDropdown(null); }}
+                                                            >{y}</div>
+                                                        ))}
                                                     </div>
                                                 )}
                                             </div>
@@ -748,46 +812,178 @@ export const EmployeeDetailView: React.FC = () => {
                                                     className={`custom-dropdown-header ${openDropdown === 'view' ? 'active' : ''}`}
                                                     onClick={() => setOpenDropdown(openDropdown === 'view' ? null : 'view')}
                                                 >
-                                                    Balance History <i className="fa-solid fa-chevron-down"></i>
+                                                    {historyView === 'requests' ? 'Requests' : 'Balance History'} <i className="fa-solid fa-chevron-down"></i>
                                                 </div>
                                                 {openDropdown === 'view' && (
                                                     <div className="dropdown-menu">
-                                                        <div className="dropdown-item">{t('employeeDetail.timeOff.requests')}</div>
-                                                        <div className="dropdown-item selected">{t('employeeDetail.timeOff.balanceHistory')}</div>
+                                                        <div
+                                                            className={`dropdown-item ${historyView === 'requests' ? 'selected' : ''}`}
+                                                            onClick={() => { setHistoryView('requests'); setOpenDropdown(null); }}
+                                                        >Requests</div>
+                                                        <div
+                                                            className={`dropdown-item ${historyView === 'balance' ? 'selected' : ''}`}
+                                                            onClick={() => { setHistoryView('balance'); setOpenDropdown(null); }}
+                                                        >Balance History</div>
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
 
-                                    {displayRows.length === 0 ? (
+                                    {historyView === 'requests' ? (
+                                        leaveRequests.length === 0 ? (
+                                            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                                                <i className="fa-solid fa-inbox" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }}></i>
+                                                No leave requests found.
+                                            </div>
+                                        ) : (
+                                            <table className="history-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Date <i className="fa-solid fa-arrow-up"></i></th>
+                                                        <th>Description</th>
+                                                        <th>Submitted</th>
+                                                        <th>Status</th>
+                                                        <th>(-)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {leaveRequests
+                                                        .filter(req => accrualHistoryType === 'pto' ? (req.type === 'pto' || req.type === 'vacation') : req.type === 'sick')
+                                                        .map((req) => {
+                                                            const fmtDate = (d: string) => {
+                                                                if (!d) return '';
+                                                                const [y, m, day] = d.split('T')[0].split('-');
+                                                                return `${m}/${day}/${y}`;
+                                                            };
+                                                            const statusColor = req.status === 'approved' ? '#16a34a' : req.status === 'rejected' || req.status === 'cancelled' ? '#dc2626' : '#d97706';
+                                                            const approverName = req.approved_by_name || req.rejected_by_name || '';
+                                                            const actionDate = req.approved_at || req.rejected_at || req.updated_at || '';
+                                                            const actionDateFmt = actionDate ? fmtDate(actionDate) : '';
+                                                            return (
+                                                                <tr key={req.id}>
+                                                                    <td style={{ whiteSpace: 'nowrap' }}>
+                                                                        {fmtDate(req.start_date)} - {fmtDate(req.end_date)}
+                                                                    </td>
+                                                                    <td>
+                                                                        <div>{req.type === 'pto' || req.type === 'vacation' ? 'Paid Time Off (PTO)' : 'Sick Time'}</div>
+                                                                        {req.reason && <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>See Comments</div>}
+                                                                    </td>
+                                                                    <td style={{ whiteSpace: 'nowrap', color: '#64748b' }}>
+                                                                        {fmtDate(req.created_at)}
+                                                                    </td>
+                                                                    <td>
+                                                                        <span style={{ color: statusColor, fontWeight: 700, textTransform: 'capitalize' }}>
+                                                                            {req.status}
+                                                                        </span>
+                                                                        {approverName && actionDateFmt && (
+                                                                            <span style={{ color: '#64748b', fontWeight: 400, fontSize: '0.8rem' }}>
+                                                                                {' '}({approverName} {actionDateFmt})
+                                                                            </span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="used-cell" style={{ color: '#dc2626', fontWeight: 700 }}>
+                                                                        {req.hours_requested != null ? `-${Number(req.hours_requested).toFixed(2)}` : ''}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        )
+                                    ) : displayRows.length === 0 ? (
                                         <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
                                             <i className="fa-solid fa-inbox" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }}></i>
                                             {t('No History')}
                                         </div>
                                     ) : (
-                                        <table className="history-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>{t('employeeDetail.timeOff.date')} <i className="fa-solid fa-arrow-up"></i></th>
-                                                    <th>{t('employeeDetail.timeOff.description')}</th>
-                                                    <th>{t('employeeDetail.timeOff.usedHours')}</th>
-                                                    <th>{t('employeeDetail.timeOff.earnedHours')}</th>
-                                                    <th>{t('employeeDetail.timeOff.balance')}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {displayRows.map((item) => (
-                                                    <tr key={item.id}>
-                                                        <td>{new Date(item.entry_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</td>
-                                                        <td>{item.description}</td>
-                                                        <td className="used-cell">{item.used_hours != null ? item.used_hours.toFixed(2) : ''}</td>
-                                                        <td className="earned-cell">{item.earned_hours != null ? item.earned_hours.toFixed(2) : ''}</td>
-                                                        <td className="balance-cell">{Number(item.balance).toFixed(2)}</td>
+                                        <>
+                                            <table className="history-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>{t('employeeDetail.timeOff.date')} <i className="fa-solid fa-arrow-up"></i></th>
+                                                        <th>{t('employeeDetail.timeOff.description')}</th>
+                                                        <th>{t('employeeDetail.timeOff.usedHours')}</th>
+                                                        <th>{t('employeeDetail.timeOff.earnedHours')}</th>
+                                                        <th>{t('employeeDetail.timeOff.balance')}</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody>
+                                                    {paginatedRows.map((item) => (
+                                                        <tr key={item.id}>
+                                                            <td>{item.entry_date.includes('-') ? (() => { const [y, m, d] = item.entry_date.split('-'); return `${m}/${d}/${y}`; })() : item.entry_date}</td>
+                                                            <td>{item.description}</td>
+                                                            <td className="used-cell">{item.used_hours != null ? item.used_hours.toFixed(2) : ''}</td>
+                                                            <td className="earned-cell">{item.earned_hours != null ? item.earned_hours.toFixed(2) : ''}</td>
+                                                            <td className="balance-cell">{Number(item.balance).toFixed(2)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+
+                                            {/* Pagination Controls */}
+                                            {totalPages > 1 && (
+                                                <div className="pagination-container" style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                    gap: '1.5rem',
+                                                    marginTop: '2rem',
+                                                    padding: '1rem',
+                                                    background: '#f8fafc',
+                                                    borderRadius: '16px',
+                                                    border: '1px solid #e2e8f0'
+                                                }}>
+                                                    <button
+                                                        onClick={() => setHistoryPage(prev => Math.max(1, prev - 1))}
+                                                        disabled={historyPage === 1}
+                                                        className="pagination-btn"
+                                                        style={{
+                                                            padding: '0.6rem 1.2rem',
+                                                            borderRadius: '10px',
+                                                            border: '1px solid #e2e8f0',
+                                                            background: historyPage === 1 ? '#f1f5f9' : 'white',
+                                                            color: historyPage === 1 ? '#94a3b8' : '#1e1b4b',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.85rem',
+                                                            cursor: historyPage === 1 ? 'not-allowed' : 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.5rem',
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                    >
+                                                        <i className="fa-solid fa-chevron-left"></i> {t('common.previous', 'Previous')}
+                                                    </button>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e1b4b' }}>{historyPage}</span>
+                                                        <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>/ {totalPages}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setHistoryPage(prev => Math.min(totalPages, prev + 1))}
+                                                        disabled={historyPage === totalPages}
+                                                        className="pagination-btn"
+                                                        style={{
+                                                            padding: '0.6rem 1.2rem',
+                                                            borderRadius: '10px',
+                                                            border: '1px solid #e2e8f0',
+                                                            background: historyPage === totalPages ? '#f1f5f9' : 'white',
+                                                            color: historyPage === totalPages ? '#94a3b8' : '#1e1b4b',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.85rem',
+                                                            cursor: historyPage === totalPages ? 'not-allowed' : 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.5rem',
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                    >
+                                                        {t('common.next', 'Next')} <i className="fa-solid fa-chevron-right"></i>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -802,27 +998,27 @@ export const EmployeeDetailView: React.FC = () => {
                             </div>
 
                             {isOrgChartModalOpen && (
-                        <div className="modal-overlay" onClick={() => setIsOrgChartModalOpen(false)}>
-                            <div className="modal-content org-chart-modal" onClick={e => e.stopPropagation()}>
-                                <div className="modal-header">
-                                    <h2>{t('employeeDetail.viewInOrgChart')}</h2>
-                                    <button className="close-modal" onClick={() => setIsOrgChartModalOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                                <div className="modal-overlay" onClick={() => setIsOrgChartModalOpen(false)}>
+                                    <div className="modal-content org-chart-modal" onClick={e => e.stopPropagation()}>
+                                        <div className="modal-header">
+                                            <h2>{t('employeeDetail.viewInOrgChart')}</h2>
+                                            <button className="close-modal" onClick={() => setIsOrgChartModalOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                                        </div>
+                                        <div className="modal-body" style={{ padding: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f8fafc' }}>
+                                            <img
+                                                src="/images/org_chart.png"
+                                                alt="Organizational Chart"
+                                                style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                            />
+                                        </div>
+                                        <div className="modal-footer">
+                                            <button className="modal-save-btn" onClick={() => setIsOrgChartModalOpen(false)}>{t('common.close', 'Close')}</button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="modal-body" style={{ padding: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f8fafc' }}>
-                                    <img 
-                                        src="/images/org_chart.png" 
-                                        alt="Organizational Chart" 
-                                        style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
-                                    />
-                                </div>
-                                <div className="modal-footer">
-                                    <button className="modal-save-btn" onClick={() => setIsOrgChartModalOpen(false)}>{t('common.close', 'Close')}</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                            )}
 
-                    {/* Basic Information */}
+                            {/* Basic Information */}
                             <div className="info-card">
                                 <div className="card-header">
                                     <i className="fa-solid fa-id-card"></i>
@@ -937,7 +1133,7 @@ export const EmployeeDetailView: React.FC = () => {
                                 </div>
                                 <div className="card-grid">
                                     <div className="info-field">
-                                        <label>{t('contact.workPhone')}</label>
+                                        <label>{t('Phone')}</label>
                                         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-phone" style={{ color: "var(--text-muted)" }}></i><input type="text" className={`info-input ${validationErrors.work_phone ? 'error' : ''}`} style={{ flex: 1 }} value={employee.work_phone || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_phone: e.target.value } : null)} /></div>
                                         {validationErrors.work_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.work_phone}</span>}
                                     </div>
@@ -956,11 +1152,11 @@ export const EmployeeDetailView: React.FC = () => {
                                         {validationErrors.home_phone && <span className="error-text" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>{validationErrors.home_phone}</span>}
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>{t('contact.workEmail')}</label>
+                                        <label>{t('Email')}</label>
                                         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-envelope" style={{ color: "var(--text-muted)" }}></i><input type="email" className="info-input" style={{ flex: 1 }} value={employee.work_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, work_email: e.target.value } : null)} /></div>
                                     </div>
                                     <div className="info-field full-width">
-                                        <label>{t('contact.homeEmail')}</label>
+                                        <label>{t('Home Email')}</label>
                                         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-envelope" style={{ color: "var(--text-muted)" }}></i><input type="email" className="info-input" style={{ flex: 1 }} value={employee.home_email || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, home_email: e.target.value } : null)} /></div>
                                     </div>
                                 </div>
@@ -1017,11 +1213,21 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
                                     <div className="info-field">
                                         <label>{t('employeeDetail.job.payGroup')}</label>
-                                        <select className="info-input" value={employee.pay_schedule || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, pay_schedule: e.target.value } : null)}>
-                                            <option value="">-Select-</option>
-                                            <option value="Twice a month">Twice a month</option>
-                                            <option value="Monthly">Monthly</option>
-                                            <option value="Weekly">Weekly</option>
+                                        <select className="info-input" value={employee.pay_schedule || ''} onChange={(e) => {
+                                            const val = e.target.value;
+                                            let updates: any = { pay_schedule: val };
+                                            if (val === 'Monthly') {
+                                                updates.pay_type = 'Salary';
+                                                updates.pay_period = 'Year';
+                                            } else if (val === 'Semi-monthly') {
+                                                updates.pay_type = 'Hourly';
+                                                updates.pay_period = 'Hour';
+                                            }
+                                            setEmployee(prev => prev ? { ...prev, ...updates } : null);
+                                        }}>
+                                            <option value="">{t('common.select')}</option>
+                                            <option value="Monthly">{t('hire.options.paySchedule.monthly')}</option>
+                                            <option value="Semi-monthly">{t('hire.options.paySchedule.semiMonthly')}</option>
                                         </select>
                                     </div>
                                     <div className="info-field">
@@ -1216,7 +1422,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                     setEeoSearch('');
                                                 }}
                                             >
-                                                <span>{employee.eeo_job_category || '-Select-'}</span>
+                                                <span>{employee.eeo_category || '-Select-'}</span>
                                                 <div className="trigger-divider"></div>
                                                 <i className="fa-solid fa-chevron-down"></i>
                                             </div>
@@ -1236,9 +1442,9 @@ export const EmployeeDetailView: React.FC = () => {
                                                         {filteredOptions(eeoCategoryOptions).map(opt => (
                                                             <div
                                                                 key={opt}
-                                                                className={`eeo-option ${employee.eeo_job_category === opt ? 'selected' : ''}`}
+                                                                className={`eeo-option ${employee.eeo_category === opt ? 'selected' : ''}`}
                                                                 onClick={async () => {
-                                                                    setEmployee(prev => prev ? { ...prev, eeo_job_category: opt } : null);
+                                                                    setEmployee(prev => prev ? { ...prev, eeo_category: opt } : null);
                                                                     setOpenDropdown(null);
                                                                 }}
                                                             >
@@ -1643,6 +1849,69 @@ export const EmployeeDetailView: React.FC = () => {
                                             />
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'Benefits' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                            <div className="section-title-row">
+                                <i className="fa-solid fa-umbrella"></i>
+                                <h2>{t('benefits.title')}</h2>
+                            </div>
+
+                            <div className="info-card">
+                                <div className="card-header" style={{ gap: '1rem', flexWrap: 'wrap' }}>
+                                    <select className="table-input" style={{ width: 'auto', background: 'var(--bg-main)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px' }}>
+                                        <option>{t('benefits.allEventTypes')}</option>
+                                    </select>
+                                    <select className="table-input" style={{ width: 'auto', background: 'var(--bg-main)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px' }}>
+                                        <option>{t('benefits.allPlanTypes')}</option>
+                                    </select>
+                                    <select className="table-input" style={{ width: 'auto', background: 'var(--bg-main)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px' }}>
+                                        <option>{t('benefits.changedByAnyone')}</option>
+                                    </select>
+                                    <button className="small-action-btn" style={{ marginLeft: '0' }}>{t('benefits.apply')}</button>
+                                </div>
+                                <table className="info-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{t('benefits.table.dateTime')}</th>
+                                            <th>{t('benefits.table.event')}</th>
+                                            <th>{t('benefits.table.plan')}</th>
+                                            <th>{t('benefits.table.changedBy')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>03/20/2026 10:45 AM</td>
+                                            <td>{t('benefits.eligible')}</td>
+                                            <td>{t('benefits.dental')}</td>
+                                            <td>System</td>
+                                        </tr>
+                                        <tr>
+                                            <td>03/20/2026 10:45 AM</td>
+                                            <td>{t('benefits.eligible')}</td>
+                                            <td>{t('benefits.health')}</td>
+                                            <td>System</td>
+                                        </tr>
+                                        <tr>
+                                            <td>03/20/2026 10:45 AM</td>
+                                            <td>{t('benefits.eligible')}</td>
+                                            <td>{t('benefits.vision')}</td>
+                                            <td>System</td>
+                                        </tr>
+                                        <tr>
+                                            <td>03/20/2026 10:45 AM</td>
+                                            <td>{t('benefits.eligible')}</td>
+                                            <td>{t('benefits.401k')}</td>
+                                            <td>System</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <div style={{ padding: '1rem', borderTop: '1px solid var(--border)', textAlign: 'right' }}>
+                                    <button className="text-link" style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>{t('benefits.viewHistory')}</button>
                                 </div>
                             </div>
                         </div>

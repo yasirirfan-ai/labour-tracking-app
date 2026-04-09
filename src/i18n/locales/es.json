@@ -132,6 +132,71 @@
       "noRequests": "No se encontraron solicitudes de licencia."
     }
   },
+  "table": {
+    "title": "Tabla de Control",
+    "subtitle": "Seguimiento en tiempo real de las actividades de los trabajadores (Zona horaria PST)",
+    "manualEntry": "Entrada Manual",
+    "searchPlaceholder": "Buscar MO, Operación o Trabajador...",
+    "allWorkers": "Todos los Trabajadores",
+    "allStatuses": "Todos los Estados",
+    "from": "Desde:",
+    "to": "Hasta:",
+    "reset": "Restablecer",
+    "chips": {
+      "all": "Todo",
+      "today": "Hoy",
+      "thisweek": "Esta Semana",
+      "lastweek": "La Semana Pasada",
+      "thismonth": "Este Mes",
+      "lastmonth": "El Mes Pasado"
+    },
+    "columns": {
+      "workerId": "ID Trabajador",
+      "name": "Nombre",
+      "mo": "MO",
+      "operation": "Operación",
+      "clockIn": "Entrada",
+      "startTime": "Hora de Inicio",
+      "clockOut": "Salida",
+      "lastAction": "Última Acción",
+      "duration": "Duración",
+      "status": "Estado",
+      "edit": "Editar"
+    },
+    "statusLabels": {
+      "timerRunning": "TEMPORIZADOR EN MARCHA",
+      "clockedIn": "EN SERVICIO",
+      "onBreak": "EN DESCANSO",
+      "completed": "COMPLETADO",
+      "pending": "PENDIENTE"
+    },
+    "modals": {
+      "editTitle": "Editar Entrada de Tarea",
+      "manualTitle": "Entrada Manual",
+      "worker": "Trabajador",
+      "task": "Tarea",
+      "clockIn": "Entrada",
+      "startTime": "Hora de Inicio",
+      "clockOut": "Salida",
+      "lastAction": "Última Acción",
+      "duration": "Duración Total (Asignada)",
+      "hours": "hrs",
+      "minutes": "mins",
+      "hourlyRate": "Tasa por Hora ($)",
+      "status": "Estado",
+      "update": "Actualizar Entrada",
+      "create": "Crear Entrada",
+      "cancel": "Cancelar",
+      "selectWorker": "Seleccionar Trabajador...",
+      "selectMo": "Seleccionar MO...",
+      "selectOp": "Seleccionar Operación...",
+      "validationError": "Por favor seleccione Trabajador, MO y Operación"
+    },
+    "deleteConfirm": "¿Está seguro de que desea eliminar esta entrada de actividad?",
+    "errorUpdating": "Error al actualizar la tarea",
+    "errorDeleting": "Error al eliminar la tarea",
+    "errorCreating": "Error al crear la tarea"
+  },
   "common": {
     "active": "Activo",
     "archived": "Archivado",
@@ -554,8 +619,7 @@
       },
       "paySchedule": {
         "monthly": "Mensual",
-        "twiceMonth": "Dos veces al mes",
-        "weekly": "Semanal"
+        "semiMonthly": "Quincenal"
       },
       "payType": {
         "hourly": "Por hora",
@@ -640,5 +704,24 @@
     "previous": "Anterior",
     "next": "Siguiente",
     "recordsPerPage": "Registros por página"
+  },
+  "benefits": {
+    "title": "Beneficios",
+    "allEventTypes": "Todos los tipos de eventos",
+    "allPlanTypes": "Todos los tipos de planes",
+    "changedByAnyone": "Cambiado por cualquier persona",
+    "apply": "Aplicar",
+    "table": {
+      "dateTime": "Fecha/Hora",
+      "event": "Evento",
+      "plan": "Plan",
+      "changedBy": "Cambiado por"
+    },
+    "viewHistory": "Ver todo el historial",
+    "eligible": "Elegible para el plan",
+    "dental": "Seguro Dental",
+    "health": "Seguro de Salud",
+    "vision": "Seguro de Visión",
+    "401k": "401K"
   }
 }

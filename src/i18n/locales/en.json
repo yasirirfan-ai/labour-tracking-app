@@ -123,13 +123,20 @@
       "submit": "Submit Request",
       "submitting": "Submitting...",
       "historyTitle": "Request History",
+      "historyLedgerTitle": "Detailed History Ledger",
       "table": {
         "type": "Type",
         "dates": "Dates",
         "hours": "Hours",
-        "status": "Status"
+        "status": "Status",
+        "date": "Date",
+        "description": "Description",
+        "used": "Used Hours (−)",
+        "earned": "Earned Hours (+)",
+        "balance": "Balance"
       },
-      "noRequests": "No leave requests found."
+      "noRequests": "No leave requests found.",
+      "noHistory": "No detailed history found."
     }
   },
   "matrix": {
@@ -171,10 +178,10 @@
     "chips": {
       "all": "All",
       "today": "Today",
-      "thisWeek": "This Week",
-      "lastWeek": "Last Week",
-      "thisMonth": "This Month",
-      "lastMonth": "Last Month"
+      "thisweek": "This Week",
+      "lastweek": "Last Week",
+      "thismonth": "This Month",
+      "lastmonth": "Last Month"
     },
     "columns": {
       "workerId": "Worker ID",
@@ -627,8 +634,7 @@
       },
       "paySchedule": {
         "monthly": "Monthly",
-        "twiceMonth": "Twice a month",
-        "weekly": "Weekly"
+        "semiMonthly": "Semi-monthly"
       },
       "payType": {
         "hourly": "Hourly",
@@ -713,5 +719,24 @@
     "previous": "Previous",
     "next": "Next",
     "recordsPerPage": "Records per page"
+  },
+  "benefits": {
+    "title": "Benefits",
+    "allEventTypes": "All Event Types",
+    "allPlanTypes": "All Plan Types",
+    "changedByAnyone": "Changed by Anyone",
+    "apply": "Apply",
+    "table": {
+      "dateTime": "Date/Time",
+      "event": "Event",
+      "plan": "Plan",
+      "changedBy": "Changed By"
+    },
+    "viewHistory": "View All History",
+    "eligible": "Eligible for Plan",
+    "dental": "Dental Insurance",
+    "health": "Health Insurance",
+    "vision": "Vision Insurance",
+    "401k": "401K"
   }
 }
