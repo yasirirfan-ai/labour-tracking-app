@@ -6,10 +6,9 @@ import type { User } from '../types';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PTO_TIERS = [
-    { minMonths: 0,  maxMonths: 12, rate: 0.8335, annualMax: 20, carryover: 20 },
-    { minMonths: 12, maxMonths: 24, rate: 1.3335, annualMax: 32, carryover: 32 },
-    { minMonths: 24, maxMonths: 36, rate: 2.0,    annualMax: 48, carryover: 48 },
-    { minMonths: 36, maxMonths: Infinity, rate: 4.0, annualMax: 48, carryover: 48 },
+    { minMonths: 0,  maxMonths: 12, rate: 0.41675, annualMax: 10, carryover: 10 },
+    { minMonths: 12, maxMonths: 24, rate: 0.66675, annualMax: 16, carryover: 16 },
+    { minMonths: 24, maxMonths: Infinity, rate: 1.0, annualMax: 24, carryover: 24 },
 ];
 
 /** Sick leave: 1 hour per every 30 hours worked (108 000 seconds). */
