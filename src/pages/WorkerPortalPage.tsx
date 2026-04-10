@@ -21,7 +21,6 @@ export const WorkerPortalPage: React.FC = () => {
     const [activeTasks, setActiveTasks] = useState<any[]>([]);
     const [disciplinaryIncidents, setDisciplinaryIncidents] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'dashboard' | 'personal_info' | 'conduct' | 'settings' | 'training' | 'timeoff'>('dashboard');
-    const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
     const [leaveHistory, setLeaveHistory] = useState<any[]>([]);
     const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
     const [leaveFormData, setLeaveFormData] = useState({
@@ -72,7 +71,6 @@ export const WorkerPortalPage: React.FC = () => {
             // Initial load from user object (synced via AuthContext/Supabase)
             const initialCompleted = (user as any).completed_trainings || ['GMP and Quality Awareness'];
             setCompletedTrainings(initialCompleted);
-            fetchLeaveRequests();
             fetchLeaveHistory();
         }
     }, [user?.id]);
@@ -128,17 +126,6 @@ export const WorkerPortalPage: React.FC = () => {
         setIsTimerActive(true);
     };
 
-    const fetchLeaveRequests = async () => {
-        if (!user) return;
-        const { data, error } = await supabase
-            .from('leave_requests')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
-        if (error) { console.error('Error fetching leave requests:', error); return; }
-        if (data) setLeaveRequests(data);
-    };
-
     const handleLeaveSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
@@ -167,7 +154,7 @@ export const WorkerPortalPage: React.FC = () => {
                     import.meta.env.VITE_EMAILJS_SERVICE_ID,
                     import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
                     {
-                        to_email: 'omair.khan@babylonllc.com',
+                        to_email: 'ahbhananbajwa123@gmail.com',
                         worker_name: (user as any)?.name || (user as any)?.email || 'A worker',
                         leave_type: leaveFormData.type === 'pto' ? 'PTO (Paid Time Off)' : 'Sick Leave',
                         start_date: leaveFormData.start_date,
@@ -182,7 +169,6 @@ export const WorkerPortalPage: React.FC = () => {
             }
             alert('Request submitted successfully!');
             setLeaveFormData({ type: 'pto', start_date: '', end_date: '', hours_requested: 8, reason: '' });
-            fetchLeaveRequests();
             fetchLeaveHistory();
         }
         setIsSubmittingLeave(false);

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { User, LeaveRequest } from '../types';
+import type { User } from '../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
