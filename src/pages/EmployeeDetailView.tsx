@@ -44,6 +44,16 @@ export const EmployeeDetailView: React.FC = () => {
     const [historyView, setHistoryView] = useState<'balance' | 'requests'>('balance');
     const itemsPerPage = 20;
 
+    // Modals
+    const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+    const [isCalculateModalOpen, setIsCalculateModalOpen] = useState(false);
+    const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+    const [adjustmentType, setAdjustmentType] = useState<'pto' | 'sick'>('pto');
+    const [calculateAsOfDate, setCalculateAsOfDate] = useState(new Date().toISOString().split('T')[0]);
+    const [adjustmentForm, setAdjustmentForm] = useState({ amount: 0, description: '', effectiveDate: new Date().toISOString().split('T')[0] });
+    const [recordForm, setRecordForm] = useState({ type: 'pto' as 'pto' | 'sick', startDate: new Date().toISOString().split('T')[0], hours: 8, description: '' });
+    const [calculatedFutureBalance, setCalculatedFutureBalance] = useState<{ pto: number, sick: number } | null>(null);
+
     useEffect(() => {
         const fetchTrainings = async () => {
             const materials = await trainingService.getAllMaterials(trainingLanguage);
@@ -259,6 +269,91 @@ export const EmployeeDetailView: React.FC = () => {
         }
     };
 
+    const handleRecordTimeOff = async () => {
+        if (!employee) return;
+        setIsSaving(true);
+        try {
+            const { data: req } = await (supabase.from('leave_requests') as any).insert({
+                user_id: employee.id,
+                type: recordForm.type,
+                start_date: recordForm.startDate,
+                end_date: recordForm.startDate,
+                hours_requested: recordForm.hours,
+                reason: recordForm.description,
+                status: 'approved'
+            }).select().single();
+
+            if (req) {
+                await (supabase.from('leave_history') as any).insert({
+                    user_id: employee.id,
+                    type: recordForm.type,
+                    used_hours: recordForm.hours,
+                    balance: parseFloat((employee as any)[recordForm.type === 'pto' ? 'pto_balance' : 'sick_balance'] || '0') - recordForm.hours,
+                    entry_date: recordForm.startDate,
+                    description: recordForm.description || `Record: ${recordForm.hours}hrs ${recordForm.type.toUpperCase()}`
+                });
+                await syncLeaveBalances(employee!);
+                setIsRecordModalOpen(false);
+                fetchEmployee();
+            }
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleAdjustBalance = async () => {
+        if (!employee) return;
+        setIsSaving(true);
+        try {
+            const balanceField = adjustmentType === 'pto' ? 'pto_balance' : 'sick_balance';
+            const currentBalance = parseFloat((employee as any)[balanceField] || '0');
+            const newBalance = currentBalance + adjustmentForm.amount;
+
+            await (supabase.from('leave_history') as any).insert({
+                user_id: employee.id,
+                type: adjustmentType,
+                earned_hours: adjustmentForm.amount > 0 ? adjustmentForm.amount : null,
+                used_hours: adjustmentForm.amount < 0 ? Math.abs(adjustmentForm.amount) : null,
+                balance: newBalance,
+                entry_date: adjustmentForm.effectiveDate,
+                description: adjustmentForm.description || `Admin Adjustment (${adjustmentForm.amount} hrs)`
+            });
+
+            await (supabase.from('users') as any).update({ [balanceField]: newBalance }).eq('id', employee.id);
+            setIsAdjustModalOpen(false);
+            fetchEmployee();
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+
+
+    const handleProjectFuture = () => {
+        if (!employee) return;
+        const targetDate = new Date(calculateAsOfDate);
+        const today = new Date();
+        if (targetDate <= today) {
+            setCalculatedFutureBalance({
+                pto: parseFloat(employee.pto_balance || '0'),
+                sick: parseFloat(employee.sick_balance || '0')
+            });
+            return;
+        }
+
+        // Simple simulation: Accrual every 15 days
+        const diffDays = Math.ceil((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const cycles = Math.floor(diffDays / 15);
+
+        const ptoPerCycle = 5; // Example rates
+        const sickPerCycle = 2.5;
+
+        setCalculatedFutureBalance({
+            pto: parseFloat(employee.pto_balance || '0') + (cycles * ptoPerCycle),
+            sick: parseFloat(employee.sick_balance || '0') + (cycles * sickPerCycle)
+        });
+    };
+
 
     const tabs = ['Personal', 'Job', 'Training', 'Emergency', 'Time Off', 'Benefits'];
 
@@ -300,10 +395,10 @@ export const EmployeeDetailView: React.FC = () => {
                 <div className="header-main">
                     <div className="profile-photo-container">
                         {employee.photo_url ? (
-                            <img src={employee.photo_url} alt={employee.name} />
+                            <img src={employee.photo_url} alt={String(employee.name || 'Worker')} />
                         ) : (
                             <div className="profile-photo-placeholder">
-                                {employee.name ? employee.name.substring(0, 2).toUpperCase() : '??'}
+                                {employee.name ? String(employee.name).substring(0, 2).toUpperCase() : '??'}
                             </div>
                         )}
                     </div>
@@ -572,35 +667,33 @@ export const EmployeeDetailView: React.FC = () => {
                         const sickUsable = hireDate ? isSickLeaveUsable(hireDate) : false;
                         const ptoBalance = parseFloat(employee.pto_balance || '0');
                         const sickBalance = parseFloat(employee.sick_balance || '0');
-                        
+
                         const isMonthly = (employee as any)?.pay_schedule?.toLowerCase().includes('monthly') && !(employee as any)?.pay_schedule?.toLowerCase().includes('semi');
                         const periodLabel = isMonthly ? '30 days' : '15 days';
 
                         /** Filter real leave history by selected type, year, and search */
                         const displayRows = leaveHistory.filter(r => {
                             const matchesType = r.type === accrualHistoryType;
-                            const matchesYear = selectedHistoryYear === 'All' || r.entry_date.startsWith(selectedHistoryYear);
-                            const matchesSearch = r.description.toLowerCase().includes(historySearch.toLowerCase());
+                            const matchesYear = selectedHistoryYear === 'All' || (r.entry_date || '').startsWith(selectedHistoryYear);
+                            const matchesSearch = (r.description || '').toLowerCase().includes(historySearch.toLowerCase());
                             return matchesType && matchesYear && matchesSearch;
                         });
 
-                        const totalPages = Math.ceil(displayRows.length / itemsPerPage);
-                        
-                        // Sort descending: newest first
                         const sortedRows = [...displayRows].sort((a, b) => {
                             if (b.entry_date !== a.entry_date) {
-                                return b.entry_date.localeCompare(a.entry_date);
+                                return (b.entry_date || '').localeCompare(a.entry_date || '');
                             }
-                            // If entry dates are same, sort by created_at descending
                             return (b.created_at || '').localeCompare(a.created_at || '');
                         });
+
+                        const totalPages = Math.ceil(displayRows.length / itemsPerPage);
 
                         const paginatedRows = sortedRows.slice(
                             (historyPage - 1) * itemsPerPage,
                             historyPage * itemsPerPage
                         );
 
-                        const years = Array.from({ length: 12 }, (_, i) => String(2026 - i)); // 2026 to 2015
+                        const years = Array.from({ length: 12 }, (_, i) => String(2026 - i));
 
                         return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -617,10 +710,17 @@ export const EmployeeDetailView: React.FC = () => {
 
 
                                 {/* Balance Cards */}
-                                <div className="time-off-grid">
+                                <div className="time-off-grid" style={{ display: 'grid', gridTemplateColumns: isMonthly ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
                                     {/* PTO Card */}
                                     <div className="time-off-card">
-                                        <div className="card-icon"><i className="fa-solid fa-palm-tree"></i></div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                                            <div className="card-icon"><i className="fa-solid fa-palm-tree"></i></div>
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                <button className="pill-control-btn" onClick={() => setIsRecordModalOpen(true)} title="Record Time Off"><i className="fa-solid fa-calendar-check"></i></button>
+                                                <button className="pill-control-btn" onClick={() => setIsCalculateModalOpen(true)} title="Project Future Balance"><i className="fa-solid fa-calculator"></i></button>
+                                                <button className="pill-control-btn" onClick={() => { setAdjustmentType('pto'); setIsAdjustModalOpen(true); }} title="Adjust Balance"><i className="fa-solid fa-plus"></i></button>
+                                            </div>
+                                        </div>
                                         <div className="card-value">
                                             <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
                                                 {ptoBalance.toFixed(2)}
@@ -632,34 +732,46 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
 
                                     {/* Sick Card */}
-                                    <div className={`time-off-card ${isMonthly ? 'monthly-sick' : ''}`} style={isMonthly ? { opacity: 0.7, background: '#f8fafc' } : {}}>
-                                        <div className="card-icon">
-                                            <i className="fa-solid fa-hospital" style={isMonthly ? { color: '#94a3b8' } : {}}></i>
-                                            {!sickUsable && !isMonthly && (
-                                                <span style={{
-                                                    fontSize: '0.65rem', fontWeight: 700, background: '#fef3c7',
-                                                    color: '#92400e', padding: '0.15rem 0.5rem',
-                                                    borderRadius: '20px', marginLeft: '0.5rem',
-                                                }}>{t('employeeDetail.timeOff.waitPeriod')}</span>
-                                            )}
-                                        </div>
-                                        <div className="card-value">
-                                            {isMonthly ? (
-                                                <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#64748b', lineHeight: 1.2 }}>
-                                                    Sick leave deducted from PTO
+                                    {!isMonthly && (
+                                        <div className="time-off-card">
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                                                <div className="card-icon">
+                                                    <i className="fa-solid fa-hospital"></i>
+                                                    {!sickUsable && (
+                                                        <span style={{
+                                                            fontSize: '0.65rem', fontWeight: 700, background: '#fef3c7',
+                                                            color: '#92400e', padding: '0.15rem 0.5rem',
+                                                            borderRadius: '20px', marginLeft: '0.5rem',
+                                                        }}>{t('employeeDetail.timeOff.waitPeriod')}</span>
+                                                    )}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '6px' }}>
+                                                    <button className="pill-control-btn" onClick={() => setIsRecordModalOpen(true)} title="Record Time Off"><i className="fa-solid fa-calendar-check"></i></button>
+                                                    <button className="pill-control-btn" onClick={() => setIsCalculateModalOpen(true)} title="Project Future Balance"><i className="fa-solid fa-calculator"></i></button>
+                                                    <button className="pill-control-btn" onClick={() => { setAdjustmentType('sick'); setIsAdjustModalOpen(true); }} title="Adjust Balance"><i className="fa-solid fa-plus"></i></button>
+                                                </div>
+                                            </div>
+                                            <div className="card-value">
+                                                <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
+                                                    {sickBalance.toFixed(2)}
                                                 </span>
-                                            ) : (
-                                                <>
-                                                    <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
-                                                        {sickBalance.toFixed(2)}
-                                                    </span>
-                                                    <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
-                                                </>
-                                            )}
+                                                <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
+                                            </div>
+                                            <div className="card-label">{t('employeeDetail.timeOff.sickLabel')}</div>
+                                            <div className="card-sublabel">{t('employeeDetail.timeOff.sickCap')}</div>
                                         </div>
-                                        <div className="card-label">{t('employeeDetail.timeOff.sickLabel')}</div>
-                                        <div className="card-sublabel">{isMonthly ? 'No separate sick balance for Monthly workers' : t('employeeDetail.timeOff.sickCap')}</div>
-                                    </div>
+                                    )}
+
+                                    {/* Monthly Sick Notification */}
+                                    {isMonthly && (
+                                        <div className="time-off-card" style={{ opacity: 0.8, background: '#f8fafc', borderStyle: 'dashed', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                                            <div>
+                                                <i className="fa-solid fa-hospital" style={{ color: '#94a3b8', fontSize: '1.5rem', marginBottom: '0.5rem' }}></i>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>Sick leave is deducted from PTO</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Monthly worker policy applied</div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Upcoming & Pending Requests */}
@@ -3598,7 +3710,206 @@ export const EmployeeDetailView: React.FC = () => {
                     max-width: 90vw !important;
                     width: fit-content !important;
                 }
+
+                .pill-control-btn {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    border: 1px solid #e2e8f0;
+                    background: white;
+                    color: #64748b;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.85rem;
+                    transition: all 0.2s ease;
+                }
+                .pill-control-btn:hover {
+                    background: #f8fafc;
+                    color: #1e1b4b;
+                    border-color: #cbd5e1;
+                    transform: translateY(-1px);
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                }
+                .modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(15, 23, 42, 0.4);
+                    backdrop-filter: blur(4px);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 9999;
+                }
+                .modal-content-new {
+                    background: white;
+                    border-radius: 20px;
+                    width: 100%;
+                    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                }
+                .modal-header-new {
+                    padding: 20px 24px;
+                    border-bottom: 1px solid #f1f5f9;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .modal-title-new {
+                    font-size: 1.15rem;
+                    font-weight: 800;
+                    color: #1e1b4b;
+                    margin: 0;
+                }
+                .close-btn-new {
+                    background: none;
+                    border: none;
+                    color: #94a3b8;
+                    cursor: pointer;
+                    font-size: 1.25rem;
+                }
+                .full-input-new {
+                    width: 100%;
+                    padding: 10px 14px;
+                    border: 1.5px solid #e2e8f0;
+                    border-radius: 10px;
+                    font-size: 0.9rem;
+                    outline: none;
+                    background: #fff;
+                }
+                .full-input-new:focus {
+                    border-color: #1e1b4b;
+                }
+                .modal-footer-new {
+                    padding: 16px 24px;
+                    background: #f8fafc;
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 12px;
+                    border-top: 1px solid #f1f5f9;
+                }
+                .modal-cancel-btn-new {
+                    padding: 8px 18px;
+                    border: 1.5px solid #e2e8f0;
+                    background: white;
+                    border-radius: 8px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    color: #1e293b;
+                }
+                .modal-save-btn-new {
+                    padding: 8px 18px;
+                    background: #1e1b4b;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 700;
+                    cursor: pointer;
+                }
             `}</style>
+
+            {/* MODALS */}
+            {isRecordModalOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content-new" style={{ maxWidth: '450px' }}>
+                        <div className="modal-header-new">
+                            <h2 className="modal-title-new">Record Time Off</h2>
+                            <button className="close-btn-new" onClick={() => setIsRecordModalOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div style={{ padding: '24px' }}>
+                            <div className="modal-form-field">
+                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>{t('Type')}</label>
+                                <select className="full-input-new" value={recordForm.type} onChange={e => setRecordForm({ ...recordForm, type: e.target.value as any })}>
+                                    <option value="pto">PTO</option>
+                                    <option value="sick">Sick Leave</option>
+                                </select>
+                            </div>
+                            <div className="modal-form-field" style={{ marginTop: '1.25rem' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>{t('Date')}</label>
+                                <input type="date" className="full-input-new" value={recordForm.startDate} onChange={e => setRecordForm({ ...recordForm, startDate: e.target.value })} />
+                            </div>
+                            <div className="modal-form-field" style={{ marginTop: '1.25rem' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>{t('Hours')}</label>
+                                <input type="number" className="full-input-new" value={recordForm.hours} onChange={e => setRecordForm({ ...recordForm, hours: parseFloat(e.target.value) })} />
+                            </div>
+                        </div>
+                        <div className="modal-footer-new">
+                            <button className="modal-cancel-btn-new" onClick={() => setIsRecordModalOpen(false)}>{t('common.cancel')}</button>
+                            <button className="modal-save-btn-new" onClick={handleRecordTimeOff} disabled={isSaving}>{isSaving ? t('common.saving') : t('common.save')}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isAdjustModalOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content-new" style={{ maxWidth: '450px' }}>
+                        <div className="modal-header-new">
+                            <h2 className="modal-title-new">Adjust {adjustmentType.toUpperCase()} Balance</h2>
+                            <button className="close-btn-new" onClick={() => setIsAdjustModalOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div style={{ padding: '24px' }}>
+                            <div className="modal-form-field">
+                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>Adjustment Amount (Hours)</label>
+                                <input type="number" className="full-input-new" value={adjustmentForm.amount} onChange={e => setAdjustmentForm({ ...adjustmentForm, amount: parseFloat(e.target.value) })} placeholder="e.g. 5 or -2" />
+                                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '6px' }}>Positive increases, negative decreases balance.</p>
+                            </div>
+                            <div className="modal-form-field" style={{ marginTop: '1.25rem' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>Effective Date</label>
+                                <input type="date" className="full-input-new" value={adjustmentForm.effectiveDate} onChange={e => setAdjustmentForm({ ...adjustmentForm, effectiveDate: e.target.value })} />
+                            </div>
+                            <div className="modal-form-field" style={{ marginTop: '1.25rem' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>Reason</label>
+                                <textarea className="full-input-new" style={{ height: '80px', paddingTop: '10px' }} value={adjustmentForm.description} onChange={e => setAdjustmentForm({ ...adjustmentForm, description: e.target.value })} placeholder="Why is this change being made?" />
+                            </div>
+                            <div style={{ marginTop: '1rem', padding: '10px', background: '#fff9e6', border: '1px solid #ffe58f', borderRadius: '8px', fontSize: '0.75rem', color: '#856404' }}>
+                                <i className="fa-solid fa-circle-info"></i> Note: Adjusting balances can bypass standard caps. Ensure this change is documented.
+                            </div>
+                        </div>
+                        <div className="modal-footer-new">
+                            <button className="modal-cancel-btn-new" onClick={() => setIsAdjustModalOpen(false)}>{t('common.cancel')}</button>
+                            <button className="modal-save-btn-new" onClick={handleAdjustBalance} disabled={isSaving}>{isSaving ? t('common.saving') : t('common.save')}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {isCalculateModalOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content-new" style={{ maxWidth: '450px' }}>
+                        <div className="modal-header-new">
+                            <h2 className="modal-title-new">Calculate Future Balance</h2>
+                            <button className="close-btn-new" onClick={() => setIsCalculateModalOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div style={{ padding: '24px' }}>
+                            <div className="modal-form-field">
+                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>Calculate As Of Date</label>
+                                <input type="date" className="full-input-new" value={calculateAsOfDate} onChange={e => setCalculateAsOfDate(e.target.value)} />
+                            </div>
+
+                            {calculatedFutureBalance && (
+                                <div style={{ marginTop: '20px', padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                                    <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#166534' }}>Projected Balances:</h4>
+                                    <div style={{ display: 'flex', gap: '20px' }}>
+                                        <div>
+                                            <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600 }}>PTO</span>
+                                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#166534' }}>{calculatedFutureBalance.pto.toFixed(2)} hrs</div>
+                                        </div>
+                                        <div>
+                                            <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600 }}>Sick Leave</span>
+                                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#166534' }}>{calculatedFutureBalance.sick.toFixed(2)} hrs</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="modal-footer-new">
+                            <button className="modal-cancel-btn-new" onClick={() => { setIsCalculateModalOpen(false); setCalculatedFutureBalance(null); }}>{t('common.close')}</button>
+                            <button className="modal-save-btn-new" onClick={handleProjectFuture}>Calculate</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
