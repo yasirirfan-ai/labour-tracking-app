@@ -50,7 +50,7 @@ export const EmployeeDetailView: React.FC = () => {
     const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
     const [adjustmentType, setAdjustmentType] = useState<'pto' | 'sick'>('pto');
     const [calculateAsOfDate, setCalculateAsOfDate] = useState(new Date().toISOString().split('T')[0]);
-    const [adjustmentForm, setAdjustmentForm] = useState({ amount: 0, description: '', effectiveDate: new Date().toISOString().split('T')[0] });
+    const [adjustmentForm, setAdjustmentForm] = useState({ amount: 0, direction: 'add' as 'add' | 'deduct', description: '', effectiveDate: new Date().toISOString().split('T')[0] });
     const [recordForm, setRecordForm] = useState({ type: 'pto' as 'pto' | 'sick', startDate: new Date().toISOString().split('T')[0], hours: 8, description: '' });
     const [calculatedFutureBalance, setCalculatedFutureBalance] = useState<{ pto: number, sick: number } | null>(null);
 
@@ -284,18 +284,27 @@ export const EmployeeDetailView: React.FC = () => {
             }).select().single();
 
             if (req) {
+                const currentBal = parseFloat((employee as any)[recordForm.type === 'pto' ? 'pto_balance' : 'sick_balance'] || '0');
                 await (supabase.from('leave_history') as any).insert({
                     user_id: employee.id,
                     type: recordForm.type,
                     used_hours: recordForm.hours,
-                    balance: parseFloat((employee as any)[recordForm.type === 'pto' ? 'pto_balance' : 'sick_balance'] || '0') - recordForm.hours,
+                    balance: currentBal - recordForm.hours,
                     entry_date: recordForm.startDate,
-                    description: recordForm.description || `Record: ${recordForm.hours}hrs ${recordForm.type.toUpperCase()}`
+                    description: recordForm.description || `Admin Recorded: ${recordForm.hours}hrs ${recordForm.type.toUpperCase()}`
                 });
                 await syncLeaveBalances(employee!);
                 setIsRecordModalOpen(false);
-                fetchEmployee();
+                // Refresh both employee data AND leave history
+                await fetchEmployee();
+                const updatedHistory = await fetchLeaveHistory(employee.id);
+                setLeaveHistory(updatedHistory);
+                setToast({ message: 'Time off recorded successfully', type: 'success' });
+                setTimeout(() => setToast(null), 3000);
             }
+        } catch (err: any) {
+            setToast({ message: err.message || 'Error recording time off', type: 'error' });
+            setTimeout(() => setToast(null), 3000);
         } finally {
             setIsSaving(false);
         }
@@ -307,21 +316,37 @@ export const EmployeeDetailView: React.FC = () => {
         try {
             const balanceField = adjustmentType === 'pto' ? 'pto_balance' : 'sick_balance';
             const currentBalance = parseFloat((employee as any)[balanceField] || '0');
-            const newBalance = currentBalance + adjustmentForm.amount;
+            // direction: 'add' increases, 'deduct' decreases
+            const delta = adjustmentForm.direction === 'add'
+                ? Math.abs(adjustmentForm.amount)
+                : -Math.abs(adjustmentForm.amount);
+            const newBalance = parseFloat((currentBalance + delta).toFixed(2));
+
+            const description = adjustmentForm.description ||
+                `Admin ${adjustmentForm.direction === 'add' ? 'Added' : 'Deducted'} ${Math.abs(adjustmentForm.amount)} hrs (${adjustmentType.toUpperCase()})`;
 
             await (supabase.from('leave_history') as any).insert({
                 user_id: employee.id,
                 type: adjustmentType,
-                earned_hours: adjustmentForm.amount > 0 ? adjustmentForm.amount : null,
-                used_hours: adjustmentForm.amount < 0 ? Math.abs(adjustmentForm.amount) : null,
+                earned_hours: delta > 0 ? delta : null,
+                used_hours: delta < 0 ? Math.abs(delta) : null,
                 balance: newBalance,
                 entry_date: adjustmentForm.effectiveDate,
-                description: adjustmentForm.description || `Admin Adjustment (${adjustmentForm.amount} hrs)`
+                description
             });
 
             await (supabase.from('users') as any).update({ [balanceField]: newBalance }).eq('id', employee.id);
             setIsAdjustModalOpen(false);
-            fetchEmployee();
+            setAdjustmentForm({ amount: 0, direction: 'add', description: '', effectiveDate: new Date().toISOString().split('T')[0] });
+            // Refresh both employee data AND leave history
+            await fetchEmployee();
+            const updatedHistory = await fetchLeaveHistory(employee.id);
+            setLeaveHistory(updatedHistory);
+            setToast({ message: `Balance ${adjustmentForm.direction === 'add' ? 'increased' : 'decreased'} by ${Math.abs(adjustmentForm.amount)} hrs`, type: 'success' });
+            setTimeout(() => setToast(null), 3000);
+        } catch (err: any) {
+            setToast({ message: err.message || 'Error adjusting balance', type: 'error' });
+            setTimeout(() => setToast(null), 3000);
         } finally {
             setIsSaving(false);
         }
@@ -427,7 +452,7 @@ export const EmployeeDetailView: React.FC = () => {
                         <h3>{t('employeeDetail.vitals')}</h3>
                         <div className="vitals-list">
                             <div className="vital-item"><i className="fa-solid fa-phone"></i> {employee.work_phone || employee.phone || t('common.notAvailable')}</div>
-                            <div className="vital-item"><i className="fa-solid fa-envelope"></i> {employee.work_email || employee.email || employee.username}</div>
+                            <div className="vital-item"><i className="fa-solid fa-envelope"></i> <a href={`mailto:${employee.work_email || employee.email || employee.username}`} style={{ color: 'inherit', textDecoration: 'none' }} onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>{employee.work_email || employee.email || employee.username}</a></div>
                             <div className="vital-item"><i className="fa-solid fa-briefcase"></i> {employee.job_title || t('employeeDetail.job.defaultTitle')} <br /> {t('hire.options.employment.fullTime')}</div>
                             <div className="vital-item"><i className="fa-solid fa-building"></i> {employee.department || t('employeeDetail.job.defaultDepartment')}</div>
                         </div>
@@ -3844,16 +3869,55 @@ export const EmployeeDetailView: React.FC = () => {
 
             {isAdjustModalOpen && (
                 <div className="modal-overlay">
-                    <div className="modal-content-new" style={{ maxWidth: '450px' }}>
+                    <div className="modal-content-new" style={{ maxWidth: '460px' }}>
                         <div className="modal-header-new">
                             <h2 className="modal-title-new">Adjust {adjustmentType.toUpperCase()} Balance</h2>
                             <button className="close-btn-new" onClick={() => setIsAdjustModalOpen(false)}><i className="fa-solid fa-xmark"></i></button>
                         </div>
                         <div style={{ padding: '24px' }}>
+                            {/* Add / Deduct toggle */}
                             <div className="modal-form-field">
-                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>Adjustment Amount (Hours)</label>
-                                <input type="number" className="full-input-new" value={adjustmentForm.amount} onChange={e => setAdjustmentForm({ ...adjustmentForm, amount: parseFloat(e.target.value) })} placeholder="e.g. 5 or -2" />
-                                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '6px' }}>Positive increases, negative decreases balance.</p>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '8px', display: 'block' }}>Adjustment Type</label>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        onClick={() => setAdjustmentForm({ ...adjustmentForm, direction: 'add' })}
+                                        style={{
+                                            flex: 1, padding: '10px', borderRadius: '10px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', border: '2px solid',
+                                            background: adjustmentForm.direction === 'add' ? '#dcfce7' : '#fff',
+                                            borderColor: adjustmentForm.direction === 'add' ? '#16a34a' : '#e2e8f0',
+                                            color: adjustmentForm.direction === 'add' ? '#15803d' : '#64748b'
+                                        }}
+                                    >
+                                        <i className="fa-solid fa-plus" style={{ marginRight: '6px' }}></i> Add Hours
+                                    </button>
+                                    <button
+                                        onClick={() => setAdjustmentForm({ ...adjustmentForm, direction: 'deduct' })}
+                                        style={{
+                                            flex: 1, padding: '10px', borderRadius: '10px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', border: '2px solid',
+                                            background: adjustmentForm.direction === 'deduct' ? '#fee2e2' : '#fff',
+                                            borderColor: adjustmentForm.direction === 'deduct' ? '#dc2626' : '#e2e8f0',
+                                            color: adjustmentForm.direction === 'deduct' ? '#b91c1c' : '#64748b'
+                                        }}
+                                    >
+                                        <i className="fa-solid fa-minus" style={{ marginRight: '6px' }}></i> Deduct Hours
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="modal-form-field" style={{ marginTop: '1.25rem' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>Hours</label>
+                                <input
+                                    type="number" min="0" step="0.5"
+                                    className="full-input-new"
+                                    value={adjustmentForm.amount || ''}
+                                    onChange={e => setAdjustmentForm({ ...adjustmentForm, amount: Math.abs(parseFloat(e.target.value) || 0) })}
+                                    placeholder="e.g. 8"
+                                />
+                                <p style={{ fontSize: '0.75rem', marginTop: '6px', color: adjustmentForm.direction === 'add' ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                                    {adjustmentForm.direction === 'add'
+                                        ? `Will increase ${adjustmentType.toUpperCase()} balance by ${adjustmentForm.amount} hrs`
+                                        : `Will decrease ${adjustmentType.toUpperCase()} balance by ${adjustmentForm.amount} hrs`
+                                    }
+                                </p>
                             </div>
                             <div className="modal-form-field" style={{ marginTop: '1.25rem' }}>
                                 <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px', display: 'block' }}>Effective Date</label>
@@ -3864,12 +3928,19 @@ export const EmployeeDetailView: React.FC = () => {
                                 <textarea className="full-input-new" style={{ height: '80px', paddingTop: '10px' }} value={adjustmentForm.description} onChange={e => setAdjustmentForm({ ...adjustmentForm, description: e.target.value })} placeholder="Why is this change being made?" />
                             </div>
                             <div style={{ marginTop: '1rem', padding: '10px', background: '#fff9e6', border: '1px solid #ffe58f', borderRadius: '8px', fontSize: '0.75rem', color: '#856404' }}>
-                                <i className="fa-solid fa-circle-info"></i> Note: Adjusting balances can bypass standard caps. Ensure this change is documented.
+                                <i className="fa-solid fa-circle-info"></i> Note: Adjusting balances directly bypasses standard caps. Ensure this change is documented.
                             </div>
                         </div>
                         <div className="modal-footer-new">
                             <button className="modal-cancel-btn-new" onClick={() => setIsAdjustModalOpen(false)}>{t('common.cancel')}</button>
-                            <button className="modal-save-btn-new" onClick={handleAdjustBalance} disabled={isSaving}>{isSaving ? t('common.saving') : t('common.save')}</button>
+                            <button
+                                className="modal-save-btn-new"
+                                onClick={handleAdjustBalance}
+                                disabled={isSaving || adjustmentForm.amount <= 0}
+                                style={{ background: adjustmentForm.direction === 'deduct' ? '#dc2626' : '#1e1b4b' }}
+                            >
+                                {isSaving ? t('common.saving') : (adjustmentForm.direction === 'add' ? 'Add Hours' : 'Deduct Hours')}
+                            </button>
                         </div>
                     </div>
                 </div>

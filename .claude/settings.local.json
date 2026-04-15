@@ -6,7 +6,9 @@
       "Bash(npm install:*)",
       "Bash(python scratch/migrate_elkin_acevedo.py)",
       "Bash(python scratch/migrate_felipe_acevedo.py)",
-      "Bash(python -c ':*)"
+      "Bash(python -c ':*)",
+      "Bash(grep -n \"import.*LeaveRequests\" /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/src/*.tsx)",
+      "Bash(grep -n \"LeaveRequests\" /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/src/components/*.tsx)"
     ]
   }
 }

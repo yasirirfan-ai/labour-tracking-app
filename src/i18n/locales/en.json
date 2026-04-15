@@ -402,7 +402,7 @@
       "payPeriod": "hrs / pay period",
       "ptoLabel": "Paid Time Off (PTO) Available",
       "sickLabel": "Sick Time Available",
-      "sickCap": "48-hr cap · accrues from hours worked",
+      "sickCap": "40-hr cap · accrues from hours worked",
       "waitPeriod": "90-day wait",
       "requests": "Leave Requests",
       "noRequests": "No leave requests found.",

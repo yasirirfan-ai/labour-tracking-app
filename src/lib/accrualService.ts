@@ -6,33 +6,29 @@ import type { User } from '../types';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PTO_TIERS = [
-    { minMonths: 0,  maxMonths: 12, rate: 0.41675, annualMax: 10, carryover: 10 },
-    { minMonths: 12, maxMonths: 24, rate: 0.66675, annualMax: 16, carryover: 16 },
-    { minMonths: 24, maxMonths: Infinity, rate: 1.0, annualMax: 24, carryover: 24 },
+    { minMonths: 0, maxMonths: 12, rate: 0.8335, annualMax: 20, carryover: 20 },
+    { minMonths: 12, maxMonths: 24, rate: 1.3335, annualMax: 32, carryover: 32 },
+    { minMonths: 24, maxMonths: Infinity, rate: 2.0, annualMax: 48, carryover: 48 },
 ];
 
 /** Sick leave: 1 hour per every 30 hours worked (108 000 seconds). */
 const SICK_SECONDS_PER_HOUR = 30 * 3600; // 108 000 s
 
 /** Hard cap on sick leave balance (CA-style). */
-const SICK_BALANCE_CAP_HOURS = 48;
+const SICK_BALANCE_CAP_HOURS = 40;
 
 /** Usage waiting period for Sick leave (days after hire). */
 const SICK_USAGE_WAITING_DAYS = 90;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Calculate the number of complete months between hireDate and a reference date.
  */
 export function getTenureMonths(hireDate: string, referenceDate: Date = new Date()): number {
     const hire = new Date(hireDate);
-    const ref  = referenceDate;
+    const ref = referenceDate;
 
     let months = (ref.getFullYear() - hire.getFullYear()) * 12;
-    months    += ref.getMonth() - hire.getMonth();
+    months += ref.getMonth() - hire.getMonth();
 
     if (ref.getDate() < hire.getDate()) months--;
 
@@ -71,7 +67,7 @@ export function getPtoTierLabel(tenureMonths: number, paySchedule: string): stri
 }
 
 export function isSickLeaveUsable(hireDate: string): boolean {
-    const hire     = new Date(hireDate);
+    const hire = new Date(hireDate);
     const eligible = new Date(hire.getTime() + SICK_USAGE_WAITING_DAYS * 86_400_000);
     return new Date() >= eligible;
 }
@@ -86,21 +82,21 @@ export function getSickLeaveEligibleDate(hireDate: string): Date {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface AccrualResult {
-    newPtoBalance:            number;
-    newSickBalance:           number;
-    newLastPtoAccrual:        string;
-    newProcessedSickSeconds:  number;
-    ptoEarned:                number;
-    sickEarned:               number;
+    newPtoBalance: number;
+    newSickBalance: number;
+    newLastPtoAccrual: string;
+    newProcessedSickSeconds: number;
+    ptoEarned: number;
+    sickEarned: number;
 }
 
 export function calculateAccruals(user: User, totalWorkedSeconds: number): AccrualResult {
-    const now    = new Date();
+    const now = new Date();
     const nowIso = now.toISOString();
 
     const hireDate = user.hire_date || nowIso;
     const currentPtoBalance = parseFloat(user.pto_balance || '0');
-    
+
     const lastAccrual = user.last_pto_accrual
         ? new Date(user.last_pto_accrual)
         : new Date(hireDate);
@@ -109,8 +105,8 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
     const periodDays = isSemiMonthly ? 15 : 30;
 
     const daysSinceLastAccrual = (now.getTime() - lastAccrual.getTime()) / 86_400_000;
-    const periodsElapsed       = Math.floor(daysSinceLastAccrual / periodDays);
-    
+    const periodsElapsed = Math.floor(daysSinceLastAccrual / periodDays);
+
     let ptoEarned = 0;
     let newPtoBalance = currentPtoBalance;
 
@@ -120,7 +116,7 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
             runner.setDate(runner.getDate() + periodDays);
             const tenureAtPeriodEnd = getTenureMonths(hireDate, runner);
             const tier = getPtoTier(tenureAtPeriodEnd);
-            
+
             // Check annual cap
             if (newPtoBalance < tier.annualMax) {
                 const availableSpace = tier.annualMax - newPtoBalance;
@@ -132,7 +128,7 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
     }
 
     newPtoBalance = Math.round(newPtoBalance * 100) / 100;
-    const newLastPtoAccrual = periodsElapsed > 0 
+    const newLastPtoAccrual = periodsElapsed > 0
         ? new Date(lastAccrual.getTime() + periodsElapsed * periodDays * 86400000).toISOString()
         : (user.last_pto_accrual || hireDate);
 
@@ -194,9 +190,9 @@ export async function syncLeaveBalances(user: User): Promise<{
 
         if (hasChange) {
             const updatePayload: Partial<User> = {
-                pto_balance:            String(result.newPtoBalance),
-                sick_balance:           String(result.newSickBalance),
-                last_pto_accrual:       result.newLastPtoAccrual,
+                pto_balance: String(result.newPtoBalance),
+                sick_balance: String(result.newSickBalance),
+                last_pto_accrual: result.newLastPtoAccrual,
                 processed_sick_seconds: result.newProcessedSickSeconds,
             };
 
@@ -213,37 +209,37 @@ export async function syncLeaveBalances(user: User): Promise<{
             if (result.ptoEarned > 0) {
                 const prevPto = parseFloat(user.pto_balance || '0');
                 historyRows.push({
-                    user_id:      user.id,
-                    type:         'pto',
-                    entry_date:   today,
-                    description:  `PTO accrual — ${getPtoTierLabel(getTenureMonths(user.hire_date || today), user.pay_schedule || '')}`,
-                    used_hours:   null,
+                    user_id: user.id,
+                    type: 'pto',
+                    entry_date: today,
+                    description: `PTO accrual — ${getPtoTierLabel(getTenureMonths(user.hire_date || today), user.pay_schedule || '')}`,
+                    used_hours: null,
                     earned_hours: Math.round(result.ptoEarned * 100) / 100,
-                    balance:      result.newPtoBalance,
+                    balance: result.newPtoBalance,
                 });
-                
+
                 if (prevPto === 0 && result.ptoEarned > 0) {
                     historyRows.unshift({
-                        user_id:      user.id,
-                        type:         'pto',
-                        entry_date:   user.hire_date || today,
-                        description:  `${(user.first_name || user.name.split(' ')[0])} is now eligible to begin accruing time`,
-                        used_hours:   null,
+                        user_id: user.id,
+                        type: 'pto',
+                        entry_date: user.hire_date || today,
+                        description: `${(user.first_name || user.name.split(' ')[0])} is now eligible to begin accruing time`,
+                        used_hours: null,
                         earned_hours: null,
-                        balance:      0,
+                        balance: 0,
                     });
                 }
             }
 
             if (result.sickEarned > 0) {
                 historyRows.push({
-                    user_id:      user.id,
-                    type:         'sick',
-                    entry_date:   today,
-                    description:  `Sick leave accrual — 1 hr per 30 hrs worked`,
-                    used_hours:   null,
+                    user_id: user.id,
+                    type: 'sick',
+                    entry_date: today,
+                    description: `Sick leave accrual — 1 hr per 30 hrs worked`,
+                    used_hours: null,
                     earned_hours: result.sickEarned,
-                    balance:      result.newSickBalance,
+                    balance: result.newSickBalance,
                 });
             }
 
@@ -255,9 +251,9 @@ export async function syncLeaveBalances(user: User): Promise<{
         }
 
         return {
-            pto:        result.newPtoBalance,
-            sick:       result.newSickBalance,
-            ptoEarned:  result.ptoEarned,
+            pto: result.newPtoBalance,
+            sick: result.newSickBalance,
+            ptoEarned: result.ptoEarned,
             sickEarned: result.sickEarned,
         };
     } catch (err: any) {

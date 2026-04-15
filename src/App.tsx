@@ -15,6 +15,7 @@ import { DisciplineAdminPage } from './pages/DisciplineAdminPage';
 import { NfcManagementPage } from './pages/NfcManagementPage';
 import { HireWorkerPage } from './pages/HireWorkerPage';
 import { EmployeeDetailView } from './pages/EmployeeDetailView';
+import { LeaveRequestsPage } from './pages/LeaveRequestsPage';
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="discipline" element={<DisciplineAdminPage />} />
             <Route path="nfc" element={<NfcManagementPage />} />
+            <Route path="leave-requests" element={<LeaveRequestsPage />} />
           </Route>
         </Routes>
       </Router>

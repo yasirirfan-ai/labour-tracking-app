@@ -72,6 +72,7 @@ export const WorkerPortalPage: React.FC = () => {
             const initialCompleted = (user as any).completed_trainings || ['GMP and Quality Awareness'];
             setCompletedTrainings(initialCompleted);
             fetchLeaveHistory();
+            fetchMyLeaveRequests();
         }
     }, [user?.id]);
 
@@ -85,6 +86,17 @@ export const WorkerPortalPage: React.FC = () => {
             .order('created_at', { ascending: false });
         if (error) { console.error('Error fetching leave history:', error); return; }
         if (data) setLeaveHistory(data);
+    };
+
+    const fetchMyLeaveRequests = async () => {
+        if (!user) return;
+        const { data, error } = await (supabase as any)
+            .from('leave_requests')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+        if (error) { console.error('Error fetching leave requests:', error); return; }
+        if (data) setMyLeaveRequests(data);
     };
 
     useEffect(() => {
@@ -167,9 +179,11 @@ export const WorkerPortalPage: React.FC = () => {
             } catch (emailError) {
                 console.error('Email notification failed:', emailError);
             }
-            alert('Request submitted successfully!');
+            setNotification({ show: true, message: 'Your leave request has been submitted and is pending admin review.', severity: 'success' });
+            setTimeout(() => setNotification(null), 6000);
             setLeaveFormData({ type: 'pto', start_date: '', end_date: '', hours_requested: 8, reason: '' });
             fetchLeaveHistory();
+            fetchMyLeaveRequests();
         }
         setIsSubmittingLeave(false);
     };
@@ -215,6 +229,7 @@ export const WorkerPortalPage: React.FC = () => {
         }));
     };
     const [notification, setNotification] = useState<{ show: boolean, message: string, severity: string } | null>(null);
+    const [myLeaveRequests, setMyLeaveRequests] = useState<any[]>([]);
     const [editMode, setEditMode] = useState(false);
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -420,10 +435,34 @@ export const WorkerPortalPage: React.FC = () => {
                 })
                 .subscribe();
 
+            const leaveRequestChannel = supabase
+                .channel(`public:leave_requests:user_id=eq.${user.id}`)
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leave_requests', filter: `user_id=eq.${user.id}` }, (payload) => {
+                    fetchMyLeaveRequests();
+                    const updated = payload.new as any;
+                    if (updated.status === 'approved') {
+                        setNotification({
+                            show: true,
+                            message: `Your ${updated.type === 'pto' ? 'PTO' : 'Sick Leave'} request (${updated.start_date} – ${updated.end_date}) has been approved!`,
+                            severity: 'success'
+                        });
+                        setTimeout(() => setNotification(null), 10000);
+                    } else if (updated.status === 'rejected') {
+                        setNotification({
+                            show: true,
+                            message: `Your ${updated.type === 'pto' ? 'PTO' : 'Sick Leave'} request (${updated.start_date} – ${updated.end_date}) was not approved.${updated.admin_notes ? ' Note: ' + updated.admin_notes : ''}`,
+                            severity: 'major'
+                        });
+                        setTimeout(() => setNotification(null), 12000);
+                    }
+                })
+                .subscribe();
+
             return () => {
                 userChannel.unsubscribe();
                 taskChannel.unsubscribe();
                 disciplineChannel.unsubscribe();
+                leaveRequestChannel.unsubscribe();
             };
         }
     }, [user?.id]);
@@ -2251,6 +2290,88 @@ export const WorkerPortalPage: React.FC = () => {
                                         <div style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1 }}>{user?.sick_balance || '0.00'}</div>
                                         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#15803d', marginTop: '0.5rem', textTransform: 'uppercase' }}>{t('workerPortal.timeOff.hoursAvailable')}</div>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* My Requests Status */}
+                            <div className="info-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                <div className="card-header">
+                                    <i className="fa-solid fa-list-check"></i>
+                                    <h3 style={{ color: 'var(--text-main)' }}>My Requests</h3>
+                                </div>
+                                <div style={{ overflowX: 'auto' }}>
+                                    {myLeaveRequests.length === 0 ? (
+                                        <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                            No requests submitted yet.
+                                        </div>
+                                    ) : (
+                                        <table className="info-table">
+                                            <thead>
+                                                <tr>
+                                                    <th style={{ color: 'var(--text-muted)' }}>Type</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>Dates</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>Hours</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>Status</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>Admin Note</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>Submitted</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {myLeaveRequests.map((req: any) => {
+                                                    const statusColor = req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#dc2626' : '#d97706';
+                                                    const statusBg = req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7';
+                                                    const statusIcon = req.status === 'approved' ? 'fa-circle-check' : req.status === 'rejected' ? 'fa-circle-xmark' : 'fa-clock';
+                                                    return (
+                                                        <tr key={req.id}>
+                                                            <td>
+                                                                <span style={{
+                                                                    background: req.type === 'pto' ? '#dbeafe' : '#d1fae5',
+                                                                    color: req.type === 'pto' ? '#1d4ed8' : '#065f46',
+                                                                    fontWeight: 700,
+                                                                    padding: '0.2rem 0.6rem',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '0.75rem',
+                                                                    textTransform: 'uppercase',
+                                                                }}>
+                                                                    {req.type === 'pto' ? 'PTO' : 'Sick'}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ color: 'var(--text-main)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                                                                {req.start_date} → {req.end_date}
+                                                            </td>
+                                                            <td style={{ color: 'var(--text-main)', fontWeight: 700, textAlign: 'center' }}>
+                                                                {req.hours_requested}h
+                                                            </td>
+                                                            <td>
+                                                                <span style={{
+                                                                    background: statusBg,
+                                                                    color: statusColor,
+                                                                    fontWeight: 800,
+                                                                    padding: '0.25rem 0.75rem',
+                                                                    borderRadius: '8px',
+                                                                    fontSize: '0.78rem',
+                                                                    textTransform: 'uppercase',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '0.35rem',
+                                                                    whiteSpace: 'nowrap',
+                                                                }}>
+                                                                    <i className={`fa-solid ${statusIcon}`} style={{ fontSize: '0.7rem' }}></i>
+                                                                    {req.status}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem', maxWidth: '180px' }}>
+                                                                {req.admin_notes || '—'}
+                                                            </td>
+                                                            <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                                                {new Date(req.created_at).toLocaleDateString()}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    )}
                                 </div>
                             </div>
 
