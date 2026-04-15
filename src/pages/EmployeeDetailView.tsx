@@ -741,7 +741,6 @@ export const EmployeeDetailView: React.FC = () => {
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                                             <div className="card-icon"><i className="fa-solid fa-palm-tree"></i></div>
                                             <div style={{ display: 'flex', gap: '6px' }}>
-                                                <button className="pill-control-btn" onClick={() => setIsRecordModalOpen(true)} title="Record Time Off"><i className="fa-solid fa-calendar-check"></i></button>
                                                 <button className="pill-control-btn" onClick={() => setIsCalculateModalOpen(true)} title="Project Future Balance"><i className="fa-solid fa-calculator"></i></button>
                                                 <button className="pill-control-btn" onClick={() => { setAdjustmentType('pto'); setIsAdjustModalOpen(true); }} title="Adjust Balance"><i className="fa-solid fa-plus"></i></button>
                                             </div>
@@ -771,7 +770,6 @@ export const EmployeeDetailView: React.FC = () => {
                                                     )}
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '6px' }}>
-                                                    <button className="pill-control-btn" onClick={() => setIsRecordModalOpen(true)} title="Record Time Off"><i className="fa-solid fa-calendar-check"></i></button>
                                                     <button className="pill-control-btn" onClick={() => setIsCalculateModalOpen(true)} title="Project Future Balance"><i className="fa-solid fa-calculator"></i></button>
                                                     <button className="pill-control-btn" onClick={() => { setAdjustmentType('sick'); setIsAdjustModalOpen(true); }} title="Adjust Balance"><i className="fa-solid fa-plus"></i></button>
                                                 </div>
@@ -802,9 +800,9 @@ export const EmployeeDetailView: React.FC = () => {
                                 {/* Upcoming & Pending Requests */}
                                 <div className="upcoming-section">
                                     <h3><i className="fa-solid fa-clock"></i> {t('employeeDetail.timeOff.requests')}</h3>
-                                    {leaveRequests.length > 0 ? (
+                                    {leaveRequests.filter(req => req.status === 'pending').length > 0 ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-                                            {leaveRequests.map(req => (
+                                            {leaveRequests.filter(req => req.status === 'pending').map(req => (
                                                 <div key={req.id} style={{
                                                     background: 'white',
                                                     padding: '1.25rem',
