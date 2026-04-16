@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
@@ -10,12 +10,14 @@ import type { User } from '../types';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import emailjs from '@emailjs/browser';
+import { syncLeaveBalances } from '../lib/accrualService';
 
 export const WorkerPortalPage: React.FC = () => {
     const { t, i18n } = useTranslation();
     const { toggleTheme, setLanguage, currentTheme } = useTheme();
     const { user, loading: authLoading, logout } = useAuth();
     const [localUser, setLocalUser] = useState(user);
+    const isSyncing = useRef(false);
     const [loading, setLoading] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [activeTasks, setActiveTasks] = useState<any[]>([]);
@@ -67,12 +69,29 @@ export const WorkerPortalPage: React.FC = () => {
     }, [user?.id, trainingLanguage]);
 
     useEffect(() => {
-        if (user) {
+        if (user?.id) {
+            setLocalUser(user);
             // Initial load from user object (synced via AuthContext/Supabase)
             const initialCompleted = (user as any).completed_trainings || ['GMP and Quality Awareness'];
             setCompletedTrainings(initialCompleted);
-            fetchLeaveHistory();
             fetchMyLeaveRequests();
+            
+            // Sync leave balances on load
+            const sync = async () => {
+                if (isSyncing.current) return;
+                isSyncing.current = true;
+                
+                try {
+                    const res: any = await syncLeaveBalances(user as any);
+                    if (res && !res.error) {
+                        setLocalUser(prev => prev ? { ...prev, pto_balance: String(res.pto), sick_balance: String(res.sick) } : prev);
+                    }
+                    fetchLeaveHistory();
+                } finally {
+                    isSyncing.current = false;
+                }
+            };
+            sync();
         }
     }, [user?.id]);
 
@@ -2467,7 +2486,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {leaveHistory.length > 0 ? leaveHistory.map(item => (
+                                                {leaveHistory.length > 0 ? leaveHistory.map((item, idx) => (
                                                     <tr key={item.id}>
                                                         <td style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>
                                                             {item.entry_date.includes('-') ? (() => { const [y, m, d] = item.entry_date.split('-'); return `${m}/${d}/${y}`; })() : item.entry_date}
@@ -2475,7 +2494,11 @@ export const WorkerPortalPage: React.FC = () => {
                                                         <td style={{ color: 'var(--text-main)', fontWeight: 700 }}>{item.description}</td>
                                                         <td style={{ color: 'var(--danger)', fontWeight: 800 }}>{item.used_hours != null ? `-${item.used_hours.toFixed(2)}` : ''}</td>
                                                         <td style={{ color: 'var(--success)', fontWeight: 800 }}>{item.earned_hours != null ? `+${item.earned_hours.toFixed(2)}` : ''}</td>
-                                                        <td style={{ color: 'var(--text-main)', fontWeight: 900 }}>{Number(item.balance).toFixed(2)}</td>
+                                                        <td style={{ color: 'var(--text-main)', fontWeight: 900 }}>
+                                                            {idx === 0 
+                                                                ? Number((item.description || '').toLowerCase().includes('sick') ? (user?.sick_balance ?? 0) : (user?.pto_balance ?? 0)).toFixed(2) 
+                                                                : '0.00'}
+                                                        </td>
                                                     </tr>
                                                 )) : (
                                                     <tr>

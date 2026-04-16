@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
@@ -24,7 +24,8 @@ export const EmployeeDetailView: React.FC = () => {
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('Personal');
+    const [activeTab, setActiveTab] = useState('Overview');
+    const isSyncing = useRef(false);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [historySearch, setHistorySearch] = useState('');
     const [eeoSearch, setEeoSearch] = useState('');
@@ -96,13 +97,23 @@ export const EmployeeDetailView: React.FC = () => {
     /** Auto-fetch history whenever the Time Off tab becomes active */
     useEffect(() => {
         if (activeTab === 'Time Off' && employee) {
-            syncLeaveBalances(employee as any).then((res: any) => {
-                if (res && !res.error) {
-                    setEmployee(prev => prev ? { ...prev, pto_balance: String(res.pto), sick_balance: String(res.sick) } : null);
+            if (isSyncing.current) return;
+            isSyncing.current = true;
+
+            const sync = async () => {
+                try {
+                    const res: any = await syncLeaveBalances(employee as any);
+                    if (res && !res.error) {
+                        setEmployee(prev => prev ? { ...prev, pto_balance: String(res.pto), sick_balance: String(res.sick) } : null);
+                    }
+                    const rows = await fetchLeaveHistory(employee.id);
+                    setLeaveHistory(rows);
+                    fetchLeaveRequests(employee.id);
+                } finally {
+                    isSyncing.current = false;
                 }
-            });
-            fetchLeaveHistory(employee.id).then((rows: LeaveHistoryRow[]) => setLeaveHistory(rows));
-            fetchLeaveRequests(employee.id);
+            };
+            sync();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, !!employee]);
@@ -1045,13 +1056,17 @@ export const EmployeeDetailView: React.FC = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {paginatedRows.map((item) => (
+                                                    {paginatedRows.map((item, idx) => (
                                                         <tr key={item.id}>
                                                             <td>{item.entry_date.includes('-') ? (() => { const [y, m, d] = item.entry_date.split('-'); return `${m}/${d}/${y}`; })() : item.entry_date}</td>
                                                             <td>{item.description}</td>
                                                             <td className="used-cell">{item.used_hours != null ? item.used_hours.toFixed(2) : ''}</td>
                                                             <td className="earned-cell">{item.earned_hours != null ? item.earned_hours.toFixed(2) : ''}</td>
-                                                            <td className="balance-cell">{Number(item.balance).toFixed(2)}</td>
+                                                            <td className="balance-cell">
+                                                                {idx === 0 && historyPage === 1 
+                                                                    ? Number(accrualHistoryType === 'pto' ? (employee.pto_balance ?? 0) : (employee.sick_balance ?? 0)).toFixed(2) 
+                                                                    : '0.00'}
+                                                            </td>
                                                         </tr>
                                                     ))}
                                                 </tbody>

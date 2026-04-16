@@ -81,6 +81,14 @@ export function getSickLeaveEligibleDate(hireDate: string): Date {
 // CORE ACCRUAL CALCULATION (PURE – NO SIDE EFFECTS)
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface HistoryEvent {
+    type: 'pto' | 'sick';
+    earned_hours: number;
+    entry_date: string;
+    description: string;
+    balance: number;
+}
+
 interface AccrualResult {
     newPtoBalance: number;
     newSickBalance: number;
@@ -88,6 +96,7 @@ interface AccrualResult {
     newProcessedSickSeconds: number;
     ptoEarned: number;
     sickEarned: number;
+    historyEvents: HistoryEvent[];
 }
 
 export function calculateAccruals(user: User, totalWorkedSeconds: number): AccrualResult {
@@ -97,40 +106,108 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
     const hireDate = user.hire_date || nowIso;
     const currentPtoBalance = parseFloat(user.pto_balance || '0');
 
-    const lastAccrual = user.last_pto_accrual
+    // lastAccrual is the point in time we last successfully processed an accrual event
+    const lastAccrualDate = user.last_pto_accrual
         ? new Date(user.last_pto_accrual)
         : new Date(hireDate);
 
     const isSemiMonthly = (user.pay_schedule || '').toLowerCase().includes('semi');
-    const periodDays = isSemiMonthly ? 15 : 30;
 
-    const daysSinceLastAccrual = (now.getTime() - lastAccrual.getTime()) / 86_400_000;
-    const periodsElapsed = Math.floor(daysSinceLastAccrual / periodDays);
+    console.log(`[Accrual Debug] User: ${user.name}, Schedule: ${user.pay_schedule}, isSemi: ${isSemiMonthly}`);
+    console.log(`[Accrual Debug] Last Accrual: ${user.last_pto_accrual || 'None (using hire)'}`);
 
     let ptoEarned = 0;
     let newPtoBalance = currentPtoBalance;
+    let newLastPtoAccrual = user.last_pto_accrual || hireDate;
+    const historyEvents: HistoryEvent[] = [];
 
-    if (periodsElapsed > 0) {
-        const runner = new Date(lastAccrual);
-        for (let i = 0; i < periodsElapsed; i++) {
-            runner.setDate(runner.getDate() + periodDays);
-            const tenureAtPeriodEnd = getTenureMonths(hireDate, runner);
-            const tier = getPtoTier(tenureAtPeriodEnd);
+    // We iterate day-by-day from lastAccrual to today to find all "trigger dates" (1st and 16th)
+    const runner = new Date(lastAccrualDate);
+    runner.setHours(0, 0, 0, 0); // Normalize to start of day for comparison
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let periodsElapsed = 0;
+    const maxSafety = 365 * 10; // 10 years safety break
+    let safety = 0;
+
+    while (runner < today && safety < maxSafety) {
+        safety++;
+        runner.setDate(runner.getDate() + 1);
+        
+        const dayOfMonth = runner.getDate();
+        let isTriggerDate = false;
+
+        if (isSemiMonthly) {
+            // Semi-monthly: 1st and 16th
+            if (dayOfMonth === 1 || dayOfMonth === 16) isTriggerDate = true;
+        } else {
+            // Monthly: 1st only
+            if (dayOfMonth === 1) isTriggerDate = true;
+        }
+
+        if (isTriggerDate) {
+            periodsElapsed++;
+            const tenureMonths = getTenureMonths(hireDate, runner);
+            const tier = getPtoTier(tenureMonths);
 
             // Check annual cap
+            let earnedThisPeriod = 0;
             if (newPtoBalance < tier.annualMax) {
                 const availableSpace = tier.annualMax - newPtoBalance;
-                const earnedThisPeriod = Math.min(tier.rate, availableSpace);
+                earnedThisPeriod = Math.min(tier.rate, availableSpace);
                 ptoEarned += earnedThisPeriod;
                 newPtoBalance += earnedThisPeriod;
             }
+
+            // Always record the period passage in history if something was earned or if requested (per-period transparency)
+            // Round for storage
+            const roundedEarned = Math.round(earnedThisPeriod * 100) / 100;
+            const roundedBalance = Math.round(newPtoBalance * 100) / 100;
+
+            if (roundedEarned > 0) {
+                // Calculate period dates for the description
+                const periodEnd = new Date(runner);
+                periodEnd.setDate(periodEnd.getDate() - 1); // If triggered on 16th, period ends on 15th. If on 1st, ends on last day of prev month.
+                
+                const periodStart = new Date(periodEnd);
+                if (isSemiMonthly) {
+                    if (periodEnd.getDate() === 15) {
+                        periodStart.setDate(1);
+                    } else {
+                        periodStart.setDate(16);
+                    }
+                } else {
+                    periodStart.setDate(1);
+                }
+
+                const formatDate = (d: Date) => {
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const year = d.getFullYear();
+                    return `${month}/${day}/${year}`;
+                };
+
+                const description = `Accrual for ${formatDate(periodStart)} to ${formatDate(periodEnd)}`;
+
+                historyEvents.push({
+                    type: 'pto',
+                    earned_hours: roundedEarned,
+                    entry_date: runner.toISOString().split('T')[0],
+                    description: description,
+                    balance: roundedBalance
+                });
+            }
+
+            // Update last accrual to the timestamp of this trigger
+            newLastPtoAccrual = runner.toISOString();
         }
     }
 
+    console.log(`[Accrual Debug] Periods Elapsed: ${periodsElapsed}, PTO Earned Total: ${ptoEarned.toFixed(4)}`);
+
     newPtoBalance = Math.round(newPtoBalance * 100) / 100;
-    const newLastPtoAccrual = periodsElapsed > 0
-        ? new Date(lastAccrual.getTime() + periodsElapsed * periodDays * 86400000).toISOString()
-        : (user.last_pto_accrual || hireDate);
 
     // ── SICK ─────────────────────────────────────────────────────────────────
     let sickEarned = 0;
@@ -149,6 +226,16 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
 
         newProcessedSickSeconds = alreadyProcessed + (sickHoursToAdd * SICK_SECONDS_PER_HOUR);
         sickEarned = sickHoursToAdd;
+
+        if (sickEarned > 0) {
+            historyEvents.push({
+                type: 'sick',
+                earned_hours: sickEarned,
+                entry_date: now.toISOString().split('T')[0],
+                description: `Sick leave accrual — 1 hr per 30 hrs worked`,
+                balance: newSickBalance
+            });
+        }
     }
 
     return {
@@ -158,37 +245,56 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
         newProcessedSickSeconds,
         ptoEarned,
         sickEarned,
+        historyEvents,
     };
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SYNC TO SUPABASE
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function syncLeaveBalances(user: User): Promise<{
-    pto: number;
-    sick: number;
-    ptoEarned: number;
-    sickEarned: number;
-    error?: string;
-}> {
+export async function syncLeaveBalances(user: User): Promise<{ pto: number; sick: number; ptoEarned: number; sickEarned: number; error?: string }> {
     try {
-        const { data: tasks, error: taskError } = await (supabase
-            .from('tasks')
-            .select('active_seconds')
-            .eq('assigned_to_id', user.id) as any);
+        // 1. Refetch the LATEST user state from the database
+        // This is critical to prevent race conditions where two components sync at once
+        const { data: latestUserData, error: userError } = await (supabase as any)
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-        if (taskError) throw taskError;
+        if (userError || !latestUserData) throw userError || new Error('User not found');
+        const latestUser = latestUserData as User;
 
-        const totalWorkedSeconds: number = (tasks || []).reduce(
-            (sum: number, t: any) => sum + (t.active_seconds || 0),
+        const { data: totalHoursData, error: logsError } = await supabase
+            .from('time_logs')
+            .select('hours_worked')
+            .eq('user_id', latestUser.id);
+
+        if (logsError) throw logsError;
+
+        const totalWorkedSeconds = (totalHoursData as any[] || []).reduce(
+            (acc, log) => acc + (parseFloat(log.hours_worked || '0') * 3600),
             0
         );
 
-        const result = calculateAccruals(user, totalWorkedSeconds);
-        const hasChange = result.ptoEarned > 0 || result.sickEarned > 0;
+        const result = calculateAccruals(latestUser, totalWorkedSeconds);
+        const hasPtoPeriodPassed = result.newLastPtoAccrual !== latestUser.last_pto_accrual;
+        const hasChange = result.ptoEarned > 0 || result.sickEarned > 0 || hasPtoPeriodPassed;
 
         if (hasChange) {
+            // 2. FETCH EXISTING HISTORY TO PREVENT DUPLICATES
+            // We check if an accrual for the same type exists on the trigger date
+            const todayStr = new Date().toISOString().split('T')[0];
+            const { data: existingHistory } = await (supabase as any)
+                .from('leave_history')
+                .select('description, entry_date, type')
+                .eq('user_id', latestUser.id)
+                .gte('created_at', todayStr + 'T00:00:00'); // Check entries created today
+
+            const existingEntries = new Set(existingHistory?.map((h: any) => `${h.type}_${h.entry_date}`) || []);
+
             const updatePayload: Partial<User> = {
                 pto_balance: String(result.newPtoBalance),
                 sick_balance: String(result.newSickBalance),
@@ -196,51 +302,58 @@ export async function syncLeaveBalances(user: User): Promise<{
                 processed_sick_seconds: result.newProcessedSickSeconds,
             };
 
-            const { error: updateError } = await (supabase as any)
+            // 3. Perform Atomic Update (Compare-and-Swap)
+            let updateQuery = (supabase as any)
                 .from('users')
-                .update(updatePayload)
-                .eq('id', user.id);
+                .update(updatePayload, { count: 'exact' })
+                .eq('id', latestUser.id);
+
+            if (latestUser.last_pto_accrual) {
+                updateQuery = updateQuery.eq('last_pto_accrual', latestUser.last_pto_accrual);
+            } else {
+                updateQuery = updateQuery.is('last_pto_accrual', null);
+            }
+
+            const { error: updateError, count } = await updateQuery;
 
             if (updateError) throw updateError;
 
-            const historyRows: any[] = [];
-            const today = new Date().toISOString().split('T')[0];
+            // 4. Only insert history if the balance update was successful (affected 1 row)
+            if (count === 0) {
+                console.warn(`[accrualService] Race condition detected. Accrual already processed.`);
+                return {
+                    pto: parseFloat(latestUser.pto_balance || '0'),
+                    sick: parseFloat(latestUser.sick_balance || '0'),
+                    ptoEarned: 0,
+                    sickEarned: 0
+                };
+            }
 
-            if (result.ptoEarned > 0) {
-                const prevPto = parseFloat(user.pto_balance || '0');
-                historyRows.push({
-                    user_id: user.id,
-                    type: 'pto',
-                    entry_date: today,
-                    description: `PTO accrual — ${getPtoTierLabel(getTenureMonths(user.hire_date || today), user.pay_schedule || '')}`,
+            // Filter out events that already exist for this date/type (extra safety)
+            const historyRows: any[] = result.historyEvents
+                .filter(ev => !existingEntries.has(`${ev.type}_${ev.entry_date}`))
+                .map(ev => ({
+                    user_id: latestUser.id,
+                    ...ev,
                     used_hours: null,
-                    earned_hours: Math.round(result.ptoEarned * 100) / 100,
-                    balance: result.newPtoBalance,
-                });
+                }));
 
-                if (prevPto === 0 && result.ptoEarned > 0) {
+            // Special case: Add "eligible to begin accruing" row if balance was 0 and now increased
+            const prevPto = parseFloat(latestUser.pto_balance || '0');
+            if (prevPto === 0 && result.ptoEarned > 0 && historyRows.length > 0) {
+                const eligibilityCheck = `eligible_${latestUser.hire_date || todayStr}`;
+                if (!existingEntries.has(eligibilityCheck)) {
+                    const today = new Date().toISOString().split('T')[0];
                     historyRows.unshift({
-                        user_id: user.id,
+                        user_id: latestUser.id,
                         type: 'pto',
-                        entry_date: user.hire_date || today,
-                        description: `${(user.first_name || user.name.split(' ')[0])} is now eligible to begin accruing time`,
+                        entry_date: latestUser.hire_date || today,
+                        description: `${(latestUser.first_name || latestUser.name.split(' ')[0])} is now eligible to begin accruing time`,
                         used_hours: null,
                         earned_hours: null,
                         balance: 0,
                     });
                 }
-            }
-
-            if (result.sickEarned > 0) {
-                historyRows.push({
-                    user_id: user.id,
-                    type: 'sick',
-                    entry_date: today,
-                    description: `Sick leave accrual — 1 hr per 30 hrs worked`,
-                    used_hours: null,
-                    earned_hours: result.sickEarned,
-                    balance: result.newSickBalance,
-                });
             }
 
             if (historyRows.length > 0) {

@@ -70,7 +70,9 @@ export const LeaveRequestsPage: React.FC = () => {
                 const { error: historyError } = await (supabase.from('leave_history') as any).insert([{
                     user_id: request.user_id,
                     type: request.type,
-                    amount: -request.hours_requested,
+                    used_hours: request.hours_requested,
+                    earned_hours: null,
+                    balance: parseFloat(newBalance),
                     description: `Approved ${request.type.toUpperCase()} for ${request.start_date} - ${request.end_date}`,
                     entry_date: request.start_date,
                     created_at: new Date().toISOString()
