@@ -123,20 +123,19 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
 
     // We iterate day-by-day from lastAccrual to today to find all "trigger dates" (1st and 16th)
     const runner = new Date(lastAccrualDate);
-    runner.setHours(0, 0, 0, 0); // Normalize to start of day for comparison
+    runner.setUTCHours(0, 0, 0, 0); // Normalize to start of day UTC
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayUTC = new Date();
+    todayUTC.setUTCHours(0, 0, 0, 0);
 
     let periodsElapsed = 0;
     const maxSafety = 365 * 10; // 10 years safety break
     let safety = 0;
 
-    while (runner < today && safety < maxSafety) {
+    while (runner.getTime() <= todayUTC.getTime() && safety < maxSafety) {
         safety++;
-        runner.setDate(runner.getDate() + 1);
         
-        const dayOfMonth = runner.getDate();
+        const dayOfMonth = runner.getUTCDate();
         let isTriggerDate = false;
 
         if (isSemiMonthly) {
@@ -147,7 +146,7 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
             if (dayOfMonth === 1) isTriggerDate = true;
         }
 
-        if (isTriggerDate) {
+        if (isTriggerDate && safety > 1) {
             periodsElapsed++;
             const tenureMonths = getTenureMonths(hireDate, runner);
             const tier = getPtoTier(tenureMonths);
@@ -169,23 +168,23 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
             if (roundedEarned > 0) {
                 // Calculate period dates for the description
                 const periodEnd = new Date(runner);
-                periodEnd.setDate(periodEnd.getDate() - 1); // If triggered on 16th, period ends on 15th. If on 1st, ends on last day of prev month.
+                periodEnd.setUTCDate(periodEnd.getUTCDate() - 1); // If triggered on 16th, period ends on 15th. If on 1st, ends on last day of prev month.
                 
                 const periodStart = new Date(periodEnd);
                 if (isSemiMonthly) {
-                    if (periodEnd.getDate() === 15) {
-                        periodStart.setDate(1);
+                    if (periodEnd.getUTCDate() === 15) {
+                        periodStart.setUTCDate(1);
                     } else {
-                        periodStart.setDate(16);
+                        periodStart.setUTCDate(16);
                     }
                 } else {
-                    periodStart.setDate(1);
+                    periodStart.setUTCDate(1);
                 }
 
                 const formatDate = (d: Date) => {
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const year = d.getFullYear();
+                    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const day = String(d.getUTCDate()).padStart(2, '0');
+                    const year = d.getUTCFullYear();
                     return `${month}/${day}/${year}`;
                 };
 
@@ -203,6 +202,9 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
             // Update last accrual to the timestamp of this trigger
             newLastPtoAccrual = runner.toISOString();
         }
+
+        // Move to the next day
+        runner.setUTCDate(runner.getUTCDate() + 1);
     }
 
     console.log(`[Accrual Debug] Periods Elapsed: ${periodsElapsed}, PTO Earned Total: ${ptoEarned.toFixed(4)}`);

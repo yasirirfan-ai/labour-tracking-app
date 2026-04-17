@@ -1063,9 +1063,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                             <td className="used-cell">{item.used_hours != null ? item.used_hours.toFixed(2) : ''}</td>
                                                             <td className="earned-cell">{item.earned_hours != null ? item.earned_hours.toFixed(2) : ''}</td>
                                                             <td className="balance-cell">
-                                                                {idx === 0 && historyPage === 1 
-                                                                    ? Number(accrualHistoryType === 'pto' ? (employee.pto_balance ?? 0) : (employee.sick_balance ?? 0)).toFixed(2) 
-                                                                    : '0.00'}
+                                                                {item.balance != null ? Number(item.balance).toFixed(2) : '0.00'}
                                                             </td>
                                                         </tr>
                                                     ))}
