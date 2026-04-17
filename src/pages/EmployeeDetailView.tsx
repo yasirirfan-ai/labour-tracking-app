@@ -1056,7 +1056,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {paginatedRows.map((item, idx) => (
+                                                    {paginatedRows.map((item) => (
                                                         <tr key={item.id}>
                                                             <td>{item.entry_date.includes('-') ? (() => { const [y, m, d] = item.entry_date.split('-'); return `${m}/${d}/${y}`; })() : item.entry_date}</td>
                                                             <td>{item.description}</td>
