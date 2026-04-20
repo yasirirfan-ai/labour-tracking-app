@@ -228,7 +228,7 @@ export const ControlMatrixPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="matrix-container">
+            <div className="matrix-container table-responsive-container">
                 <div className="matrix-grid">
                     <div className="matrix-row">
                         <div className="matrix-header-cell" style={{ textAlign: 'left', paddingLeft: '20px' }}>
@@ -523,7 +523,7 @@ export const ControlMatrixPage: React.FC = () => {
                         }}
                     />
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="time-off-responsive-grid" style={{ display: 'grid', gap: '2rem' }}>
                         <button
                             onClick={() => setIsPauseModalOpen(false)}
                             style={{

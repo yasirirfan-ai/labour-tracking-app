@@ -226,6 +226,10 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
         const actualEarned = Math.max(0, Math.min(sickHoursToEarn, SICK_BALANCE_CAP_HOURS - newSickBalance));
 
         newSickBalance = parseFloat((newSickBalance + actualEarned).toFixed(2));
+        // Final safety clamp
+        if (newSickBalance > SICK_BALANCE_CAP_HOURS) {
+            newSickBalance = SICK_BALANCE_CAP_HOURS;
+        }
         newProcessedSickSeconds = alreadyProcessed + (sickHoursToEarn * SICK_SECONDS_PER_HOUR);
         sickEarned = actualEarned;
 

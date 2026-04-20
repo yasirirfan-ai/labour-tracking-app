@@ -1099,11 +1099,26 @@ tr:hover td {
     }
 }
 
-/* Mobile & Small Tablets (< 768px) */
+/* ============================================================
+   RESPONSIVE OVERHAUL (Core Framework)
+   ============================================================ */
+
+@media (max-width: 1024px) {
+    .content-grid, .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+    
+    /* Ensure 2-column layouts on Worker Portal move to 1 column earlier if needed */
+    .time-off-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Mobile & Tablets (< 768px) */
 @media (max-width: 768px) {
     :root {
         --sidebar-width: 0px;
-        --content-padding: 1.25rem 1rem;
+        --content-padding: 1rem 0.75rem;
     }
 
     .app-container {
@@ -1111,116 +1126,157 @@ tr:hover td {
     }
 
     .sidebar {
+        position: fixed;
         width: 280px;
         left: -280px;
+        height: 100vh;
+        z-index: 2000;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 20px 0 50px rgba(0,0,0,0.1);
     }
 
     .sidebar.mobile-open {
         transform: translateX(280px);
         left: 0;
-        width: 280px;
-    }
-
-    .sidebar.mobile-open .brand span,
-    .sidebar.mobile-open .nav-item span,
-    .sidebar.mobile-open .bottom-menu span {
-        display: inline;
     }
 
     .main-content {
         margin-left: 0 !important;
-        padding: var(--content-padding);
+        padding-top: 64px !important; /* Fixed header height */
+        width: 100% !important;
+    }
+
+    .admin-top-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
         width: 100%;
-        padding-top: calc(var(--header-height) + 1rem); /* Space for mobile header if needed */
+        background: var(--bg-card);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border);
+        z-index: 1000;
+        padding: 0 1rem;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between !important;
     }
 
     .mobile-menu-btn {
         display: flex !important;
-        position: relative;
-        z-index: 1500;
-        background: var(--bg-card);
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        width: 40px;
-        height: 40px;
         align-items: center;
         justify-content: center;
+        width: 42px;
+        height: 42px;
+        background: var(--bg-main) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
+        color: var(--text-main);
+        cursor: pointer;
     }
 
-    .admin-top-header {
-        padding: 0 1rem;
-        height: 64px;
-        justify-content: space-between !important;
+    /* Force all grids to 1 column on mobile */
+    .summary-grid, .stats-grid, .content-grid, .card-grid, .filter-grid, .time-off-grid, .responsive-grid-2 {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
     }
 
-    /* Prevent text overflow in small cards */
-    .stat-value {
-        font-size: 1.25rem;
+    /* Responsive Table Wrapper */
+    div[style*="overflowX: 'auto'"], .table-responsive-container {
+        margin: 0 -0.75rem;
+        padding: 0 0.75rem;
+        width: calc(100% + 1.5rem);
+        -webkit-overflow-scrolling: touch;
     }
 
-    .page-title {
-        font-size: 1.5rem;
+    .info-table, .history-table {
+        min-width: 650px;
     }
 
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .content-grid {
-        grid-template-columns: 1fr;
-    }
-
+    /* UI Fixes */
     .page-header {
         flex-direction: column;
-        align-items: flex-start !important;
-        gap: 0.75rem;
-    }
-
-    .filter-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .offcanvas {
-        width: 100% !important;
-        max-width: 100% !important;
-    }
-
-    .custom-modal {
-        width: 95%;
-        padding: 1.5rem;
-    }
-
-    .table-responsive-container table {
-        min-width: 600px; /* Reduced for better mobile compatibility */
-    }
-}
-
-/* Extra Small Devices (< 480px) */
-@media (max-width: 480px) {
-    :root {
-        --content-padding: 1rem 0.75rem;
-    }
-
-    .page-title {
-        font-size: 1.25rem;
-    }
-
-    .stat-value {
-        font-size: 1.25rem;
-    }
-
-    .btn {
-        width: 100%; /* Stack buttons on very small screens */
+        align-items: stretch !important;
+        gap: 1rem;
     }
 
     .header-actions {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr;
         gap: 0.5rem;
     }
+
+    .custom-modal {
+        width: 95% !important;
+        padding: 1.5rem !important;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    /* Worker Portal Balance Cards - Font scaling */
+    div[style*="fontSize: '3.5rem'"] {
+        font-size: 2.5rem !important;
+    }
+
+    /* Stack the Worker Portal Form & Ledger */
+    div[style*="gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.5fr)'"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Training Viewer on Mobile */
+    div[style*="height: '90vh'"] {
+        height: 100vh !important;
+        width: 100vw !important;
+        max-width: 100vw !important;
+        border-radius: 0 !important;
+    }
+}
+
+/* Extra Small Devices - iPhone 13/Pro/Mini (< 480px) */
+@media (max-width: 480px) {
+    :root {
+        --content-padding: 0.75rem 0.5rem;
+    }
+
+    .page-title {
+        font-size: 1.15rem !important;
+    }
+
+    .info-card {
+        border-radius: 12px;
+    }
+
+    .card-header {
+        padding: 0.75rem 1rem;
+    }
+
+    .card-header h3 {
+        font-size: 0.75rem;
+    }
+
+    /* Personal info Grid */
+    .card-grid {
+        padding: 1rem !important;
+    }
+
+    /* Balance numbers on tiny screens */
+    div[style*="fontSize: '3.5rem'"] {
+        font-size: 2.25rem !important;
+    }
+
+    /* Stack nested grids like start/end date */
+    div[style*="gridTemplateColumns: '1fr 1fr'"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+.mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 1999;
 }
 
 .mobile-menu-btn {
@@ -2522,6 +2578,26 @@ select:focus {
 /* ============================================================
    RESPONSIVE UTILITIES & BUG FIXES
    ============================================================ */
+
+.time-off-responsive-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+}
+
+.responsive-grid-2 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.grid-auto-250 {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+    .time-off-responsive-grid {
+        grid-template-columns: 1fr;
+    }
+}
 
 /* Mobile Hidden / Visible */
 @media (max-width: 768px) {

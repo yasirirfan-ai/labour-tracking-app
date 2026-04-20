@@ -1581,7 +1581,7 @@ export const WorkerPortalPage: React.FC = () => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
                                 <div className="status-card" style={{ margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                                     <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>{t('workerPortal.todaySummary')}</div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                    <div className="responsive-grid-2" style={{ display: 'grid', gap: '1rem' }}>
                                         <div style={{ padding: '1.5rem', background: 'var(--primary-bg)', borderRadius: '20px', border: '1px solid var(--border)' }}>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem' }}>{t('workerPortal.totalHours')}</div>
                                             <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>8.5</div>
@@ -2446,7 +2446,7 @@ export const WorkerPortalPage: React.FC = () => {
                                 })()}
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.5fr)', gap: '2rem' }}>
+                            <div className="time-off-responsive-grid" style={{ display: 'grid', gap: '2rem' }}>
                                 {/* Request Form */}
                                 <div className="info-card" style={{ height: 'fit-content', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                                     <div className="card-header">
@@ -2468,7 +2468,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                 )}
                                             </select>
                                         </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                        <div className="responsive-grid-2" style={{ display: 'grid', gap: '1rem' }}>
                                             <div className="info-field">
                                                 <label style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.startDate')}</label>
                                                 <input
