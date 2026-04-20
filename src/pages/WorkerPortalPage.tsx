@@ -41,6 +41,7 @@ export const WorkerPortalPage: React.FC = () => {
     const [policySignature, setPolicySignature] = useState('');
     const [isSigningPolicy, setIsSigningPolicy] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>([]);
     const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Compounder I' | 'Quality Assurance' | 'Shipping & Recieving' | 'Purchase'>(user?.role === 'manager' ? 'Quality Assurance' : 'Production');
     const [selectedSOPSection, setSelectedSOPSection] = useState<string>('');
@@ -1343,7 +1344,14 @@ export const WorkerPortalPage: React.FC = () => {
                 </div>
             )}
 
-            <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+            {isMobileOpen && (
+                <div
+                    className="mobile-overlay"
+                    onClick={() => setIsMobileOpen(false)}
+                />
+            )}
+
+            <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
                 <div className="brand">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem' }}>
                         <div className="brand-icon" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)' }}>
@@ -1351,39 +1359,45 @@ export const WorkerPortalPage: React.FC = () => {
                         </div>
                         {!isCollapsed && <span style={{ letterSpacing: '-0.03em', fontSize: '1.4rem', fontWeight: 900, color: 'white' }}>Babylon</span>}
                     </div>
-                    <button className="sidebar-toggle" onClick={() => setIsCollapsed(!isCollapsed)}>
+                    <button className="sidebar-toggle" onClick={() => {
+                        if (window.innerWidth <= 768) {
+                            setIsMobileOpen(false);
+                        } else {
+                            setIsCollapsed(!isCollapsed);
+                        }
+                    }}>
                         <i className={`fa-solid ${isCollapsed ? 'fa-bars-staggered' : 'fa-chevron-left'}`}></i>
                     </button>
                 </div>
 
                 <ul className="nav-menu">
                     <li>
-                        <div className={`portal-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+                        <div className={`portal-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveTab('dashboard'); setIsMobileOpen(false); }}>
                             <i className="fa-solid fa-gauge-high"></i> <span>{t('workerPortal.tabs.dashboard')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`portal-nav-item ${activeTab === 'personal_info' ? 'active' : ''}`} onClick={() => setActiveTab('personal_info')}>
+                        <div className={`portal-nav-item ${activeTab === 'personal_info' ? 'active' : ''}`} onClick={() => { setActiveTab('personal_info'); setIsMobileOpen(false); }}>
                             <i className="fa-solid fa-user-gear"></i> <span>{t('workerPortal.tabs.personalInfo')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`portal-nav-item ${activeTab === 'conduct' ? 'active' : ''}`} onClick={() => setActiveTab('conduct')}>
+                        <div className={`portal-nav-item ${activeTab === 'conduct' ? 'active' : ''}`} onClick={() => { setActiveTab('conduct'); setIsMobileOpen(false); }}>
                             <i className="fa-solid fa-shield-halved"></i> <span>{t('workerPortal.tabs.conduct')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`portal-nav-item ${activeTab === 'training' ? 'active' : ''}`} onClick={() => setActiveTab('training')}>
+                        <div className={`portal-nav-item ${activeTab === 'training' ? 'active' : ''}`} onClick={() => { setActiveTab('training'); setIsMobileOpen(false); }}>
                             <i className="fa-solid fa-graduation-cap"></i> <span>{t('workerPortal.tabs.training')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`portal-nav-item ${activeTab === 'timeoff' ? 'active' : ''}`} onClick={() => setActiveTab('timeoff')}>
+                        <div className={`portal-nav-item ${activeTab === 'timeoff' ? 'active' : ''}`} onClick={() => { setActiveTab('timeoff'); setIsMobileOpen(false); }}>
                             <i className="fa-solid fa-calendar-day"></i> <span>{t('workerPortal.tabs.timeOff')}</span>
                         </div>
                     </li>
                     <li>
-                        <div className={`portal-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+                        <div className={`portal-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setIsMobileOpen(false); }}>
                             <i className="fa-solid fa-sliders"></i> <span>{t('workerPortal.tabs.settings')}</span>
                         </div>
                     </li>
@@ -1413,15 +1427,20 @@ export const WorkerPortalPage: React.FC = () => {
                     top: 0,
                     zIndex: 100
                 }}>
-                    <div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('workerPortal.title')}</div>
-                        <h2 style={{ margin: 0, fontWeight: 900, color: 'var(--text-main)', fontSize: '1.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <button className="mobile-menu-btn hide-desktop" onClick={() => setIsMobileOpen(true)} style={{ position: 'static' }}>
+                            <i className="fa-solid fa-bars"></i>
+                        </button>
+                        <div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('workerPortal.title')}</div>
+                            <h2 style={{ margin: 0, fontWeight: 900, color: 'var(--text-main)', fontSize: '1.75rem' }}>
                             {activeTab === 'dashboard' ? t('workerPortal.overview') :
                                 activeTab === 'personal_info' ? t('workerPortal.tabs.personalInfo') :
                                     activeTab === 'conduct' ? t('workerPortal.conduct.title') :
                                         activeTab === 'settings' ? t('workerPortal.settings.title') :
                                             activeTab === 'training' ? t('workerPortal.tabs.training') : t('workerPortal.tabs.timeOff')}
                         </h2>
+                        </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
                         {/* Quick Access Settings */}
@@ -2286,7 +2305,7 @@ export const WorkerPortalPage: React.FC = () => {
                     )}
 
                     {activeTab === 'timeoff' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%' }}>
+                        <div className="timeoff-tab-content" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%' }}>
                             <div className="section-title-row">
                                 <i className="fa-solid fa-calendar-day"></i>
                                 <h2 style={{ fontSize: '2rem', color: 'var(--text-main)' }}>{t('workerPortal.timeOff.title')}</h2>

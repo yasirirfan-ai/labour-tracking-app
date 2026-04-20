@@ -265,8 +265,10 @@ export const WorkersPage: React.FC = () => {
                     display: flex;
                     gap: 1rem;
                     align-items: center;
+                    flex-wrap: wrap;
+                    width: 100%;
                 }
-                .search-wrapper { position: relative; width: 300px; }
+                .search-wrapper { position: relative; width: 100%; max-width: 300px; flex: 1 1 200px; }
                 .search-wrapper i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
                 .search-wrapper input {
                     width: 100%;
@@ -276,8 +278,9 @@ export const WorkersPage: React.FC = () => {
                     background: var(--bg-card);
                     color: var(--text-main);
                     outline: none;
+                    box-sizing: border-box;
                 }
-                .status-filter { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+                .status-filter { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; }
                 .select-wrapper select {
                     background: var(--bg-card);
                     border: 1px solid var(--border);
@@ -285,6 +288,7 @@ export const WorkersPage: React.FC = () => {
                     border-radius: 8px;
                     color: var(--text-main);
                     font-weight: 600;
+                    box-sizing: border-box;
                 }
 
                 /* Modals Styling */

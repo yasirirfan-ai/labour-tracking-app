@@ -3424,17 +3424,22 @@ export const EmployeeDetailView: React.FC = () => {
                         padding: 1rem;
                     }
                     .header-main {
-                        flex-direction: column;
-                        text-align: center;
-                        padding: 1.5rem;
+                        flex-direction: row;
+                        align-items: center;
+                        text-align: left;
+                        padding: 1rem 1.5rem;
                         gap: 1rem;
                     }
                     .profile-photo-container {
-                        width: 80px;
-                        height: 80px;
+                        width: 68px;
+                        height: 68px;
                     }
                     .profile-title-info h1 {
-                        font-size: 1.5rem;
+                        font-size: 1.25rem;
+                        margin-bottom: 2px;
+                    }
+                    .profile-title-info p {
+                        font-size: 0.75rem;
                     }
                     .header-actions {
                         margin-left: 0;

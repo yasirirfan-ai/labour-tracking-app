@@ -42,15 +42,16 @@ export const LoginPage: React.FC = () => {
                 .login-body-wrapper {
                     background-color: #f8fafc;
                     margin: 0;
-                    padding: 0;
+                    padding: 1rem;
                     height: 100vh;
                     width: 100%;
+                    box-sizing: border-box;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     font-family: 'Inter', sans-serif;
                     color: var(--babylon-navy);
-                    overflow: hidden;
+                    overflow: auto; /* changed from hidden so short landscape screens can scroll */
                     position: fixed;
                     top: 0;
                     left: 0;
@@ -60,8 +61,9 @@ export const LoginPage: React.FC = () => {
                 .login-card {
                     width: 100%;
                     max-width: 440px;
-                    padding: 3rem 2.5rem;
+                    padding: 2rem 1.5rem; /* reduced from 3rem 2.5rem for tight 320px mobile screens */
                     background: white;
+                    box-sizing: border-box;
                     border-radius: 24px;
                     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
                     text-align: center;

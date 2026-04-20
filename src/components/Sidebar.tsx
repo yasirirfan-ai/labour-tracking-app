@@ -13,7 +13,11 @@ export const Sidebar: React.FC<{
     const { t } = useTranslation();
 
     const toggleSidebar = () => {
-        setIsCollapsed(!isCollapsed);
+        if (window.innerWidth <= 768 && setIsMobileOpen) {
+            setIsMobileOpen(false);
+        } else {
+            setIsCollapsed(!isCollapsed);
+        }
     };
 
     const handleMobileClose = () => {
