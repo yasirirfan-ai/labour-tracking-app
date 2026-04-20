@@ -24,6 +24,9 @@ export const WorkerPortalPage: React.FC = () => {
     const [disciplinaryIncidents, setDisciplinaryIncidents] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'dashboard' | 'personal_info' | 'conduct' | 'settings' | 'training' | 'timeoff'>('dashboard');
     const [leaveHistory, setLeaveHistory] = useState<any[]>([]);
+    const [requestHistoryPage, setRequestHistoryPage] = useState(1);
+    const [ledgerPage, setLedgerPage] = useState(1);
+    const [historyTypeFilter, setHistoryTypeFilter] = useState<'all' | 'pto' | 'sick'>('all');
     const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
     const [leaveFormData, setLeaveFormData] = useState({
         type: 'pto' as 'pto' | 'sick',
@@ -113,7 +116,8 @@ export const WorkerPortalPage: React.FC = () => {
             .from('leave_requests')
             .select('*')
             .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(25);
         if (error) { console.error('Error fetching leave requests:', error); return; }
         if (data) setMyLeaveRequests(data);
     };
@@ -2352,62 +2356,94 @@ export const WorkerPortalPage: React.FC = () => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {myLeaveRequests.filter((req: any) => !((user?.pay_schedule?.toLowerCase().includes('monthly') && !(user?.pay_schedule?.toLowerCase().includes('semi'))) && req.type === 'sick')).map((req: any) => {
-                                                    const statusColor = req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#dc2626' : '#d97706';
-                                                    const statusBg = req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7';
-                                                    const statusIcon = req.status === 'approved' ? 'fa-circle-check' : req.status === 'rejected' ? 'fa-circle-xmark' : 'fa-clock';
-                                                    return (
-                                                        <tr key={req.id}>
-                                                            <td>
-                                                                <span style={{
-                                                                    background: req.type === 'pto' ? '#dbeafe' : '#d1fae5',
-                                                                    color: req.type === 'pto' ? '#1d4ed8' : '#065f46',
-                                                                    fontWeight: 700,
-                                                                    padding: '0.2rem 0.6rem',
-                                                                    borderRadius: '6px',
-                                                                    fontSize: '0.75rem',
-                                                                    textTransform: 'uppercase',
-                                                                }}>
-                                                                    {req.type === 'pto' ? t('workerPortal.timeOff.pto') : t('workerPortal.timeOff.sick')}
-                                                                </span>
-                                                            </td>
-                                                            <td style={{ color: 'var(--text-main)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                                                                {req.start_date} → {req.end_date}
-                                                            </td>
-                                                            <td style={{ color: 'var(--text-main)', fontWeight: 700, textAlign: 'center' }}>
-                                                                {req.hours_requested}h
-                                                            </td>
-                                                            <td>
-                                                                <span style={{
-                                                                    background: statusBg,
-                                                                    color: statusColor,
-                                                                    fontWeight: 800,
-                                                                    padding: '0.25rem 0.75rem',
-                                                                    borderRadius: '8px',
-                                                                    fontSize: '0.78rem',
-                                                                    textTransform: 'uppercase',
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '0.35rem',
-                                                                    whiteSpace: 'nowrap',
-                                                                }}>
-                                                                    <i className={`fa-solid ${statusIcon}`} style={{ fontSize: '0.7rem' }}></i>
-                                                                    {t(`leave.filters.${req.status}`)}
-                                                                </span>
-                                                            </td>
-                                                            <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem', maxWidth: '180px' }}>
-                                                                {req.admin_notes || '—'}
-                                                            </td>
-                                                            <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                                                                {new Date(req.created_at).toLocaleDateString()}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
+                                                {(() => {
+                                                    const filteredRequests = myLeaveRequests.filter((req: any) => !((user?.pay_schedule?.toLowerCase().includes('monthly') && !(user?.pay_schedule?.toLowerCase().includes('semi'))) && req.type === 'sick'));
+                                                    const perPage = 4;
+                                                    const startIndex = (requestHistoryPage - 1) * perPage;
+                                                    const paginated = filteredRequests.slice(startIndex, startIndex + perPage);
+
+                                                    return paginated.map((req: any) => {
+                                                        const statusColor = req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#dc2626' : '#d97706';
+                                                        const statusBg = req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7';
+                                                        const statusIcon = req.status === 'approved' ? 'fa-circle-check' : req.status === 'rejected' ? 'fa-circle-xmark' : 'fa-clock';
+                                                        return (
+                                                            <tr key={req.id}>
+                                                                <td>
+                                                                    <span style={{
+                                                                        background: req.type === 'pto' ? '#dbeafe' : '#d1fae5',
+                                                                        color: req.type === 'pto' ? '#1d4ed8' : '#065f46',
+                                                                        fontWeight: 700,
+                                                                        padding: '0.2rem 0.6rem',
+                                                                        borderRadius: '6px',
+                                                                        fontSize: '0.75rem',
+                                                                        textTransform: 'uppercase',
+                                                                    }}>
+                                                                        {req.type === 'pto' ? t('workerPortal.timeOff.pto') : t('workerPortal.timeOff.sick')}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ color: 'var(--text-main)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                                                                    {req.start_date} → {req.end_date}
+                                                                </td>
+                                                                <td style={{ color: 'var(--text-main)', fontWeight: 700, textAlign: 'center' }}>
+                                                                    {req.hours_requested}h
+                                                                </td>
+                                                                <td>
+                                                                    <span style={{
+                                                                        background: statusBg,
+                                                                        color: statusColor,
+                                                                        fontWeight: 800,
+                                                                        padding: '0.25rem 0.75rem',
+                                                                        borderRadius: '8px',
+                                                                        fontSize: '0.78rem',
+                                                                        textTransform: 'uppercase',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '0.35rem',
+                                                                        whiteSpace: 'nowrap',
+                                                                    }}>
+                                                                        <i className={`fa-solid ${statusIcon}`} style={{ fontSize: '0.7rem' }}></i>
+                                                                        {t(`leave.filters.${req.status}`)}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem', maxWidth: '180px' }}>
+                                                                    {req.admin_notes || '—'}
+                                                                </td>
+                                                                <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                                                    {new Date(req.created_at).toLocaleDateString()}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    });
+                                                })()}
                                             </tbody>
                                         </table>
                                     )}
                                 </div>
+                                {(() => {
+                                    const filteredRequests = myLeaveRequests.filter((req: any) => !((user?.pay_schedule?.toLowerCase().includes('monthly') && !(user?.pay_schedule?.toLowerCase().includes('semi'))) && req.type === 'sick'));
+                                    const perPage = 4;
+                                    const totalPages = Math.ceil(filteredRequests.length / perPage);
+                                    if (totalPages <= 1) return null;
+                                    return (
+                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--border)' }}>
+                                            <button 
+                                                onClick={() => setRequestHistoryPage(p => Math.max(1, p - 1))}
+                                                disabled={requestHistoryPage === 1}
+                                                style={{ padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', cursor: requestHistoryPage === 1 ? 'not-allowed' : 'pointer', opacity: requestHistoryPage === 1 ? 0.5 : 1 }}
+                                            >
+                                                <i className="fa-solid fa-chevron-left"></i>
+                                            </button>
+                                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>{requestHistoryPage} / {totalPages}</span>
+                                            <button 
+                                                onClick={() => setRequestHistoryPage(p => Math.min(totalPages, p + 1))}
+                                                disabled={requestHistoryPage === totalPages}
+                                                style={{ padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', cursor: requestHistoryPage === totalPages ? 'not-allowed' : 'pointer', opacity: requestHistoryPage === totalPages ? 0.5 : 1 }}
+                                            >
+                                                <i className="fa-solid fa-chevron-right"></i>
+                                            </button>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.5fr)', gap: '2rem' }}>
@@ -2488,9 +2524,34 @@ export const WorkerPortalPage: React.FC = () => {
 
                                 {/* History Ledger */}
                                 <div className="info-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                                    <div className="card-header">
-                                        <i className="fa-solid fa-clock-rotate-left"></i>
-                                        <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.timeOff.historyLedgerTitle', 'Detailed History')}</h3>
+                                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <i className="fa-solid fa-clock-rotate-left"></i>
+                                            <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.timeOff.historyLedgerTitle', 'Detailed History')}</h3>
+                                        </div>
+                                        {((user?.pay_schedule || '').toLowerCase().includes('semi')) && (
+                                            <select 
+                                                value={historyTypeFilter}
+                                                onChange={(e) => {
+                                                    setHistoryTypeFilter(e.target.value as 'all' | 'pto' | 'sick');
+                                                    setLedgerPage(1); // Reset to first page on filter change
+                                                }}
+                                                style={{
+                                                    padding: '0.4rem 0.8rem',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid var(--border)',
+                                                    background: 'var(--bg-main)',
+                                                    color: 'var(--text-main)',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <option value="all">{t('leave.filters.all')}</option>
+                                                <option value="pto">{t('workerPortal.timeOff.pto')}</option>
+                                                <option value="sick">{t('workerPortal.timeOff.sick')}</option>
+                                            </select>
+                                        )}
                                     </div>
                                     <div style={{ overflowX: 'auto' }}>
                                         <table className="info-table">
@@ -2506,19 +2567,26 @@ export const WorkerPortalPage: React.FC = () => {
                                             <tbody>
                                                 {(() => {
                                                     const isMonthly = user?.pay_schedule?.toLowerCase().includes('monthly') && !user?.pay_schedule?.toLowerCase().includes('semi');
-                                                    const filteredHistory = leaveHistory.filter(item => !(isMonthly && item.type === 'sick'));
-                                                    return filteredHistory.length > 0 ? filteredHistory.map((item, idx) => (
+                                                    let filteredHistory = leaveHistory.filter(item => !(isMonthly && item.type === 'sick'));
+                                                    
+                                                    if (historyTypeFilter !== 'all') {
+                                                        filteredHistory = filteredHistory.filter(item => item.type === historyTypeFilter);
+                                                    }
+
+                                                    const perPage = 10;
+                                                    const startIndex = (ledgerPage - 1) * perPage;
+                                                    const paginated = filteredHistory.slice(startIndex, startIndex + perPage);
+
+                                                    return filteredHistory.length > 0 ? paginated.map((item) => (
                                                         <tr key={item.id}>
                                                             <td style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>
                                                                 {item.entry_date.includes('-') ? (() => { const [y, m, d] = item.entry_date.split('-'); return `${m}/${d}/${y}`; })() : item.entry_date}
                                                             </td>
                                                             <td style={{ color: 'var(--text-main)', fontWeight: 700 }}>{item.description}</td>
-                                                            <td style={{ color: 'var(--danger)', fontWeight: 800 }}>{item.used_hours != null ? `-${item.used_hours.toFixed(2)}` : ''}</td>
-                                                            <td style={{ color: 'var(--success)', fontWeight: 800 }}>{item.earned_hours != null ? `+${item.earned_hours.toFixed(2)}` : ''}</td>
+                                                            <td style={{ color: 'var(--danger)', fontWeight: 800 }}>{item.used_hours && item.used_hours > 0 ? `-${item.used_hours.toFixed(2)}` : ''}</td>
+                                                            <td style={{ color: 'var(--success)', fontWeight: 800 }}>{item.earned_hours && item.earned_hours > 0 ? `+${item.earned_hours.toFixed(2)}` : ''}</td>
                                                             <td style={{ color: 'var(--text-main)', fontWeight: 900 }}>
-                                                                {idx === 0 
-                                                                    ? Number((item.description || '').toLowerCase().includes('sick') ? (user?.sick_balance ?? 0) : (user?.pto_balance ?? 0)).toFixed(2) 
-                                                                    : '0.00'}
+                                                                {item.balance != null ? Number(item.balance).toFixed(2) : '0.00'}
                                                             </td>
                                                         </tr>
                                                     )) : (
@@ -2532,6 +2600,37 @@ export const WorkerPortalPage: React.FC = () => {
                                             </tbody>
                                         </table>
                                     </div>
+                                    {(() => {
+                                        const isMonthly = user?.pay_schedule?.toLowerCase().includes('monthly') && !user?.pay_schedule?.toLowerCase().includes('semi');
+                                        let filteredHistory = leaveHistory.filter(item => !(isMonthly && item.type === 'sick'));
+                                        
+                                        if (historyTypeFilter !== 'all') {
+                                            filteredHistory = filteredHistory.filter(item => item.type === historyTypeFilter);
+                                        }
+
+                                        const perPage = 10;
+                                        const totalPages = Math.ceil(filteredHistory.length / perPage);
+                                        if (totalPages <= 1) return null;
+                                        return (
+                                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--border)' }}>
+                                                <button 
+                                                    onClick={() => setLedgerPage(p => Math.max(1, p - 1))}
+                                                    disabled={ledgerPage === 1}
+                                                    style={{ padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', cursor: ledgerPage === 1 ? 'not-allowed' : 'pointer', opacity: ledgerPage === 1 ? 0.5 : 1 }}
+                                                >
+                                                    <i className="fa-solid fa-chevron-left"></i>
+                                                </button>
+                                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>{ledgerPage} / {totalPages}</span>
+                                                <button 
+                                                    onClick={() => setLedgerPage(p => Math.min(totalPages, p + 1))}
+                                                    disabled={ledgerPage === totalPages}
+                                                    style={{ padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', cursor: ledgerPage === totalPages ? 'not-allowed' : 'pointer', opacity: ledgerPage === totalPages ? 0.5 : 1 }}
+                                                >
+                                                    <i className="fa-solid fa-chevron-right"></i>
+                                                </button>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>

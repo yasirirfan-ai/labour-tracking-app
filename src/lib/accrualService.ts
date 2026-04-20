@@ -433,17 +433,13 @@ export async function recalculateUserBalances(userId: string, type: 'pto' | 'sic
         const updates: any[] = [];
 
         for (const row of history) {
-            const isCarryover = (row.description || '').toUpperCase().includes('CARRYOVER');
+            const earned = row.earned_hours || 0;
+            const used = row.used_hours || 0;
+            runningBalance = parseFloat((runningBalance + earned - used).toFixed(2));
             
-            if (!isCarryover) {
-                const earned = row.earned_hours || 0;
-                const used = row.used_hours || 0;
-                runningBalance = parseFloat((runningBalance + earned - used).toFixed(2));
-                
-                // Enforce Sick Cap
-                if (type === 'sick' && runningBalance > SICK_BALANCE_CAP_HOURS) {
-                    runningBalance = SICK_BALANCE_CAP_HOURS;
-                }
+            // Enforce Sick Cap
+            if (type === 'sick' && runningBalance > SICK_BALANCE_CAP_HOURS) {
+                runningBalance = SICK_BALANCE_CAP_HOURS;
             }
 
             // We update the row's balance

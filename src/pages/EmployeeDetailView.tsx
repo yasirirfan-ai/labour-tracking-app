@@ -1065,8 +1065,8 @@ export const EmployeeDetailView: React.FC = () => {
                                                         <tr key={item.id}>
                                                             <td>{item.entry_date.includes('-') ? (() => { const [y, m, d] = item.entry_date.split('-'); return `${m}/${d}/${y}`; })() : item.entry_date}</td>
                                                             <td>{item.description}</td>
-                                                            <td className="used-cell">{item.used_hours != null ? item.used_hours.toFixed(2) : ''}</td>
-                                                            <td className="earned-cell">{item.earned_hours != null ? item.earned_hours.toFixed(2) : ''}</td>
+                                                            <td className="used-cell">{item.used_hours && item.used_hours > 0 ? item.used_hours.toFixed(2) : ''}</td>
+                                                            <td className="earned-cell">{item.earned_hours && item.earned_hours > 0 ? item.earned_hours.toFixed(2) : ''}</td>
                                                             <td className="balance-cell">
                                                                 {item.balance != null ? Number(item.balance).toFixed(2) : '0.00'}
                                                             </td>
