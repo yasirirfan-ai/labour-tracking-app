@@ -123,13 +123,60 @@
       "submit": "Enviar Solicitud",
       "submitting": "Enviando...",
       "historyTitle": "Historial de Solicitudes",
+      "historyLedgerTitle": "Libro de Historial Detallado",
+      "noRequests": "No se encontraron solicitudes de licencia.",
+      "noHistory": "No se encontró historial detallado.",
+      "sickSubstituted": "La licencia por enfermedad se deduce del PTO",
+      "monthlyPolicy": "Se aplica la política de trabajador mensual",
       "table": {
         "type": "Tipo",
         "dates": "Fechas",
         "hours": "Horas",
-        "status": "Estado"
-      },
-      "noRequests": "No se encontraron solicitudes de licencia."
+        "status": "Estado",
+        "date": "Fecha",
+        "description": "Descripción",
+        "used": "Horas Usadas (−)",
+        "earned": "Horas Ganadas (+)",
+        "balance": "Saldo",
+        "adminNote": "Nota Admin",
+        "submitted": "Enviado"
+      }
+    }
+  },
+  "matrix": {
+    "title": "Matriz de Control de Producción",
+    "subtitle": "Haga clic en cualquier celda para asignar trabajadores y controlar temporizadores",
+    "manufacturingOrders": "Órdenes de Fabricación",
+    "workers": "{{count}} trabajadores",
+    "assign": "Asignar",
+    "addWorker": "Añadir Trabajador",
+    "selectWorker": "Seleccionar trabajador...",
+    "noWorkersClockedIn": "No hay trabajadores en servicio",
+    "pauseTask": "Pausar Tarea",
+    "pauseReasonPlaceholder": "ej. Mantenimiento de Máquina",
+    "pauseMessage": "Ingrese un motivo para pausar esta tarea (opcional).",
+    "confirmPause": "Confirmar Pausa",
+    "alreadyAssigned": "¡El trabajador ya está asignado a esta operación!",
+    "errorAssigning": "Error al asignar trabajador",
+    "removeAssignment": "¿Eliminar esta asignación de trabajador?",
+    "cannotActionBreak": "No se puede {{action}} la tarea. {{name}} está actualmente en descanso.",
+    "manualPause": "Pausa Manual",
+    "status": {
+      "active": "ACTIVO",
+      "break": "EN DESCANSO",
+      "paused": "PAUSADO",
+      "done": "LISTO",
+      "pending": "PENDIENTE"
+    },
+    "ops": {
+      "Receiving": "Recepción",
+      "Staging": "Preparación",
+      "Batching": "Loteado",
+      "Weighing": "Pesaje",
+      "Filling": "Llenado",
+      "Packing": "Empaque",
+      "Shipping": "Envío",
+      "PutBack": "Devolución"
     }
   },
   "table": {
@@ -246,11 +293,13 @@
     "divorced": "Divorciado/a",
     "optional": "opcional",
     "addPolicy": "Añadir Política",
-    "socialLinks": "Enlaces Sociales",
-    "linkedin": "LinkedIn",
-    "twitter": "Twitter",
     "facebook": "Facebook",
-    "authenticating": "Autenticando..."
+    "authenticating": "Autenticando...",
+    "mo": "MO",
+    "notAvailable": "N/A",
+    "addPolicy": "Añadir Política",
+    "live": "En Vivo",
+    "capReached": "TOPE ALCANZADO"
   },
   "workers": {
     "title": "Trabajadores",
@@ -398,7 +447,9 @@
       "earnedHours": "Horas Ganadas (+)",
       "balance": "Saldo",
       "date": "Fecha",
-      "description": "Descripción"
+      "description": "Descripción",
+      "projectFuture": "Proyectar Saldo Futuro",
+      "adjustBalance": "Ajustar Saldo"
     }
   },
   "operations": {
@@ -479,6 +530,10 @@
     "eventPlaceholder": "ej. jkv0u...",
     "requiredError": "El número de MO y el nombre del producto son obligatorios",
     "loading": "Cargando Órdenes...",
+    "poLabel": "PO:",
+    "skuLabel": "SKU:",
+    "scheduledLabel": "Programado:",
+    "qtyLabel": "Cant:",
     "statuses": {
       "draft": "Borrador",
       "scheduled": "Programado",

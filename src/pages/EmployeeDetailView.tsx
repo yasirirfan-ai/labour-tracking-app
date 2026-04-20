@@ -6,7 +6,8 @@ import {
     fetchLeaveHistory,
     getTenureMonths,
     getPtoRate,
-    isSickLeaveUsable
+    isSickLeaveUsable,
+    recalculateUserBalances
 } from '../lib/accrualService';
 import type { LeaveHistoryRow } from '../lib/accrualService';
 import type { User } from '../types';
@@ -259,13 +260,15 @@ export const EmployeeDetailView: React.FC = () => {
                     type: typeForHistory,
                     used_hours: request.hours_requested,
                     earned_hours: null,
-                    balance: parseFloat(newBalance),
                     description: description,
                     entry_date: request.start_date,
                     created_at: new Date().toISOString()
                 }]);
 
                 if (historyError) throw historyError;
+                
+                // Recalculate accurately
+                await recalculateUserBalances(request.user_id, typeForHistory as 'pto' | 'sick');
             }
 
             setToast({ message: t('leave.actions.success', { status: t(`leave.filters.${status}`) }), type: 'success' });
@@ -295,15 +298,15 @@ export const EmployeeDetailView: React.FC = () => {
             }).select().single();
 
             if (req) {
-                const currentBal = parseFloat((employee as any)[recordForm.type === 'pto' ? 'pto_balance' : 'sick_balance'] || '0');
-                await (supabase.from('leave_history') as any).insert({
+                await (supabase as any).from('leave_history').insert({
                     user_id: employee.id,
                     type: recordForm.type,
                     used_hours: recordForm.hours,
-                    balance: currentBal - recordForm.hours,
                     entry_date: recordForm.startDate,
                     description: recordForm.description || `Admin Recorded: ${recordForm.hours}hrs ${recordForm.type.toUpperCase()}`
                 });
+                
+                await recalculateUserBalances(employee.id, recordForm.type);
                 await syncLeaveBalances(employee!);
                 setIsRecordModalOpen(false);
                 // Refresh both employee data AND leave history
@@ -325,28 +328,24 @@ export const EmployeeDetailView: React.FC = () => {
         if (!employee) return;
         setIsSaving(true);
         try {
-            const balanceField = adjustmentType === 'pto' ? 'pto_balance' : 'sick_balance';
-            const currentBalance = parseFloat((employee as any)[balanceField] || '0');
             // direction: 'add' increases, 'deduct' decreases
             const delta = adjustmentForm.direction === 'add'
                 ? Math.abs(adjustmentForm.amount)
                 : -Math.abs(adjustmentForm.amount);
-            const newBalance = parseFloat((currentBalance + delta).toFixed(2));
 
             const description = adjustmentForm.description ||
                 `Admin ${adjustmentForm.direction === 'add' ? 'Added' : 'Deducted'} ${Math.abs(adjustmentForm.amount)} hrs (${adjustmentType.toUpperCase()})`;
 
-            await (supabase.from('leave_history') as any).insert({
+            await (supabase as any).from('leave_history').insert({
                 user_id: employee.id,
                 type: adjustmentType,
                 earned_hours: delta > 0 ? delta : null,
                 used_hours: delta < 0 ? Math.abs(delta) : null,
-                balance: newBalance,
                 entry_date: adjustmentForm.effectiveDate,
                 description
             });
 
-            await (supabase.from('users') as any).update({ [balanceField]: newBalance }).eq('id', employee.id);
+            await recalculateUserBalances(employee.id, adjustmentType);
             setIsAdjustModalOpen(false);
             setAdjustmentForm({ amount: 0, direction: 'add', description: '', effectiveDate: new Date().toISOString().split('T')[0] });
             // Refresh both employee data AND leave history
@@ -767,6 +766,7 @@ export const EmployeeDetailView: React.FC = () => {
                                     </div>
 
                                     {/* Sick Card */}
+                                    {/* Sick Card */}
                                     {!isMonthly && (
                                         <div className="time-off-card">
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
@@ -781,15 +781,18 @@ export const EmployeeDetailView: React.FC = () => {
                                                     )}
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '6px' }}>
-                                                    <button className="pill-control-btn" onClick={() => setIsCalculateModalOpen(true)} title="Project Future Balance"><i className="fa-solid fa-calculator"></i></button>
-                                                    <button className="pill-control-btn" onClick={() => { setAdjustmentType('sick'); setIsAdjustModalOpen(true); }} title="Adjust Balance"><i className="fa-solid fa-plus"></i></button>
+                                                    <button className="pill-control-btn" onClick={() => setIsCalculateModalOpen(true)} title={t('employeeDetail.timeOff.projectFuture')}><i className="fa-solid fa-calculator"></i></button>
+                                                    <button className="pill-control-btn" onClick={() => { setAdjustmentType('sick'); setIsAdjustModalOpen(true); }} title={t('employeeDetail.timeOff.adjustBalance')}><i className="fa-solid fa-plus"></i></button>
                                                 </div>
                                             </div>
                                             <div className="card-value">
                                                 <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>
                                                     {sickBalance.toFixed(2)}
                                                 </span>
-                                                <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 600 }}>{t('employeeDetail.timeOff.hrs', 'Hrs')}</span>
+                                                <span style={{ fontSize: '1.1rem', color: '#64748b', fontWeight: 700, marginLeft: '4px' }}>{t('employeeDetail.timeOff.hrs')}</span>
+                                                {sickBalance >= 40 && (
+                                                    <span style={{ marginLeft: '12px', fontSize: '0.65rem', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '4px', fontWeight: 900, textTransform: 'uppercase', verticalAlign: 'middle' }}>{t('common.capReached')}</span>
+                                                )}
                                             </div>
                                             <div className="card-label">{t('employeeDetail.timeOff.sickLabel')}</div>
                                             <div className="card-sublabel">{t('employeeDetail.timeOff.sickCap')}</div>
@@ -801,8 +804,8 @@ export const EmployeeDetailView: React.FC = () => {
                                         <div className="time-off-card" style={{ opacity: 0.8, background: '#f8fafc', borderStyle: 'dashed', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
                                             <div>
                                                 <i className="fa-solid fa-hospital" style={{ color: '#94a3b8', fontSize: '1.5rem', marginBottom: '0.5rem' }}></i>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>Sick leave is deducted from PTO</div>
-                                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Monthly worker policy applied</div>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>{t('workerPortal.timeOff.sickSubstituted')}</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{t('workerPortal.timeOff.monthlyPolicy')}</div>
                                             </div>
                                         </div>
                                     )}
@@ -911,10 +914,12 @@ export const EmployeeDetailView: React.FC = () => {
                                                             className={`dropdown-item ${accrualHistoryType === 'pto' ? 'selected' : ''}`}
                                                             onClick={() => { setAccrualHistoryType('pto'); setOpenDropdown(null); }}
                                                         >Paid Time Off (PTO)</div>
-                                                        <div
-                                                            className={`dropdown-item ${accrualHistoryType === 'sick' ? 'selected' : ''}`}
-                                                            onClick={() => { setAccrualHistoryType('sick'); setOpenDropdown(null); }}
-                                                        >Sick Time</div>
+                                                        {!isMonthly && (
+                                                            <div
+                                                                className={`dropdown-item ${accrualHistoryType === 'sick' ? 'selected' : ''}`}
+                                                                onClick={() => { setAccrualHistoryType('sick'); setOpenDropdown(null); }}
+                                                            >Sick Time</div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -1020,7 +1025,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                                     </td>
                                                                     <td>
                                                                         <span style={{ color: statusColor, fontWeight: 700, textTransform: 'capitalize' }}>
-                                                                            {req.status}
+                                                                            {t(`leave.filters.${req.status}`)}
                                                                         </span>
                                                                         {approverName && actionDateFmt && (
                                                                             <span style={{ color: '#64748b', fontWeight: 400, fontSize: '0.8rem' }}>

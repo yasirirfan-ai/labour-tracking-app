@@ -8,7 +8,10 @@
       "Bash(python scratch/migrate_felipe_acevedo.py)",
       "Bash(python -c ':*)",
       "Bash(grep -n \"import.*LeaveRequests\" /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/src/*.tsx)",
-      "Bash(grep -n \"LeaveRequests\" /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/src/components/*.tsx)"
+      "Bash(grep -n \"LeaveRequests\" /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/src/components/*.tsx)",
+      "Bash(ls c:\\\\Users\\\\ESHOP\\\\Downloads\\\\labour-tracking-app-main\\\\labour-tracking-app-main/*.md)",
+      "Read(//c/Users/ESHOP//**)",
+      "Bash(python /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/scratch/extract_sarbelio.py)"
     ]
   }
 }

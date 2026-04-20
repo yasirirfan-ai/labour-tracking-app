@@ -220,14 +220,14 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
     if (isSemiMonthly) {
         const alreadyProcessed = user.processed_sick_seconds || 0;
         const newWorkedSeconds = Math.max(0, totalWorkedSeconds - alreadyProcessed);
-        const sickHoursToAdd = Math.floor(newWorkedSeconds / SICK_SECONDS_PER_HOUR);
+        const sickHoursToEarn = Math.floor(newWorkedSeconds / SICK_SECONDS_PER_HOUR);
 
-        newSickBalance = newSickBalance + sickHoursToAdd;
-        if (newSickBalance > SICK_BALANCE_CAP_HOURS) newSickBalance = SICK_BALANCE_CAP_HOURS;
-        newSickBalance = Math.round(newSickBalance * 100) / 100;
+        // Cap actual earned hours to reach exactly 40 if currently below
+        const actualEarned = Math.max(0, Math.min(sickHoursToEarn, SICK_BALANCE_CAP_HOURS - newSickBalance));
 
-        newProcessedSickSeconds = alreadyProcessed + (sickHoursToAdd * SICK_SECONDS_PER_HOUR);
-        sickEarned = sickHoursToAdd;
+        newSickBalance = parseFloat((newSickBalance + actualEarned).toFixed(2));
+        newProcessedSickSeconds = alreadyProcessed + (sickHoursToEarn * SICK_SECONDS_PER_HOUR);
+        sickEarned = actualEarned;
 
         if (sickEarned > 0) {
             historyEvents.push({
@@ -411,4 +411,69 @@ export async function fetchLeaveHistory(userId: string, type?: 'pto' | 'sick'): 
         return [];
     }
 }
+
+export async function recalculateUserBalances(userId: string, type: 'pto' | 'sick'): Promise<number> {
+    try {
+        console.log(`[accrualService] Recalculating ${type} balances for user ${userId}...`);
+
+        // 1. Fetch all history for this user and type, sorted chronologically
+        const { data: history, error: fetchError } = await (supabase as any)
+            .from('leave_history')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('type', type)
+            .order('entry_date', { ascending: true })
+            .order('created_at', { ascending: true });
+
+        if (fetchError) throw fetchError;
+        if (!history || history.length === 0) return 0;
+
+        // 2. Calculate running balances
+        let runningBalance = 0;
+        const updates: any[] = [];
+
+        for (const row of history) {
+            const isCarryover = (row.description || '').toUpperCase().includes('CARRYOVER');
+            
+            if (!isCarryover) {
+                const earned = row.earned_hours || 0;
+                const used = row.used_hours || 0;
+                runningBalance = parseFloat((runningBalance + earned - used).toFixed(2));
+                
+                // Enforce Sick Cap
+                if (type === 'sick' && runningBalance > SICK_BALANCE_CAP_HOURS) {
+                    runningBalance = SICK_BALANCE_CAP_HOURS;
+                }
+            }
+
+            // We update the row's balance
+            updates.push({
+                id: row.id,
+                balance: runningBalance
+            });
+        }
+
+        // 3. Batch update the history balances
+        const updatePromises = updates.map(upd => 
+            (supabase as any).from('leave_history')
+                .update({ balance: upd.balance })
+                .eq('id', upd.id)
+        );
+        await Promise.all(updatePromises);
+
+        // 4. Update the user profile with the final balance
+        const balanceField = type === 'pto' ? 'pto_balance' : 'sick_balance';
+        await (supabase as any)
+            .from('users')
+            .update({ [balanceField]: String(runningBalance) })
+            .eq('id', userId);
+
+        console.log(`[accrualService] Finished recalculating ${type}. Final balance: ${runningBalance}`);
+        return runningBalance;
+    } catch (err) {
+        console.error('[accrualService] recalculateUserBalances error:', err);
+        throw err;
+    }
+}
+
 

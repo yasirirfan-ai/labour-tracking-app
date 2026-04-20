@@ -124,6 +124,10 @@
       "submitting": "Submitting...",
       "historyTitle": "Request History",
       "historyLedgerTitle": "Detailed History Ledger",
+      "noRequests": "No leave requests found.",
+      "noHistory": "No detailed history found.",
+      "sickSubstituted": "Sick leave is deducted from PTO",
+      "monthlyPolicy": "Monthly worker policy applied",
       "table": {
         "type": "Type",
         "dates": "Dates",
@@ -133,10 +137,10 @@
         "description": "Description",
         "used": "Used Hours (−)",
         "earned": "Earned Hours (+)",
-        "balance": "Balance"
-      },
-      "noRequests": "No leave requests found.",
-      "noHistory": "No detailed history found."
+        "balance": "Balance",
+        "adminNote": "Admin Note",
+        "submitted": "Submitted"
+      }
     }
   },
   "matrix": {
@@ -163,6 +167,16 @@
       "paused": "PAUSED",
       "done": "DONE",
       "pending": "PENDING"
+    },
+    "ops": {
+      "Receiving": "Receiving",
+      "Staging": "Staging",
+      "Batching": "Batching",
+      "Weighing": "Weighing",
+      "Filling": "Filling",
+      "Packing": "Packing",
+      "Shipping": "Shipping",
+      "PutBack": "PutBack"
     }
   },
   "table": {
@@ -281,7 +295,8 @@
     "mo": "MO",
     "notAvailable": "N/A",
     "addPolicy": "Add Policy",
-    "live": "Live"
+    "live": "Live",
+    "capReached": "CAP REACHED"
   },
   "education": {
     "title": "Education",
@@ -413,7 +428,9 @@
       "earnedHours": "Earned Hours (+)",
       "balance": "Balance",
       "date": "Date",
-      "description": "Description"
+      "description": "Description",
+      "projectFuture": "Project Future Balance",
+      "adjustBalance": "Adjust Balance"
     }
   },
   "operations": {
@@ -494,6 +511,10 @@
     "eventPlaceholder": "e.g. jkv0u...",
     "requiredError": "MO Number and Product Name are required",
     "loading": "Loading Orders...",
+    "poLabel": "PO:",
+    "skuLabel": "SKU:",
+    "scheduledLabel": "Scheduled:",
+    "qtyLabel": "Qty:",
     "statuses": {
       "draft": "Draft",
       "scheduled": "Scheduled",

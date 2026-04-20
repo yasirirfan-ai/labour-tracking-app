@@ -2300,43 +2300,59 @@ export const WorkerPortalPage: React.FC = () => {
                                         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0369a1', marginTop: '0.5rem', textTransform: 'uppercase' }}>{t('workerPortal.timeOff.hoursAvailable')}</div>
                                     </div>
                                 </div>
-                                <div className="info-card" style={{ marginBottom: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                                    <div className="card-header" style={{ background: 'rgba(21, 128, 61, 0.08)' }}>
-                                        <i className="fa-solid fa-briefcase-medical" style={{ color: '#15803d' }}></i>
-                                        <h3 style={{ color: '#15803d' }}>{t('workerPortal.timeOff.sick')}</h3>
+                                {!(user?.pay_schedule?.toLowerCase().includes('monthly') && !(user?.pay_schedule?.toLowerCase().includes('semi'))) && (
+                                    <div className="info-card" style={{ marginBottom: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                        <div className="card-header" style={{ background: 'rgba(21, 128, 61, 0.08)' }}>
+                                            <i className="fa-solid fa-briefcase-medical" style={{ color: '#15803d' }}></i>
+                                            <h3 style={{ color: '#15803d' }}>{t('workerPortal.timeOff.sick')}</h3>
+                                        </div>
+                                        <div style={{ padding: '2rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1 }}>{user?.sick_balance || '0.00'}</div>
+                                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#15803d', marginTop: '0.5rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                {t('workerPortal.timeOff.hoursAvailable')}
+                                                {(parseFloat(user?.sick_balance || '0')) >= 40 && (
+                                                    <span style={{ fontSize: '0.6rem', background: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: '4px', border: '1px solid #fecaca' }}>{t('common.capReached')}</span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{ padding: '2rem', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1 }}>{user?.sick_balance || '0.00'}</div>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#15803d', marginTop: '0.5rem', textTransform: 'uppercase' }}>{t('workerPortal.timeOff.hoursAvailable')}</div>
+                                )}
+                                { (user?.pay_schedule?.toLowerCase().includes('monthly') && !(user?.pay_schedule?.toLowerCase().includes('semi'))) && (
+                                    <div className="info-card" style={{ marginBottom: 0, opacity: 0.8, background: 'var(--bg-card)', border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                                         <div style={{ padding: '2rem' }}>
+                                             <i className="fa-solid fa-hospital" style={{ color: 'var(--text-muted)', fontSize: '1.5rem', marginBottom: '0.5rem' }}></i>
+                                             <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>{t('workerPortal.timeOff.sickSubstituted')}</div>
+                                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.monthlyPolicy')}</div>
+                                         </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             {/* My Requests Status */}
                             <div className="info-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                                 <div className="card-header">
                                     <i className="fa-solid fa-list-check"></i>
-                                    <h3 style={{ color: 'var(--text-main)' }}>My Requests</h3>
+                                    <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.timeOff.historyTitle')}</h3>
                                 </div>
                                 <div style={{ overflowX: 'auto' }}>
                                     {myLeaveRequests.length === 0 ? (
                                         <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                            No requests submitted yet.
+                                            {t('workerPortal.timeOff.noRequests')}
                                         </div>
                                     ) : (
                                         <table className="info-table">
                                             <thead>
                                                 <tr>
-                                                    <th style={{ color: 'var(--text-muted)' }}>Type</th>
-                                                    <th style={{ color: 'var(--text-muted)' }}>Dates</th>
-                                                    <th style={{ color: 'var(--text-muted)' }}>Hours</th>
-                                                    <th style={{ color: 'var(--text-muted)' }}>Status</th>
-                                                    <th style={{ color: 'var(--text-muted)' }}>Admin Note</th>
-                                                    <th style={{ color: 'var(--text-muted)' }}>Submitted</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.type')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.dates')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.hours')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.status')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.adminNote')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.timeOff.table.submitted')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {myLeaveRequests.map((req: any) => {
+                                                {myLeaveRequests.filter((req: any) => !((user?.pay_schedule?.toLowerCase().includes('monthly') && !(user?.pay_schedule?.toLowerCase().includes('semi'))) && req.type === 'sick')).map((req: any) => {
                                                     const statusColor = req.status === 'approved' ? '#15803d' : req.status === 'rejected' ? '#dc2626' : '#d97706';
                                                     const statusBg = req.status === 'approved' ? '#dcfce7' : req.status === 'rejected' ? '#fee2e2' : '#fef3c7';
                                                     const statusIcon = req.status === 'approved' ? 'fa-circle-check' : req.status === 'rejected' ? 'fa-circle-xmark' : 'fa-clock';
@@ -2352,7 +2368,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                                     fontSize: '0.75rem',
                                                                     textTransform: 'uppercase',
                                                                 }}>
-                                                                    {req.type === 'pto' ? 'PTO' : 'Sick'}
+                                                                    {req.type === 'pto' ? t('workerPortal.timeOff.pto') : t('workerPortal.timeOff.sick')}
                                                                 </span>
                                                             </td>
                                                             <td style={{ color: 'var(--text-main)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
@@ -2376,7 +2392,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                                     whiteSpace: 'nowrap',
                                                                 }}>
                                                                     <i className={`fa-solid ${statusIcon}`} style={{ fontSize: '0.7rem' }}></i>
-                                                                    {req.status}
+                                                                    {t(`leave.filters.${req.status}`)}
                                                                 </span>
                                                             </td>
                                                             <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem', maxWidth: '180px' }}>
@@ -2411,7 +2427,9 @@ export const WorkerPortalPage: React.FC = () => {
                                                 onChange={e => setLeaveFormData(prev => ({ ...prev, type: e.target.value as 'pto' | 'sick' }))}
                                             >
                                                 <option value="pto">{t('workerPortal.timeOff.pto')}</option>
-                                                <option value="sick">{t('workerPortal.timeOff.sick')}</option>
+                                                {!(user?.pay_schedule?.toLowerCase().includes('monthly') && !(user?.pay_schedule?.toLowerCase().includes('semi'))) && (
+                                                    <option value="sick">{t('workerPortal.timeOff.sick')}</option>
+                                                )}
                                             </select>
                                         </div>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -2486,27 +2504,31 @@ export const WorkerPortalPage: React.FC = () => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {leaveHistory.length > 0 ? leaveHistory.map((item, idx) => (
-                                                    <tr key={item.id}>
-                                                        <td style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>
-                                                            {item.entry_date.includes('-') ? (() => { const [y, m, d] = item.entry_date.split('-'); return `${m}/${d}/${y}`; })() : item.entry_date}
-                                                        </td>
-                                                        <td style={{ color: 'var(--text-main)', fontWeight: 700 }}>{item.description}</td>
-                                                        <td style={{ color: 'var(--danger)', fontWeight: 800 }}>{item.used_hours != null ? `-${item.used_hours.toFixed(2)}` : ''}</td>
-                                                        <td style={{ color: 'var(--success)', fontWeight: 800 }}>{item.earned_hours != null ? `+${item.earned_hours.toFixed(2)}` : ''}</td>
-                                                        <td style={{ color: 'var(--text-main)', fontWeight: 900 }}>
-                                                            {idx === 0 
-                                                                ? Number((item.description || '').toLowerCase().includes('sick') ? (user?.sick_balance ?? 0) : (user?.pto_balance ?? 0)).toFixed(2) 
-                                                                : '0.00'}
-                                                        </td>
-                                                    </tr>
-                                                )) : (
+                                                {(() => {
+                                                    const isMonthly = user?.pay_schedule?.toLowerCase().includes('monthly') && !user?.pay_schedule?.toLowerCase().includes('semi');
+                                                    const filteredHistory = leaveHistory.filter(item => !(isMonthly && item.type === 'sick'));
+                                                    return filteredHistory.length > 0 ? filteredHistory.map((item, idx) => (
+                                                        <tr key={item.id}>
+                                                            <td style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>
+                                                                {item.entry_date.includes('-') ? (() => { const [y, m, d] = item.entry_date.split('-'); return `${m}/${d}/${y}`; })() : item.entry_date}
+                                                            </td>
+                                                            <td style={{ color: 'var(--text-main)', fontWeight: 700 }}>{item.description}</td>
+                                                            <td style={{ color: 'var(--danger)', fontWeight: 800 }}>{item.used_hours != null ? `-${item.used_hours.toFixed(2)}` : ''}</td>
+                                                            <td style={{ color: 'var(--success)', fontWeight: 800 }}>{item.earned_hours != null ? `+${item.earned_hours.toFixed(2)}` : ''}</td>
+                                                            <td style={{ color: 'var(--text-main)', fontWeight: 900 }}>
+                                                                {idx === 0 
+                                                                    ? Number((item.description || '').toLowerCase().includes('sick') ? (user?.sick_balance ?? 0) : (user?.pto_balance ?? 0)).toFixed(2) 
+                                                                    : '0.00'}
+                                                            </td>
+                                                        </tr>
+                                                    )) : (
                                                     <tr>
                                                         <td colSpan={5} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                                                             {t('workerPortal.timeOff.noHistory')}
                                                         </td>
                                                     </tr>
-                                                )}
+                                                    );
+                                                })()}
                                             </tbody>
                                         </table>
                                     </div>

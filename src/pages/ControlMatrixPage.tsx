@@ -238,7 +238,7 @@ export const ControlMatrixPage: React.FC = () => {
                         </div>
                         {operations.map(op => (
                             <div key={op} className="matrix-header-cell">
-                                <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{op}</div>
+                                <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{t(`matrix.ops.${op}`, op)}</div>
                             </div>
                         ))}
                     </div>
@@ -264,11 +264,11 @@ export const ControlMatrixPage: React.FC = () => {
                                     {mo.product_name}
                                 </div>
                                 <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    {mo.po_number && <div><span style={{ fontWeight: 600 }}>PO:</span> {mo.po_number}</div>}
-                                    {mo.sku && <div><span style={{ fontWeight: 600 }}>SKU:</span> {mo.sku}</div>}
-                                    {mo.scheduled_date && <div><span style={{ fontWeight: 600 }}>Scheduled:</span> {mo.scheduled_date}</div>}
-                                    <div><span style={{ fontWeight: 600 }}>Qty:</span> {mo.quantity || 0}</div>
-                                    <div><span className={`status-badge badge-${(mo.current_status || 'draft').toLowerCase()}`}>{mo.current_status}</span></div>
+                                    {mo.po_number && <div><span style={{ fontWeight: 600 }}>{t('mo.poLabel')}</span> {mo.po_number}</div>}
+                                    {mo.sku && <div><span style={{ fontWeight: 600 }}>{t('mo.skuLabel')}</span> {mo.sku}</div>}
+                                    {mo.scheduled_date && <div><span style={{ fontWeight: 600 }}>{t('mo.scheduledLabel')}</span> {mo.scheduled_date}</div>}
+                                    <div><span style={{ fontWeight: 600 }}>{t('mo.qtyLabel')}</span> {mo.quantity || 0}</div>
+                                    <div><span className={`status-badge badge-${(mo.current_status || 'draft').toLowerCase()}`}>{t(`mo.statuses.${(mo.current_status || 'draft').toLowerCase()}`)}</span></div>
                                 </div>
                             </div>
 
