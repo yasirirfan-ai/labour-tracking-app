@@ -456,6 +456,7 @@ export const EmployeeDetailView: React.FC = () => {
                 </nav>
             </header>
 
+            <div className="profile-body">
             <div className="profile-content">
                 <aside className="profile-sidebar">
                     <section className="sidebar-section">
@@ -988,6 +989,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                 No leave requests found.
                                             </div>
                                         ) : (
+                                            <div className="history-table-scroll">
                                             <table className="history-table">
                                                 <thead>
                                                     <tr>
@@ -1042,6 +1044,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                     }
                                                 </tbody>
                                             </table>
+                                            </div>
                                         )
                                     ) : displayRows.length === 0 ? (
                                         <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
@@ -1050,6 +1053,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         </div>
                                     ) : (
                                         <>
+                                            <div className="history-table-scroll">
                                             <table className="history-table">
                                                 <thead>
                                                     <tr>
@@ -1074,6 +1078,7 @@ export const EmployeeDetailView: React.FC = () => {
                                                     ))}
                                                 </tbody>
                                             </table>
+                                            </div>{/* history-table-scroll */}
 
                                             {/* Pagination Controls */}
                                             {totalPages > 1 && (
@@ -2316,6 +2321,7 @@ export const EmployeeDetailView: React.FC = () => {
 
                 </main>
             </div>
+            </div>{/* profile-body */}
 
             {isDirty && (
                 <div className="sticky-footer" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', padding: '1rem 2rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', zIndex: 100 }}>
@@ -2346,18 +2352,25 @@ export const EmployeeDetailView: React.FC = () => {
 
             <style>{`
                 .profile-container {
-                    padding: 2rem;
+                    padding: 0;
                     max-width: 1400px;
                     margin: 0 auto;
-                    color: #1e293b;
+                    color: var(--text-main);
                 }
                 .profile-header {
                     background: var(--primary, #1e1b4b);
-                    border-radius: 20px;
-                    border: 1px solid rgba(255,255,255,0.1);
-                    margin-bottom: 2rem;
+                    border-radius: 0;
+                    border: none;
+                    border-bottom: 1px solid rgba(255,255,255,0.08);
+                    margin-bottom: 0;
                     overflow: hidden;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+                    position: sticky;
+                    top: 70px;
+                    z-index: 200;
+                }
+                .profile-body {
+                    padding: 2rem;
                 }
                 .header-top {
                     padding: 1rem 2rem;
@@ -2445,6 +2458,9 @@ export const EmployeeDetailView: React.FC = () => {
                     border-radius: 3px 3px 0 0;
                 }
                 
+                .profile-body {
+                    padding: 2rem;
+                }
                 .profile-content {
                     display: grid;
                     grid-template-columns: 320px 1fr;
@@ -2457,13 +2473,19 @@ export const EmployeeDetailView: React.FC = () => {
                     gap: 1.5rem;
                 }
                 .sidebar-section {
-                    background: white;
+                    background: var(--bg-card, white);
                     border-radius: 20px;
-                    border: 1px solid #e2e8f0;
+                    border: 1px solid var(--border, #e2e8f0);
                     padding: 1.5rem;
                     box-shadow: 0 1px 3px rgba(0,0,0,0.02);
                 }
-                .sidebar-section h3 { margin: 0 0 1rem; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.1em; }
+                .sidebar-section h3 { margin: 0 0 1rem; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: var(--text-muted, #94a3b8); letter-spacing: 0.1em; }
+                /* History table scroll wrapper */
+                .history-table-scroll {
+                    overflow-x: auto;
+                    -webkit-overflow-scrolling: touch;
+                    width: 100%;
+                }
                 .vitals-list { display: flex; flex-direction: column; gap: 0.75rem; }
                 .vital-item { display: flex; align-items: flex-start; gap: 12px; font-size: 0.9rem; font-weight: 600; color: #334155; line-height: 1.4; }
                 .vital-item i { width: 16px; color: #cbd5e1; margin-top: 3px; }
@@ -2798,25 +2820,27 @@ export const EmployeeDetailView: React.FC = () => {
                 .history-table {
                     width: 100%;
                     border-collapse: collapse;
+                    min-width: 480px;
                 }
                 .history-table th {
-                    background: #f8fafc;
-                    padding: 0.75rem 1.5rem;
+                    background: var(--card-header-bg, #f8fafc);
+                    padding: 0.75rem 1.25rem;
                     text-align: left;
                     font-size: 0.75rem;
                     text-transform: uppercase;
-                    color: #64748b;
+                    color: var(--text-muted, #64748b);
                     font-weight: 700;
-                    border-bottom: 1px solid #f1f5f9;
+                    border-bottom: 1px solid var(--border, #f1f5f9);
+                    white-space: nowrap;
                 }
                 .history-table td {
-                    padding: 1rem 1.5rem;
+                    padding: 0.85rem 1.25rem;
                     font-size: 0.875rem;
-                    color: #1e293b;
-                    border-bottom: 1px solid #f8fafc;
+                    color: var(--text-main, #1e293b);
+                    border-bottom: 1px solid var(--border, #f1f5f9);
                 }
                 .history-table tr:hover td {
-                    background: #fdfdfd;
+                    background: var(--bg-main, #f8fafc);
                 }
                 .used-cell { color: #ef4444 !important; font-weight: 600; }
                 .earned-cell { color: #107c41 !important; font-weight: 600; }
@@ -3421,40 +3445,55 @@ export const EmployeeDetailView: React.FC = () => {
 
                 @media (max-width: 768px) {
                     .profile-container {
+                        padding: 0;
+                    }
+                    .profile-body {
                         padding: 1rem;
+                    }
+                    .profile-header {
+                        border-radius: 0 !important;
+                        position: sticky !important;
+                        top: 64px !important;
+                        z-index: 200 !important;
+                    }
+                    .header-top {
+                        padding: 0.75rem 1.25rem;
                     }
                     .header-main {
                         flex-direction: row;
                         align-items: center;
                         text-align: left;
-                        padding: 1rem 1.5rem;
+                        padding: 0.75rem 1.25rem;
                         gap: 1rem;
                     }
                     .profile-photo-container {
-                        width: 68px;
-                        height: 68px;
+                        width: 56px;
+                        height: 56px;
+                        border-radius: 14px;
+                        flex-shrink: 0;
                     }
                     .profile-title-info h1 {
-                        font-size: 1.25rem;
+                        font-size: 1.1rem;
                         margin-bottom: 2px;
                     }
                     .profile-title-info p {
-                        font-size: 0.75rem;
+                        font-size: 0.7rem;
                     }
                     .header-actions {
-                        margin-left: 0;
-                        width: 100%;
-                        display: flex;
-                        justify-content: center;
+                        display: none;
                     }
                     .profile-nav {
                         padding: 0 1rem;
-                        gap: 1.5rem;
+                        gap: 0;
                         overflow-x: auto;
                         -webkit-overflow-scrolling: touch;
+                        scrollbar-width: none;
                     }
+                    .profile-nav::-webkit-scrollbar { display: none; }
                     .nav-tab {
                         white-space: nowrap;
+                        padding: 0.85rem 1rem;
+                        font-size: 0.85rem;
                     }
                     .time-off-grid {
                         grid-template-columns: 1fr;
@@ -3476,11 +3515,22 @@ export const EmployeeDetailView: React.FC = () => {
                     .history-header {
                         flex-direction: column;
                         align-items: flex-start;
-                        gap: 1rem;
+                        gap: 0.75rem;
                     }
                     .history-filters {
                         width: 100%;
                         overflow-x: auto;
+                        display: flex;
+                        gap: 0.5rem;
+                        flex-wrap: nowrap;
+                    }
+                    .history-table th,
+                    .history-table td {
+                        padding: 0.65rem 0.85rem;
+                        font-size: 0.8rem;
+                    }
+                    .history-section {
+                        padding: 1rem;
                     }
                 }
 

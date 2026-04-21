@@ -11,7 +11,8 @@
       "Bash(grep -n \"LeaveRequests\" /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/src/components/*.tsx)",
       "Bash(ls c:\\\\Users\\\\ESHOP\\\\Downloads\\\\labour-tracking-app-main\\\\labour-tracking-app-main/*.md)",
       "Read(//c/Users/ESHOP//**)",
-      "Bash(python /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/scratch/extract_sarbelio.py)"
+      "Bash(python /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/scratch/extract_sarbelio.py)",
+      "Bash(npx vite *)"
     ]
   }
 }

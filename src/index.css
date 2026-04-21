@@ -1164,12 +1164,14 @@ tr:hover td {
         border-bottom: none;
     }
 
-    /* Prevent massive components from permanently sticking on tiny screens */
+    /* Sticky profile header on mobile — sticks just below the 64px fixed topbar */
     .profile-header {
-        position: relative !important;
-        margin: 1rem !important;
-        border-radius: 16px !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+        position: sticky !important;
+        top: 64px !important;
+        z-index: 150 !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
     }
 
     .main-content, .worker-main-wrapper {
