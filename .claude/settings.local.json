@@ -19,7 +19,8 @@
       "Bash(node update_jobtitles.mjs)",
       "Bash(node check_training_depts.mjs)",
       "Bash(npm run *)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)"
     ]
   }
 }
