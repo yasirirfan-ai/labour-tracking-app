@@ -38,7 +38,6 @@ export const EmployeeDetailView: React.FC = () => {
     const [leaveHistory, setLeaveHistory] = useState<LeaveHistoryRow[]>([]);
     const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
     const [isProcessingLeave, setIsProcessingLeave] = useState<string | null>(null);
-    const [selectedTrainingRole, setSelectedTrainingRole] = useState<string | null>(null);
     const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>([]);
     const [trainingLanguage, setTrainingLanguage] = useState<'en' | 'es'>('en');
     const [selectedHistoryYear, setSelectedHistoryYear] = useState<string>('All');
@@ -513,17 +512,18 @@ export const EmployeeDetailView: React.FC = () => {
                         const l1Total = l1Categories.length;
                         const l1Percent = l1Total > 0 ? Math.round((l1CompletedCount / l1Total) * 100) : 0;
 
-                        // Get unique roles from L2
-                        const l2Roles = Array.from(new Set(trainingMaterials.filter(m => m.level === 2).map(m => m.department))).filter(Boolean) as string[];
+                        // Level 2 Progress (using role-based SOPs, auto-derived from job title)
+                        const jobTitle = (employee.job_title || '').toLowerCase();
+                        const autoRole =
+                            jobTitle.includes('compounder') ? 'Compounder I' :
+                            jobTitle.includes('qc') || jobTitle.includes('quality control') ? 'QC' :
+                            jobTitle.includes('r&d') || jobTitle.includes('research') ? 'Quality Assurance' :
+                            jobTitle.includes('qa') || jobTitle.includes('quality assurance') ? 'Quality Assurance' :
+                            jobTitle.includes('ship') || employee.department?.toLowerCase().includes('shipp') ? 'Shipping & Recieving' :
+                            jobTitle.includes('purchas') || employee.department?.toLowerCase().includes('purchas') ? 'Purchase' :
+                            'Production';
 
-                        // Level 2 Progress (using role-based SOPs)
-                        const autoRole = (employee.job_title?.includes('QC') || employee.department === 'QC') ? 'QC' :
-                            (employee.job_title?.includes('Compounder')) ? 'Compounder I' :
-                                (employee.job_title?.includes('QA') || employee.department === 'QA') ? 'Quality Assurance' :
-                                    (employee.department?.toLowerCase().includes('shipp')) ? 'Shipping & Recieving' :
-                                        (employee.department?.toLowerCase().includes('purchas')) ? 'Purchase' : 'Production';
-
-                        const role = selectedTrainingRole || autoRole;
+                        const role = autoRole;
 
                         const roleMaterials = trainingMaterials.filter(m => m.level === 2 && m.department === role);
 
@@ -551,24 +551,17 @@ export const EmployeeDetailView: React.FC = () => {
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t('employeeDetail.training.viewingRole')}</span>
-                                            <select
-                                                value={role}
-                                                onChange={(e) => setSelectedTrainingRole(e.target.value)}
-                                                style={{
-                                                    padding: '0.4rem 0.8rem',
-                                                    borderRadius: '8px',
-                                                    border: '1px solid #e2e8f0',
-                                                    fontSize: '0.8rem',
-                                                    fontWeight: 700,
-                                                    color: '#1e1b4b',
-                                                    cursor: 'pointer',
-                                                    background: '#f8fafc'
-                                                }}
-                                            >
-                                                {l2Roles.map(r => (
-                                                    <option key={r} value={r}>{r}</option>
-                                                ))}
-                                            </select>
+                                            <span style={{
+                                                padding: '0.4rem 1rem',
+                                                borderRadius: '8px',
+                                                border: '1px solid var(--border)',
+                                                fontSize: '0.8rem',
+                                                fontWeight: 800,
+                                                color: 'var(--primary)',
+                                                background: 'var(--bg-main)',
+                                            }}>
+                                                {role}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>

@@ -43,7 +43,17 @@ export const WorkerPortalPage: React.FC = () => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>([]);
-    const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Compounder I' | 'Quality Assurance' | 'Shipping & Recieving' | 'Purchase'>(user?.role === 'manager' ? 'Quality Assurance' : 'Production');
+    const getTrainingRoleFromJobTitle = (jobTitle: string | undefined): 'Production' | 'QC' | 'Compounder I' | 'Quality Assurance' | 'Shipping & Recieving' | 'Purchase' => {
+        const jt = (jobTitle || '').toLowerCase();
+        if (jt.includes('compounder')) return 'Compounder I';
+        if (jt.includes('qc') || jt.includes('quality control')) return 'QC';
+        if (jt.includes('r&d') || jt.includes('research')) return 'Quality Assurance';
+        if (jt.includes('qa') || jt.includes('quality assurance')) return 'Quality Assurance';
+        if (jt.includes('ship')) return 'Shipping & Recieving';
+        if (jt.includes('purchas')) return 'Purchase';
+        return 'Production';
+    };
+    const [trainingRole, setTrainingRole] = useState<'Production' | 'QC' | 'Compounder I' | 'Quality Assurance' | 'Shipping & Recieving' | 'Purchase'>(getTrainingRoleFromJobTitle((user as any)?.job_title));
     const [selectedSOPSection, setSelectedSOPSection] = useState<string>('');
     const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
     const [currentTrainingName, setCurrentTrainingName] = useState<string | null>(null);
@@ -52,7 +62,6 @@ export const WorkerPortalPage: React.FC = () => {
     const [showBreakOverlay, setShowBreakOverlay] = useState(false);
     const [readingTimer, setReadingTimer] = useState(0);
     const [isTimerActive, setIsTimerActive] = useState(false);
-    const [unlockedHeight, setUnlockedHeight] = useState(4000);
     const [isEndOfPdf, setIsEndOfPdf] = useState(false);
 
     const MAX_WORK_SECONDS = 5 * 60 * 60; // 5 hours in seconds
@@ -63,7 +72,8 @@ export const WorkerPortalPage: React.FC = () => {
             setTrainingMaterials(materials);
 
             // Set initial selected section for SOPs if available
-            const initialRole = user?.role === 'manager' ? 'Quality Assurance' : 'Production';
+            const initialRole = getTrainingRoleFromJobTitle((user as any)?.job_title);
+            setTrainingRole(initialRole);
             const initialMaterials = materials.filter(m => m.level === 2 && m.department === initialRole);
             if (initialMaterials.length > 0) {
                 setSelectedSOPSection(initialMaterials[0].category);
@@ -150,17 +160,10 @@ export const WorkerPortalPage: React.FC = () => {
         if (selectedPdf) {
             setReadingTimer(30);
             setIsTimerActive(true);
-            setUnlockedHeight(4000); // Reset height to first 4 pages
             setIsEndOfPdf(false);
         }
     }, [selectedPdf]);
 
-    const handleUnlockNext = () => {
-        if (readingTimer > 0) return;
-        setUnlockedHeight(prev => prev + 4000);
-        setReadingTimer(30);
-        setIsTimerActive(true);
-    };
 
     const handleLeaveSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -2187,66 +2190,23 @@ export const WorkerPortalPage: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--bg-main)', padding: '4px', borderRadius: '14px', border: '1px solid var(--border)' }}>
-                                                {Array.from(new Set(trainingMaterials.filter(m => m.level === 2).map(m => m.department))).map(dept => dept && (
-                                                    <button
-                                                        key={dept}
-                                                        onClick={() => {
-                                                            setTrainingRole(dept as any);
-                                                            const rolesForDept = trainingMaterials.filter(m => m.level === 2 && m.department === dept);
-                                                            if (rolesForDept.length > 0) {
-                                                                setSelectedSOPSection(rolesForDept[0].category);
-                                                            }
-                                                        }}
-                                                        style={{
-                                                            padding: '0.6rem 1.25rem',
-                                                            borderRadius: '10px',
-                                                            border: 'none',
-                                                            background: trainingRole === dept ? 'var(--primary)' : 'transparent',
-                                                            color: trainingRole === dept ? 'white' : 'var(--text-muted)',
-                                                            fontWeight: 800,
-                                                            cursor: 'pointer',
-                                                            fontSize: '0.85rem',
-                                                            transition: 'all 0.2s'
-                                                        }}
-                                                    >
-                                                        {dept}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Role</span>
+                                            <span style={{
+                                                padding: '0.5rem 1.25rem',
+                                                borderRadius: '10px',
+                                                border: '1px solid var(--border)',
+                                                background: 'var(--primary)',
+                                                color: 'white',
+                                                fontWeight: 800,
+                                                fontSize: '0.85rem',
+                                            }}>
+                                                {trainingRole}
+                                            </span>
                                         </div>
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '2.5rem', alignItems: 'flex-start' }}>
-                                        <div style={{ width: '300px', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.75rem', borderRadius: '20px', border: '1px solid var(--border)', flexShrink: 0 }}>
-                                            {Array.from(new Set(trainingMaterials.filter(m => m.level === 2 && m.department === trainingRole).map(m => m.category))).map(cat => (
-                                                <button
-                                                    key={cat}
-                                                    onClick={() => setSelectedSOPSection(cat)}
-                                                    style={{
-                                                        textAlign: 'left',
-                                                        padding: '1rem 1.25rem',
-                                                        borderRadius: '12px',
-                                                        border: 'none',
-                                                        background: selectedSOPSection === cat ? 'var(--bg-card)' : 'transparent',
-                                                        color: selectedSOPSection === cat ? 'var(--primary)' : 'var(--text-muted)',
-                                                        fontWeight: 800,
-                                                        fontSize: '0.9rem',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s',
-                                                        boxShadow: selectedSOPSection === cat ? '0 4px 6px -1px rgba(0, 0, 0, 0.05)' : 'none',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'space-between'
-                                                    }}
-                                                >
-                                                    {cat}
-                                                    {selectedSOPSection === cat && <i className="fa-solid fa-chevron-right" style={{ fontSize: '0.75rem' }}></i>}
-                                                </button>
-                                            ))}
-                                        </div>
-
+                                    <div>
                                         <div style={{ flex: 1 }}>
                                             {selectedSOPSection ? (
                                                 <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
@@ -2693,31 +2653,31 @@ export const WorkerPortalPage: React.FC = () => {
                                 <i className="fa-solid fa-xmark"></i>
                             </button>
                         </div>
-                        <div style={{ flex: 1, background: 'var(--bg-main)', position: 'relative', overflowY: 'auto', overflowX: 'hidden', maxHeight: '75vh' }}>
-                            <div style={{ width: 'calc(100% + 40px)', height: `${unlockedHeight}px`, overflowX: 'hidden', position: 'relative' }}>
-                                {selectedPdf && (
-                                    <div style={{ position: 'absolute', inset: 0, width: 'calc(100% - 40px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)', zIndex: 1 }}>
-                                        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: 'var(--primary)', opacity: 0.5 }}></i>
-                                    </div>
-                                )}
-                                <iframe
-                                    src={`${selectedPdf}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                                    onLoad={(e) => {
-                                        const loader = (e.target as HTMLElement).previousElementSibling as HTMLElement;
-                                        if (loader) loader.style.display = 'none';
-                                    }}
-                                    scrolling="no"
-                                    style={{
-                                        width: '100%',
-                                        height: `${unlockedHeight}px`,
-                                        border: 'none',
-                                        pointerEvents: 'none',
-                                        userSelect: 'none',
-                                        overflow: 'hidden'
-                                    }}
-                                    title="Training Slide Viewer"
-                                />
+                        <div style={{ flex: 1, background: '#f1f5f9', position: 'relative', overflow: 'hidden' }}>
+                            <div id="pdf-loader" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', gap: '1rem', zIndex: 2 }}>
+                                <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2.5rem', color: 'var(--primary)', opacity: 0.6 }}></i>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)' }}>Loading document...</span>
                             </div>
+                            <iframe
+                                src={`${selectedPdf}#toolbar=0&navpanes=0&view=FitH`}
+                                onLoad={(e) => {
+                                    const el = e.target as HTMLIFrameElement;
+                                    el.style.opacity = '1';
+                                    const loader = el.previousElementSibling as HTMLElement;
+                                    if (loader) loader.style.display = 'none';
+                                }}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    border: 'none',
+                                    opacity: 0,
+                                    transition: 'opacity 0.4s ease',
+                                    display: 'block',
+                                    position: 'relative',
+                                    zIndex: 1,
+                                }}
+                                title="Training Material Viewer"
+                            />
                         </div>
                         <div style={{ padding: '1.25rem 2rem', background: 'var(--bg-card)', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {!isTimerActive && (
@@ -2734,30 +2694,11 @@ export const WorkerPortalPage: React.FC = () => {
                                 </div>
                             )}
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                {isTimerActive ? (
+                                {isTimerActive && (
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <i className="fa-solid fa-clock-rotate-left fa-spin" style={{ color: 'var(--success)' }}></i>
                                         {t('workerPortal.training.viewer.reading', { time: readingTimer })}
                                     </div>
-                                ) : (
-                                    <button
-                                        onClick={handleUnlockNext}
-                                        style={{
-                                            padding: '0.75rem 1.5rem',
-                                            borderRadius: '12px',
-                                            border: '1.5px solid var(--success)',
-                                            background: 'transparent',
-                                            color: 'var(--success)',
-                                            fontWeight: 800,
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.5rem'
-                                        }}
-                                    >
-                                        <i className="fa-solid fa-arrow-down"></i>
-                                        {t('workerPortal.training.viewer.unlockNext')}
-                                    </button>
                                 )}
                                 <button
                                     onClick={async () => {

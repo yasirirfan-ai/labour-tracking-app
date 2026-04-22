@@ -16,6 +16,8 @@ import { NfcManagementPage } from './pages/NfcManagementPage';
 import { HireWorkerPage } from './pages/HireWorkerPage';
 import { EmployeeDetailView } from './pages/EmployeeDetailView';
 import { LeaveRequestsPage } from './pages/LeaveRequestsPage';
+import { PrivacyPage } from './pages/PrivacyPage';
+import { TermsPage } from './pages/TermsPage';
 
 function App() {
   return (
@@ -23,6 +25,8 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/worker-portal" element={<WorkerPortalPage />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />

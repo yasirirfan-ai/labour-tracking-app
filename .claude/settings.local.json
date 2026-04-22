@@ -12,7 +12,14 @@
       "Bash(ls c:\\\\Users\\\\ESHOP\\\\Downloads\\\\labour-tracking-app-main\\\\labour-tracking-app-main/*.md)",
       "Read(//c/Users/ESHOP//**)",
       "Bash(python /c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/scratch/extract_sarbelio.py)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(cat .env)",
+      "Bash(cat .env.local)",
+      "Bash(node update_trainings.mjs)",
+      "Bash(node update_jobtitles.mjs)",
+      "Bash(node check_training_depts.mjs)",
+      "Bash(npm run *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
