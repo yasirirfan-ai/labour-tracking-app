@@ -20,7 +20,9 @@
       "Bash(node check_training_depts.mjs)",
       "Bash(npm run *)",
       "Bash(python3 -c ' *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(dir \"c:\\\\Users\\\\ESHOP\\\\Downloads\\\\labour-tracking-app-main\\\\labour-tracking-app-main\\\\public\\\\icon-*\")",
+      "Read(//c/Users/ESHOP/Downloads/labour-tracking-app-main/labour-tracking-app-main/public/**)"
     ]
   }
 }
