@@ -698,7 +698,7 @@ export const EmployeeDetailView: React.FC = () => {
                         const sickBalance = parseFloat(employee.sick_balance || '0');
 
                         const isMonthly = (employee as any)?.pay_schedule?.toLowerCase().includes('monthly') && !(employee as any)?.pay_schedule?.toLowerCase().includes('semi');
-                        const periodLabel = isMonthly ? '30 days' : '15 days';
+                        const periodLabel = '15 days';
 
                         /** Filter real leave history by selected type, year, and search */
                         const displayRows = leaveHistory.filter(r => {

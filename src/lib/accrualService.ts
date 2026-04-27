@@ -57,9 +57,9 @@ export function getPtoRate(tenureMonths: number): number {
 /**
  * Returns a human-readable tier label.
  */
-export function getPtoTierLabel(tenureMonths: number, paySchedule: string): string {
+export function getPtoTierLabel(tenureMonths: number): string {
     const tier = getPtoTier(tenureMonths);
-    const period = (paySchedule || '').toLowerCase().includes('semi') ? '15 days' : '30 days';
+    const period = '15 days';
     if (tenureMonths < 12) return `Tier 1 (0–12 months) · ${tier.rate} hrs / ${period}`;
     if (tenureMonths < 24) return `Tier 2 (12–24 months) · ${tier.rate} hrs / ${period}`;
     if (tenureMonths < 36) return `Tier 3 (24–36 months) · ${tier.rate} hrs / ${period}`;
@@ -138,13 +138,8 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
         const dayOfMonth = runner.getUTCDate();
         let isTriggerDate = false;
 
-        if (isSemiMonthly) {
-            // Semi-monthly: 1st and 16th
-            if (dayOfMonth === 1 || dayOfMonth === 16) isTriggerDate = true;
-        } else {
-            // Monthly: 1st only
-            if (dayOfMonth === 1) isTriggerDate = true;
-        }
+        // Both Semi-monthly and Monthly now trigger on 1st and 16th
+        if (dayOfMonth === 1 || dayOfMonth === 16) isTriggerDate = true;
 
         if (isTriggerDate && safety > 1) {
             periodsElapsed++;
@@ -171,14 +166,10 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
                 periodEnd.setUTCDate(periodEnd.getUTCDate() - 1); // If triggered on 16th, period ends on 15th. If on 1st, ends on last day of prev month.
                 
                 const periodStart = new Date(periodEnd);
-                if (isSemiMonthly) {
-                    if (periodEnd.getUTCDate() === 15) {
-                        periodStart.setUTCDate(1);
-                    } else {
-                        periodStart.setUTCDate(16);
-                    }
-                } else {
+                if (periodEnd.getUTCDate() === 15) {
                     periodStart.setUTCDate(1);
+                } else {
+                    periodStart.setUTCDate(16);
                 }
 
                 const formatDate = (d: Date) => {
