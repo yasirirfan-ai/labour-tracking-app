@@ -104,7 +104,12 @@ export const EmployeeDetailView: React.FC = () => {
                 try {
                     const res: any = await syncLeaveBalances(employee as any);
                     if (res && !res.error) {
-                        setEmployee(prev => prev ? { ...prev, pto_balance: String(res.pto), sick_balance: String(res.sick) } : null);
+                        const updatedData = {
+                            pto_balance: String(res.pto),
+                            sick_balance: String(res.sick)
+                        };
+                        setEmployee(prev => prev ? { ...prev, ...updatedData } : null);
+                        setInitialEmployee(prev => prev ? { ...prev, ...updatedData } : null);
                     }
                     const rows = await fetchLeaveHistory(employee.id);
                     setLeaveHistory(rows);

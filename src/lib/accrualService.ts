@@ -62,8 +62,7 @@ export function getPtoTierLabel(tenureMonths: number): string {
     const period = '15 days';
     if (tenureMonths < 12) return `Tier 1 (0–12 months) · ${tier.rate} hrs / ${period}`;
     if (tenureMonths < 24) return `Tier 2 (12–24 months) · ${tier.rate} hrs / ${period}`;
-    if (tenureMonths < 36) return `Tier 3 (24–36 months) · ${tier.rate} hrs / ${period}`;
-    return `Tier 4 (36+ months) · ${tier.rate} hrs / ${period}`;
+    return `Tier 3 (24+ months) · ${tier.rate} hrs / ${period}`;
 }
 
 export function isSickLeaveUsable(hireDate: string): boolean {
@@ -101,13 +100,12 @@ interface AccrualResult {
 
 export function calculateAccruals(user: User, totalWorkedSeconds: number): AccrualResult {
     const now = new Date();
-    const nowIso = now.toISOString();
-
-    const hireDate = user.hire_date || nowIso;
+    // Fallback hire date: if missing, use 2020-01-01 to ensure long-term employees aren't blocked or penalized
+    const hireDate = (user.hire_date && user.hire_date !== '') ? user.hire_date : '2020-01-01';
     const currentPtoBalance = parseFloat(user.pto_balance || '0');
 
     // lastAccrual is the point in time we last successfully processed an accrual event
-    const lastAccrualDate = user.last_pto_accrual
+    const lastAccrualDate = (user.last_pto_accrual && user.last_pto_accrual !== '')
         ? new Date(user.last_pto_accrual)
         : new Date(hireDate);
 
@@ -135,63 +133,68 @@ export function calculateAccruals(user: User, totalWorkedSeconds: number): Accru
     while (runner.getTime() <= todayUTC.getTime() && safety < maxSafety) {
         safety++;
         
-        const dayOfMonth = runner.getUTCDate();
-        let isTriggerDate = false;
+        const day = runner.getUTCDate();
+        const isTriggerDate = (day === 1 || day === 16);
 
-        // Both Semi-monthly and Monthly now trigger on 1st and 16th
-        if (dayOfMonth === 1 || dayOfMonth === 16) isTriggerDate = true;
+        if (isTriggerDate) {
+            // We only skip if the runner day is EXACTLY the same day as the lastAccrualDate
+            // This prevents double-accrual while allowing accrual on the first day if it was never done.
+            const runnerStr = runner.toISOString().split('T')[0];
+            const lastAccrualStr = lastAccrualDate.toISOString().split('T')[0];
+            const alreadyProcessed = (user.last_pto_accrual && user.last_pto_accrual !== '') && (runnerStr === lastAccrualStr);
 
-        if (isTriggerDate && safety > 1) {
-            periodsElapsed++;
-            const tenureMonths = getTenureMonths(hireDate, runner);
-            const tier = getPtoTier(tenureMonths);
-
-            // Check annual cap
-            let earnedThisPeriod = 0;
-            if (newPtoBalance < tier.annualMax) {
-                const availableSpace = tier.annualMax - newPtoBalance;
-                earnedThisPeriod = Math.min(tier.rate, availableSpace);
-                ptoEarned += earnedThisPeriod;
-                newPtoBalance += earnedThisPeriod;
-            }
-
-            // Always record the period passage in history if something was earned or if requested (per-period transparency)
-            // Round for storage
-            const roundedEarned = Math.round(earnedThisPeriod * 100) / 100;
-            const roundedBalance = Math.round(newPtoBalance * 100) / 100;
-
-            if (roundedEarned > 0) {
-                // Calculate period dates for the description
-                const periodEnd = new Date(runner);
-                periodEnd.setUTCDate(periodEnd.getUTCDate() - 1); // If triggered on 16th, period ends on 15th. If on 1st, ends on last day of prev month.
+            if (!alreadyProcessed) {
+                periodsElapsed++;
+                const tenureMonths = getTenureMonths(hireDate, runner);
+                const tier = getPtoTier(tenureMonths);
                 
-                const periodStart = new Date(periodEnd);
-                if (periodEnd.getUTCDate() === 15) {
-                    periodStart.setUTCDate(1);
-                } else {
-                    periodStart.setUTCDate(16);
+                let earnedThisPeriod = 0;
+                if (newPtoBalance < tier.annualMax) {
+                    const availableSpace = tier.annualMax - newPtoBalance;
+                    earnedThisPeriod = Math.min(tier.rate, availableSpace);
+                    ptoEarned += earnedThisPeriod;
+                    newPtoBalance += earnedThisPeriod;
                 }
 
-                const formatDate = (d: Date) => {
-                    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-                    const day = String(d.getUTCDate()).padStart(2, '0');
-                    const year = d.getUTCFullYear();
-                    return `${month}/${day}/${year}`;
-                };
+                // Round for storage
+                const roundedEarned = Math.round(earnedThisPeriod * 10000) / 10000;
+                const roundedBalance = Math.round(newPtoBalance * 100) / 100;
 
-                const description = `Accrual for ${formatDate(periodStart)} to ${formatDate(periodEnd)}`;
+                if (roundedEarned > 0) {
+                    // Calculate period dates for the description
+                    // If triggered on 16th, period is 1st to 15th
+                    // If triggered on 1st, period is 16th to last day of prev month
+                    const periodEnd = new Date(runner);
+                    periodEnd.setUTCDate(periodEnd.getUTCDate() - 1); 
+                    
+                    const periodStart = new Date(periodEnd);
+                    if (periodEnd.getUTCDate() === 15) {
+                        periodStart.setUTCDate(1);
+                    } else {
+                        periodStart.setUTCDate(16);
+                    }
 
-                historyEvents.push({
-                    type: 'pto',
-                    earned_hours: roundedEarned,
-                    entry_date: runner.toISOString().split('T')[0],
-                    description: description,
-                    balance: roundedBalance
-                });
+                    const formatDate = (d: Date) => {
+                        const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+                        const day = String(d.getUTCDate()).padStart(2, '0');
+                        const year = d.getUTCFullYear();
+                        return `${month}/${day}/${year}`;
+                    };
+
+                    const description = `Accrual for ${formatDate(periodStart)} to ${formatDate(periodEnd)}`;
+                    
+                    historyEvents.push({
+                        type: 'pto',
+                        earned_hours: roundedEarned,
+                        entry_date: runner.toISOString().split('T')[0],
+                        description: description,
+                        balance: roundedBalance
+                    });
+                }
+                
+                // Update last accrual to the timestamp of this trigger
+                newLastPtoAccrual = runner.toISOString();
             }
-
-            // Update last accrual to the timestamp of this trigger
-            newLastPtoAccrual = runner.toISOString();
         }
 
         // Move to the next day
@@ -264,15 +267,15 @@ export async function syncLeaveBalances(user: User): Promise<{ pto: number; sick
         if (userError || !latestUserData) throw userError || new Error('User not found');
         const latestUser = latestUserData as User;
 
-        const { data: totalHoursData, error: logsError } = await supabase
-            .from('time_logs')
-            .select('hours_worked')
-            .eq('user_id', latestUser.id);
+        const { data: totalHoursData, error: logsError } = await (supabase as any)
+            .from('tasks')
+            .select('active_seconds')
+            .eq('assigned_to_id', latestUser.id);
 
         if (logsError) throw logsError;
 
         const totalWorkedSeconds = (totalHoursData as any[] || []).reduce(
-            (acc, log) => acc + (parseFloat(log.hours_worked || '0') * 3600),
+            (acc, log) => acc + (parseFloat(log.active_seconds || '0')),
             0
         );
 
@@ -305,10 +308,10 @@ export async function syncLeaveBalances(user: User): Promise<{ pto: number; sick
                 .update(updatePayload, { count: 'exact' })
                 .eq('id', latestUser.id);
 
-            if (latestUser.last_pto_accrual) {
+            if (latestUser.last_pto_accrual && latestUser.last_pto_accrual !== "") {
                 updateQuery = updateQuery.eq('last_pto_accrual', latestUser.last_pto_accrual);
             } else {
-                updateQuery = updateQuery.is('last_pto_accrual', null);
+                updateQuery = updateQuery.or(`last_pto_accrual.is.null,last_pto_accrual.eq.""`);
             }
 
             const { error: updateError, count } = await updateQuery;
