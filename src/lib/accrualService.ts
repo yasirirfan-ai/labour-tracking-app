@@ -6,9 +6,10 @@ import type { User } from '../types';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PTO_TIERS = [
-    { minMonths: 0, maxMonths: 12, rate: 0.8335, annualMax: 20, carryover: 20 },
-    { minMonths: 12, maxMonths: 24, rate: 1.3335, annualMax: 32, carryover: 32 },
-    { minMonths: 24, maxMonths: Infinity, rate: 2.0, annualMax: 48, carryover: 48 },
+    { minMonths: 0, maxMonths: 12, rate: 0.8335, annualMax: 40, carryover: 40 },
+    { minMonths: 12, maxMonths: 24, rate: 1.3335, annualMax: 40, carryover: 40 },
+    { minMonths: 24, maxMonths: 36, rate: 2.0, annualMax: 40, carryover: 40 },
+    { minMonths: 36, maxMonths: Infinity, rate: 2.0, annualMax: 48, carryover: 48 },
 ];
 
 /** Sick leave: 1 hour per every 30 hours worked (108 000 seconds). */
@@ -62,7 +63,8 @@ export function getPtoTierLabel(tenureMonths: number): string {
     const period = '15 days';
     if (tenureMonths < 12) return `Tier 1 (0–12 months) · ${tier.rate} hrs / ${period}`;
     if (tenureMonths < 24) return `Tier 2 (12–24 months) · ${tier.rate} hrs / ${period}`;
-    return `Tier 3 (24+ months) · ${tier.rate} hrs / ${period}`;
+    if (tenureMonths < 36) return `Tier 3 (24–36 months) · ${tier.rate} hrs / ${period}`;
+    return `Tier 4 (36+ months) · ${tier.rate} hrs / ${period}`;
 }
 
 export function isSickLeaveUsable(hireDate: string): boolean {
