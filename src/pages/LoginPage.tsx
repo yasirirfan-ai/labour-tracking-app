@@ -29,6 +29,13 @@ export const LoginPage: React.FC = () => {
             setError(result.error || 'Invalid username or password');
             return;
         }
+
+        // Explicitly navigate based on role to ensure redirection in production
+        if (loginRole === 'admin') {
+            navigate('/');
+        } else {
+            navigate('/worker-portal');
+        }
     };
 
     return (
