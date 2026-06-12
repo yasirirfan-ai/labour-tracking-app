@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { Layout } from './components/Layout';
 import { LoginPage } from './pages/LoginPage';
 import { Dashboard } from './pages/Dashboard';
@@ -18,9 +18,8 @@ import { DisciplineAdminPage } from './pages/DisciplineAdminPage';
 import { NfcManagementPage } from './pages/NfcManagementPage';
 import { WorkerSelectPage } from './pages/WorkerSelectPage';
 import { ReportsPage } from './pages/ReportsPage';
-import { useAuth } from './context/AuthContext';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'manager' | 'employee' }> = ({ children, role }) => {
+const ProtectedRoute = ({ children, role }: { children: React.ReactNode; role?: 'manager' | 'employee' }) => {
   const { user, loading } = useAuth();
 
   if (loading) return null;
@@ -34,8 +33,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'manager' | '
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/worker-select" element={<WorkerSelectPage />} />
@@ -67,8 +66,8 @@ function App() {
             <Route path="nfc" element={<NfcManagementPage />} />
           </Route>
         </Routes>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
