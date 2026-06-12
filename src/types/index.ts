@@ -5,6 +5,7 @@ export interface User {
     name: string;
     role: 'manager' | 'employee';
     password?: string;
+    pin?: string;
     hourly_rate: number;
     status?: 'offline' | 'present'; // Clocked status
     availability?: 'available' | 'break'; // Break status
@@ -51,7 +52,7 @@ export interface User {
     photo_url?: string;
     active?: boolean;
     nfc_id?: string;
-    
+
     // Emergency Contact
     emergency_contact_name?: string;
     emergency_contact_relationship?: string;
@@ -67,16 +68,16 @@ export interface User {
     emergency_contact_address_zip?: string;
     emergency_contact_address_country?: string;
     is_primary_contact?: boolean;
-    
+
     // Secondary Contact
     secondary_contact_name?: string;
     secondary_contact_relationship?: string;
     secondary_contact_phone?: string;
-    
+
     // EEO Fields
     ethnicity?: string;
     eeo_category?: string;
-    
+
     // Bonus Fields
     annual_bonus_percentage?: number;
     annual_bonus_amount?: number;

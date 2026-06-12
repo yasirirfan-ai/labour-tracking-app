@@ -11,6 +11,7 @@ import { ControlTablePage } from './pages/ControlTablePage';
 import { EmployeeActivityPage } from './pages/EmployeeActivityPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { WorkerPortalPage } from './pages/WorkerPortalPage';
+import { WorkerSelectPage } from './pages/WorkerSelectPage';
 import { DisciplineAdminPage } from './pages/DisciplineAdminPage';
 import { NfcManagementPage } from './pages/NfcManagementPage';
 import { HireWorkerPage } from './pages/HireWorkerPage';
@@ -28,6 +29,7 @@ function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/worker-portal" element={<WorkerPortalPage />} />
+          <Route path="/worker-select" element={<WorkerSelectPage />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="control-matrix" element={<ControlMatrixPage />} />

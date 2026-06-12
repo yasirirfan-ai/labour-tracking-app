@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 export const LoginPage: React.FC = () => {
     const [username, setUsername] = useState('');
@@ -14,6 +14,8 @@ export const LoginPage: React.FC = () => {
         if (user.role === 'manager') return <Navigate to="/" replace />;
         return <Navigate to="/worker-portal" replace />;
     }
+
+    const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -280,54 +282,84 @@ export const LoginPage: React.FC = () => {
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="login-form">
-                    <div className="input-group">
-                        <label>Username</label>
-                        <input
-                            type="text"
-                            name="username"
-                            required
-                            placeholder="Enter username"
-                            autoComplete="username"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                        />
+                {loginRole === 'worker' ? (
+                    <div style={{ marginTop: '2rem' }}>
+                        <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '2rem', lineHeight: 1.5 }}>
+                            Worker access is now managed through Profile Selection and PIN entry.
+                        </p>
+                        <button
+                            className="submit-btn"
+                            style={{ background: '#2563eb' }}
+                            onClick={() => navigate('/worker-select')}
+                            type="button"
+                        >
+                            <i className="fa-solid fa-users" style={{ marginRight: '8px' }}></i>
+                            Go to Profile Selection
+                        </button>
+
+                        <div className="divider">
+                            <span>OR</span>
+                        </div>
+
+                        <button
+                            type="button"
+                            className="google-btn"
+                            onClick={() => loginWithGoogle('employee')}
+                        >
+                            <i className="fa-brands fa-google"></i>
+                            Sign in with Google
+                        </button>
                     </div>
-                    <div className="input-group">
-                        <label>Password</label>
-                        <input
-                            type={showPassword ? "text" : "password"}
-                            name="password"
-                            required
-                            placeholder="••••••••"
-                            autoComplete="current-password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
-                        <span className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
-                            <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-                        </span>
-                    </div>
+                ) : (
+                    <form onSubmit={handleSubmit} className="login-form">
+                        <div className="input-group">
+                            <label>Username</label>
+                            <input
+                                type="text"
+                                name="username"
+                                required
+                                placeholder="Enter username"
+                                autoComplete="username"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                            />
+                        </div>
+                        <div className="input-group">
+                            <label>Password</label>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                name="password"
+                                required
+                                placeholder="••••••••"
+                                autoComplete="current-password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
+                            <span className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
+                                <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                            </span>
+                        </div>
 
-                    <a href="#" className="forgot-password">Forgot password?</a>
+                        <a href="#" className="forgot-password">Forgot password?</a>
 
-                    <button type="submit" className="submit-btn" onClick={() => { if(clearAuthError) clearAuthError(); }}>
-                        Sign In
-                    </button>
+                        <button type="submit" className="submit-btn" onClick={() => { if (clearAuthError) clearAuthError(); }}>
+                            Sign In
+                        </button>
 
-                    <div className="divider">
-                        <span>OR</span>
-                    </div>
+                        <div className="divider">
+                            <span>OR</span>
+                        </div>
 
-                    <button 
-                        type="button" 
-                        className="google-btn" 
-                        onClick={() => loginWithGoogle(loginRole === 'admin' ? 'manager' : 'employee')}
-                    >
-                        <i className="fa-brands fa-google"></i>
-                        Sign in with Google
-                    </button>
-                </form>
+                        <button
+                            type="button"
+                            className="google-btn"
+                            onClick={() => loginWithGoogle('manager')}
+                        >
+                            <i className="fa-brands fa-google"></i>
+                            Sign in with Google
+                        </button>
+                    </form>
+                )}
             </div>
         </div>
     );

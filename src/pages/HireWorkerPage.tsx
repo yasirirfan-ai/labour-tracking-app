@@ -11,8 +11,8 @@ export const HireWorkerPage: React.FC = () => {
 
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
-        worker_id: '', 
-        name: '', 
+        worker_id: '',
+        name: '',
         first_name: '',
         middle_name: '',
         last_name: '',
@@ -33,7 +33,7 @@ export const HireWorkerPage: React.FC = () => {
         home_phone: '',
         work_email: '',
         home_email: '',
-        username: '', 
+        username: '',
         employment_status: '',
         staff_type: 'Permanent Staff',
         job_title: '',
@@ -45,7 +45,8 @@ export const HireWorkerPage: React.FC = () => {
         pay_type: '',
         pay_rate: '',
         pay_period: 'Hour',
-        nfc_id: '' 
+        nfc_id: '',
+        pin: ''
     });
 
     useEffect(() => {
@@ -59,11 +60,11 @@ export const HireWorkerPage: React.FC = () => {
     const fetchWorker = async () => {
         setLoading(true);
         const { data } = await supabase.from('users').select('*').eq('id', id || '').single();
-            setFormData(prev => ({
-                ...prev,
-                ...(data || {}),
-                pay_rate: (data as any)?.hourly_rate?.toString() || ''
-            }));
+        setFormData(prev => ({
+            ...prev,
+            ...(data || {}),
+            pay_rate: (data as any)?.hourly_rate?.toString() || ''
+        }));
         setLoading(false);
     };
 
@@ -75,7 +76,11 @@ export const HireWorkerPage: React.FC = () => {
             const num = (parseInt(lastId?.split('-')[1]) || 0) + 1;
             nextId = `W-${num.toString().padStart(3, '0')}`;
         }
-        setFormData(prev => ({ ...prev, worker_id: nextId }));
+        setFormData(prev => ({
+            ...prev,
+            worker_id: nextId,
+            pin: Math.floor(1000 + Math.random() * 9000).toString()
+        }));
     };
 
     const handlePayScheduleChange = (value: string) => {
@@ -92,7 +97,7 @@ export const HireWorkerPage: React.FC = () => {
 
     const handleSave = async () => {
         if (!formData.name || !formData.username || !formData.pay_rate) return alert(t('hire.fillingRequired'));
-        
+
         setLoading(true);
         const payload = {
             ...formData,
@@ -102,7 +107,7 @@ export const HireWorkerPage: React.FC = () => {
         };
         delete (payload as any).pay_rate;
 
-        const { error } = isEdit 
+        const { error } = isEdit
             ? await (supabase.from('users') as any).update(payload).eq('id', id)
             : await (supabase.from('users') as any).insert({ ...payload, password: 'worker' + Math.floor(1000 + Math.random() * 9000) });
 
@@ -151,33 +156,33 @@ export const HireWorkerPage: React.FC = () => {
                                 <label>{t('hire.fields.firstName')}</label>
                                 <input type="text" placeholder={t('hire.fields.firstName')} value={formData.first_name} onChange={e => {
                                     const newFirst = e.target.value;
-                                    setFormData(prev => ({...prev, first_name: newFirst, name: `${newFirst} ${prev.last_name}`.trim()}));
+                                    setFormData(prev => ({ ...prev, first_name: newFirst, name: `${newFirst} ${prev.last_name}`.trim() }));
                                 }} />
                             </div>
                             <div className="form-field quarter-width">
                                 <label>{t('hire.fields.middleName')}</label>
-                                <input type="text" placeholder={t('hire.fields.middleName')} value={formData.middle_name} onChange={e => setFormData(prev => ({...prev, middle_name: e.target.value}))} />
+                                <input type="text" placeholder={t('hire.fields.middleName')} value={formData.middle_name} onChange={e => setFormData(prev => ({ ...prev, middle_name: e.target.value }))} />
                             </div>
                             <div className="form-field quarter-width">
                                 <label>{t('hire.fields.lastName')}</label>
                                 <input type="text" placeholder={t('hire.fields.lastName')} value={formData.last_name} onChange={e => {
                                     const newLast = e.target.value;
-                                    setFormData(prev => ({...prev, last_name: newLast, name: `${prev.first_name} ${newLast}`.trim()}));
+                                    setFormData(prev => ({ ...prev, last_name: newLast, name: `${prev.first_name} ${newLast}`.trim() }));
                                 }} />
                             </div>
                             <div className="form-field quarter-width">
                                 <label>{t('hire.fields.preferredName')}</label>
-                                <input type="text" placeholder={t('hire.fields.preferredName')} value={formData.preferred_name} onChange={e => setFormData(prev => ({...prev, preferred_name: e.target.value}))} />
+                                <input type="text" placeholder={t('hire.fields.preferredName')} value={formData.preferred_name} onChange={e => setFormData(prev => ({ ...prev, preferred_name: e.target.value }))} />
                             </div>
                             <div className="form-field">
                                 <label>{t('hire.fields.birthDate')}</label>
                                 <div className="input-with-icon">
-                                    <input type="date" value={formData.birth_date} onChange={e => setFormData(prev => ({...prev, birth_date: e.target.value}))} />
+                                    <input type="date" value={formData.birth_date} onChange={e => setFormData(prev => ({ ...prev, birth_date: e.target.value }))} />
                                 </div>
                             </div>
                             <div className="form-field">
                                 <label>{t('hire.fields.gender')}</label>
-                                <select value={formData.gender} onChange={e => setFormData(prev => ({...prev, gender: e.target.value}))}>
+                                <select value={formData.gender} onChange={e => setFormData(prev => ({ ...prev, gender: e.target.value }))}>
                                     <option value="">{t('common.select')}</option>
                                     <option value="Male">{t('hire.options.gender.male')}</option>
                                     <option value="Female">{t('hire.options.gender.female')}</option>
@@ -186,7 +191,7 @@ export const HireWorkerPage: React.FC = () => {
                             </div>
                             <div className="form-field">
                                 <label>{t('hire.fields.maritalStatus')}</label>
-                                <select value={formData.marital_status} onChange={e => setFormData(prev => ({...prev, marital_status: e.target.value}))}>
+                                <select value={formData.marital_status} onChange={e => setFormData(prev => ({ ...prev, marital_status: e.target.value }))}>
                                     <option value="">{t('common.select')}</option>
                                     <option value="Single">{t('hire.options.marital.single')}</option>
                                     <option value="Married">{t('hire.options.marital.married')}</option>
@@ -206,16 +211,16 @@ export const HireWorkerPage: React.FC = () => {
                             <div className="form-field">
                                 <label>{t('hire.fields.hireDate')}</label>
                                 <div className="input-with-icon">
-                                    <input type="date" value={formData.hire_date} onChange={e => setFormData(prev => ({...prev, hire_date: e.target.value}))} />
+                                    <input type="date" value={formData.hire_date} onChange={e => setFormData(prev => ({ ...prev, hire_date: e.target.value }))} />
                                 </div>
                             </div>
                             <div className="form-field half-width">
                                 <label>{t('hire.fields.jobTitle')}</label>
-                                <input type="text" value={formData.job_title} onChange={e => setFormData(prev => ({...prev, job_title: e.target.value}))} placeholder="e.g. Production Associate" />
+                                <input type="text" value={formData.job_title} onChange={e => setFormData(prev => ({ ...prev, job_title: e.target.value }))} placeholder="e.g. Production Associate" />
                             </div>
                             <div className="form-field">
                                 <label>{t('hire.fields.staffType')}</label>
-                                <select value={formData.staff_type} onChange={e => setFormData(prev => ({...prev, staff_type: e.target.value}))}>
+                                <select value={formData.staff_type} onChange={e => setFormData(prev => ({ ...prev, staff_type: e.target.value }))}>
                                     <option value="Permanent Staff">{t('hire.options.staffType.permanent')}</option>
                                     <option value="Temporary Staff">{t('hire.options.staffType.temporary')}</option>
                                 </select>
@@ -232,23 +237,23 @@ export const HireWorkerPage: React.FC = () => {
                         <div className="form-grid">
                             <div className="form-field full-width">
                                 <label>{t('hire.fields.street1')}</label>
-                                <input type="text" value={formData.address_street1} onChange={e => setFormData(prev => ({...prev, address_street1: e.target.value}))} />
+                                <input type="text" value={formData.address_street1} onChange={e => setFormData(prev => ({ ...prev, address_street1: e.target.value }))} />
                             </div>
                             <div className="form-field full-width">
                                 <label>{t('hire.fields.street2')}</label>
-                                <input type="text" value={formData.address_street2} onChange={e => setFormData(prev => ({...prev, address_street2: e.target.value}))} />
+                                <input type="text" value={formData.address_street2} onChange={e => setFormData(prev => ({ ...prev, address_street2: e.target.value }))} />
                             </div>
                             <div className="form-field half-width">
                                 <label>{t('hire.fields.city')}</label>
-                                <input type="text" value={formData.address_city} onChange={e => setFormData(prev => ({...prev, address_city: e.target.value}))} />
+                                <input type="text" value={formData.address_city} onChange={e => setFormData(prev => ({ ...prev, address_city: e.target.value }))} />
                             </div>
                             <div className="form-field quarter-width">
                                 <label>{t('hire.fields.state')}</label>
-                                <input type="text" value={formData.address_state} onChange={e => setFormData(prev => ({...prev, address_state: e.target.value}))} />
+                                <input type="text" value={formData.address_state} onChange={e => setFormData(prev => ({ ...prev, address_state: e.target.value }))} />
                             </div>
                             <div className="form-field quarter-width">
                                 <label>{t('hire.fields.zip')}</label>
-                                <input type="text" value={formData.address_zip} onChange={e => setFormData(prev => ({...prev, address_zip: e.target.value}))} />
+                                <input type="text" value={formData.address_zip} onChange={e => setFormData(prev => ({ ...prev, address_zip: e.target.value }))} />
                             </div>
                         </div>
                     </section>
@@ -264,18 +269,31 @@ export const HireWorkerPage: React.FC = () => {
                                 <label>{t('hire.fields.mobilePhone')}</label>
                                 <div className="input-with-icon left">
                                     <i className="fa-solid fa-mobile-screen"></i>
-                                    <input type="text" value={formData.mobile_phone} onChange={e => setFormData(prev => ({...prev, mobile_phone: e.target.value, phone: e.target.value}))} />
+                                    <input type="text" value={formData.mobile_phone} onChange={e => setFormData(prev => ({ ...prev, mobile_phone: e.target.value, phone: e.target.value }))} />
                                 </div>
                             </div>
-                            <div className="form-field half-width">
+                            <div className="form-field quarter-width">
                                 <label>{t('common.username')}</label>
-                                <input type="text" value={formData.username} onChange={e => setFormData(prev => ({...prev, username: e.target.value}))} />
+                                <input type="text" value={formData.username} onChange={e => setFormData(prev => ({ ...prev, username: e.target.value }))} />
+                            </div>
+                            <div className="form-field quarter-width">
+                                <label>PIN (4 Digits)</label>
+                                <input
+                                    type="text"
+                                    maxLength={4}
+                                    value={formData.pin}
+                                    placeholder="e.g. 1234"
+                                    onChange={e => {
+                                        const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+                                        setFormData(prev => ({ ...prev, pin: val }));
+                                    }}
+                                />
                             </div>
                             <div className="form-field full-width">
                                 <label>{t('common.email')}</label>
                                 <div className="input-with-icon left">
                                     <i className="fa-solid fa-envelope"></i>
-                                    <input type="text" value={formData.work_email} onChange={e => setFormData(prev => ({...prev, work_email: e.target.value, email: e.target.value}))} />
+                                    <input type="text" value={formData.work_email} onChange={e => setFormData(prev => ({ ...prev, work_email: e.target.value, email: e.target.value }))} />
                                 </div>
                             </div>
                         </div>
@@ -298,7 +316,7 @@ export const HireWorkerPage: React.FC = () => {
                             </div>
                             <div className="form-field half-width">
                                 <label>{t('hire.fields.payType')}</label>
-                                <select value={formData.pay_type} onChange={e => setFormData(prev => ({...prev, pay_type: e.target.value}))}>
+                                <select value={formData.pay_type} onChange={e => setFormData(prev => ({ ...prev, pay_type: e.target.value }))}>
                                     <option value="Hourly">{t('hire.options.payType.hourly')}</option>
                                     <option value="Salary">{t('hire.options.payType.salary')}</option>
                                 </select>
@@ -307,10 +325,10 @@ export const HireWorkerPage: React.FC = () => {
                                 <label>{formData.pay_type === 'Salary' ? t('hire.fields.salary') : t('hire.fields.payRate')}</label>
                                 <div className="rate-row">
                                     <span className="currency-symbol">$</span>
-                                    <input type="number" step="0.01" value={formData.pay_rate} onChange={e => setFormData(prev => ({...prev, pay_rate: e.target.value}))} />
+                                    <input type="number" step="0.01" value={formData.pay_rate} onChange={e => setFormData(prev => ({ ...prev, pay_rate: e.target.value }))} />
                                     <span className="currency-label">USD</span>
                                     <span className="per-label">per</span>
-                                    <select value={formData.pay_period} onChange={e => setFormData(prev => ({...prev, pay_period: e.target.value}))}>
+                                    <select value={formData.pay_period} onChange={e => setFormData(prev => ({ ...prev, pay_period: e.target.value }))}>
                                         <option value="Hour">{t('hire.options.payPeriod.hour')}</option>
                                         <option value="Year">{t('hire.options.payPeriod.year')}</option>
                                     </select>

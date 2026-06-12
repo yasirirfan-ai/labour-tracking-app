@@ -7,6 +7,7 @@ interface AuthContextType {
     loading: boolean;
     authError: string | null;
     login: (username: string, password: string, requiredRole?: 'manager' | 'employee') => Promise<{ success: boolean; error?: string }>;
+    loginWithPin: (userId: string, pin: string) => Promise<{ success: boolean; error?: string }>;
     loginWithGoogle: (requiredRole: 'manager' | 'employee') => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
     clearAuthError: () => void;
@@ -41,7 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log("Checking for Google Email in database:", googleEmail);
 
             const pendingRole = localStorage.getItem('bt_pending_role') as 'manager' | 'employee' | null;
-            
+
             // Map the Google user's email to our custom public.users table
             const { data, error } = await supabase
                 .from('users')
@@ -122,6 +123,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true };
     };
 
+    const loginWithPin = async (userId: string, pin: string): Promise<{ success: boolean; error?: string }> => {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .eq('pin', pin)
+            .maybeSingle();
+
+        if (error || !data) {
+            return { success: false, error: 'Invalid PIN' };
+        }
+
+        if ((data as any).role !== 'employee') {
+            return { success: false, error: 'Access Denied: PIN login is only for workers' };
+        }
+
+        const userData = data as any as User;
+        setUser(userData);
+        localStorage.setItem('bt_user', JSON.stringify(userData));
+        return { success: true };
+    };
+
     const loginWithGoogle = async (requiredRole: 'manager' | 'employee'): Promise<{ success: boolean; error?: string }> => {
         setAuthError(null);
         localStorage.setItem('bt_pending_role', requiredRole);
@@ -148,7 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const clearAuthError = () => setAuthError(null);
 
     return (
-        <AuthContext.Provider value={{ user, loading, authError, login, loginWithGoogle, logout, clearAuthError }}>
+        <AuthContext.Provider value={{ user, loading, authError, login, loginWithPin, loginWithGoogle, logout, clearAuthError }}>
             {children}
         </AuthContext.Provider>
     );
