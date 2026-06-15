@@ -310,7 +310,13 @@ export const ControlTablePage: React.FC = () => {
     };
 
     const handleCreateTask = async () => {
-        if (!createForm.worker_id || !createForm.mo_reference || !createForm.description) {
+        // Tab 1 (Clock In/Out): only Worker is required
+        // Tab 2 (Start/Last Action): Worker, MO, and Operation are all required
+        if (!createForm.worker_id) {
+            alert(t('table.modals.worker') + ' is required.');
+            return;
+        }
+        if (createTab === 'startLastAction' && (!createForm.mo_reference || !createForm.description)) {
             alert(t('table.modals.validationError'));
             return;
         }
