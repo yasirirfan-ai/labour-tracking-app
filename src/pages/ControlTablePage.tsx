@@ -50,35 +50,39 @@ export const ControlTablePage: React.FC = () => {
     });
 
     const [activeChip, setActiveChip] = useState('Today'); // Move useState to top level
+    const [createTab, setCreateTab] = useState<'clockInOut' | 'startLastAction'>('clockInOut');
 
     // Auto-calculate duration for Manual Entry
     useEffect(() => {
-        if (createForm.start_time && (createForm.end_time || createForm.last_action_time)) {
-            const start = new Date(createForm.start_time);
-            // Use end_time, fallback to last_action_time
-            const end = new Date(createForm.end_time || createForm.last_action_time);
+        // Clock In/Out tab: calculate from created_at (clock in) -> end_time (clock out)
+        // Start/Last Action tab: calculate from start_time -> end_time || last_action_time
+        let startVal = '';
+        let endVal = '';
 
-            // Calculate if valid dates
+        if (createForm.created_at && createForm.end_time) {
+            // Clock In/Out tab scenario
+            startVal = createForm.created_at;
+            endVal = createForm.end_time;
+        } else if (createForm.start_time && (createForm.end_time || createForm.last_action_time)) {
+            startVal = createForm.start_time;
+            endVal = createForm.end_time || createForm.last_action_time;
+        }
+
+        if (startVal && endVal) {
+            const start = new Date(startVal);
+            const end = new Date(endVal);
             if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
                 const diffMs = end.getTime() - start.getTime();
-                // If negative (End < Start), treat as 0 duration
                 const totalMinutes = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
-
                 const hours = Math.floor(totalMinutes / 60);
                 const minutes = totalMinutes % 60;
-
                 setCreateForm(prev => {
-                    // Only update if values are different to avoid potential loops (though dependency array handles this)
                     if (prev.active_hours === hours && prev.active_minutes === minutes) return prev;
-                    return {
-                        ...prev,
-                        active_hours: hours,
-                        active_minutes: minutes
-                    };
+                    return { ...prev, active_hours: hours, active_minutes: minutes };
                 });
             }
         }
-    }, [createForm.start_time, createForm.end_time, createForm.last_action_time]);
+    }, [createForm.created_at, createForm.start_time, createForm.end_time, createForm.last_action_time]);
 
     // Auto-calculate duration for Edit Entry
     useEffect(() => {
@@ -279,6 +283,7 @@ export const ControlTablePage: React.FC = () => {
     };
 
     const handleCreateClick = () => {
+        setCreateTab('clockInOut');
         setCreateForm({
             worker_id: '',
             mo_reference: '',
@@ -694,7 +699,7 @@ export const ControlTablePage: React.FC = () => {
                                 </div>
                             </div>
 
-                             <div>
+                            <div>
                                 <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.duration')}</label>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -756,7 +761,7 @@ export const ControlTablePage: React.FC = () => {
             </div >
 
             {/* Create Manual Entry Modal */}
-            < div className={`offcanvas ${isCreateOpen ? 'show' : ''}`} style={{
+            <div className={`offcanvas ${isCreateOpen ? 'show' : ''}`} style={{
                 right: 'auto', left: '50%', top: '50%', transform: `translate(-50%, -50%)`,
                 width: 'min(700px, 95%)', height: 'auto', maxHeight: '90vh', overflowY: 'auto',
                 borderRadius: '12px', opacity: isCreateOpen ? 1 : 0,
@@ -764,17 +769,50 @@ export const ControlTablePage: React.FC = () => {
                 transition: 'opacity 0.2s', zIndex: 3001, background: 'white', position: 'fixed',
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
             }}>
-                <div className="offcanvas-header" style={{ marginBottom: '1rem', padding: '1.5rem 1.5rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="offcanvas-header" style={{ padding: '1.5rem 1.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 className="offcanvas-title" style={{ fontSize: '1.1rem', fontWeight: 700 }}>{t('table.modals.manualTitle')}</h3>
                     <button className="close-btn" onClick={() => setIsCreateOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>
                         <i className="fa-solid fa-xmark"></i>
                     </button>
                 </div>
-                <div className="offcanvas-body" style={{ padding: '0 1.5rem 1.5rem' }}>
-                    <div style={{ display: 'grid', gap: '1rem' }}>
 
-                        {/* Row 1: Worker & MO */}
-                        <div className="form-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                {/* Tab Switcher */}
+                <div style={{ padding: '1rem 1.5rem 0', display: 'flex', gap: '0.5rem' }}>
+                    <button
+                        onClick={() => setCreateTab('clockInOut')}
+                        style={{
+                            flex: 1, padding: '0.55rem 1rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600,
+                            cursor: 'pointer', transition: 'all 0.2s',
+                            background: createTab === 'clockInOut' ? 'var(--primary)' : '#F1F5F9',
+                            color: createTab === 'clockInOut' ? 'white' : '#64748B',
+                            border: createTab === 'clockInOut' ? 'none' : '1px solid #E2E8F0'
+                        }}
+                    >
+                        <i className="fa-regular fa-clock" style={{ marginRight: '6px' }}></i>
+                        {t('table.modals.clockIn')} / {t('table.modals.clockOut')}
+                    </button>
+                    <button
+                        onClick={() => setCreateTab('startLastAction')}
+                        style={{
+                            flex: 1, padding: '0.55rem 1rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600,
+                            cursor: 'pointer', transition: 'all 0.2s',
+                            background: createTab === 'startLastAction' ? 'var(--primary)' : '#F1F5F9',
+                            color: createTab === 'startLastAction' ? 'white' : '#64748B',
+                            border: createTab === 'startLastAction' ? 'none' : '1px solid #E2E8F0'
+                        }}
+                    >
+                        <i className="fa-solid fa-rotate" style={{ marginRight: '6px' }}></i>
+                        {t('table.modals.startTime')} / {t('table.modals.lastAction')}
+                    </button>
+                </div>
+
+                <div className="offcanvas-body" style={{ padding: '1rem 1.5rem 1.5rem' }}>
+
+                    {/* ── TAB 1: Clock In / Clock Out ── */}
+                    {createTab === 'clockInOut' && (
+                        <div style={{ display: 'grid', gap: '1rem' }}>
+
+                            {/* Worker */}
                             <div>
                                 <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.worker')}</label>
                                 <select
@@ -788,36 +826,112 @@ export const ControlTablePage: React.FC = () => {
                                     ))}
                                 </select>
                             </div>
+
+                            {/* Clock In & Clock Out */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.clockIn')}</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={createForm.created_at}
+                                        onChange={e => setCreateForm(prev => ({ ...prev, created_at: e.target.value }))}
+                                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.clockOut')}</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={createForm.end_time}
+                                        onChange={e => setCreateForm(prev => ({ ...prev, end_time: e.target.value }))}
+                                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Total Duration — read-only, auto-calculated */}
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.columns.mo')}</label>
-                                <select
-                                    value={createForm.mo_reference}
-                                    onChange={e => setCreateForm(prev => ({ ...prev, mo_reference: e.target.value }))}
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem', background: 'white' }}
-                                >
-                                    <option value="">{t('table.modals.selectMo')}</option>
-                                    {mos.map(m => (
-                                        <option key={m.id} value={m.mo_number}>{m.mo_number} - {m.product_name}</option>
-                                    ))}
-                                </select>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>
+                                    {t('table.modals.duration')}
+                                    <span style={{ fontWeight: 400, fontSize: '0.78rem', color: '#94A3B8', marginLeft: '6px' }}>(auto-calculated)</span>
+                                </label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.55rem 0.75rem', background: '#F8FAFC', borderRadius: '6px', border: '1.5px solid #E2E8F0' }}>
+                                    <i className="fa-regular fa-hourglass" style={{ color: '#94A3B8' }}></i>
+                                    <span style={{ fontWeight: 700, fontSize: '1rem', color: '#1E293B', fontFamily: `'JetBrains Mono', monospace` }}>
+                                        {String(createForm.active_hours).padStart(2, '0')}h {String(createForm.active_minutes).padStart(2, '0')}m
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Hourly Rate */}
+                            <div>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.hourlyRate')}</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={createForm.hourly_rate}
+                                    onChange={e => setCreateForm(prev => ({ ...prev, hourly_rate: parseFloat(e.target.value) || 0 }))}
+                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                <button className="btn btn-secondary" onClick={() => setIsCreateOpen(false)} style={{ padding: '0.6rem 1.25rem' }}>{t('table.modals.cancel')}</button>
+                                <button className="btn btn-primary" onClick={handleCreateTask} style={{ padding: '0.6rem 1.25rem' }}>{t('table.modals.create')}</button>
                             </div>
                         </div>
+                    )}
 
-                        {/* Row 2: Operation, Status & Rate */}
-                        <div className="form-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    {/* ── TAB 2: Start Time / Last Action ── */}
+                    {createTab === 'startLastAction' && (
+                        <div style={{ display: 'grid', gap: '1rem' }}>
+
+                            {/* Worker */}
                             <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.columns.operation')}</label>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.worker')}</label>
                                 <select
-                                    value={createForm.description}
-                                    onChange={e => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                                    value={createForm.worker_id}
+                                    onChange={e => setCreateForm(prev => ({ ...prev, worker_id: e.target.value }))}
                                     style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem', background: 'white' }}
                                 >
-                                    <option value="">{t('table.modals.selectOp')}</option>
-                                    {operations.map(op => (
-                                        <option key={op} value={op}>{op}</option>
+                                    <option value="">{t('table.modals.selectWorker')}</option>
+                                    {employees.map(e => (
+                                        <option key={e.id} value={e.id}>{e.name}</option>
                                     ))}
                                 </select>
                             </div>
+
+                            {/* MO & Operation */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.columns.mo')}</label>
+                                    <select
+                                        value={createForm.mo_reference}
+                                        onChange={e => setCreateForm(prev => ({ ...prev, mo_reference: e.target.value }))}
+                                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem', background: 'white' }}
+                                    >
+                                        <option value="">{t('table.modals.selectMo')}</option>
+                                        {mos.map(m => (
+                                            <option key={m.id} value={m.mo_number}>{m.mo_number} - {m.product_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.columns.operation')}</label>
+                                    <select
+                                        value={createForm.description}
+                                        onChange={e => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem', background: 'white' }}
+                                    >
+                                        <option value="">{t('table.modals.selectOp')}</option>
+                                        {operations.map(op => (
+                                            <option key={op} value={op}>{op}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Status */}
                             <div>
                                 <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.status')}</label>
                                 <select
@@ -832,91 +946,38 @@ export const ControlTablePage: React.FC = () => {
                                     <option value="completed">{t('table.statusLabels.completed')}</option>
                                 </select>
                             </div>
-                            <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.hourlyRate')}</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={createForm.hourly_rate}
-                                    onChange={e => setCreateForm(prev => ({ ...prev, hourly_rate: parseFloat(e.target.value) || 0 }))}
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
-                                />
-                            </div>
-                        </div>
 
-                        {/* Row 3: Times */}
-                        <div className="form-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.clockIn')}</label>
-                                <input
-                                    type="datetime-local"
-                                    value={createForm.created_at}
-                                    onChange={e => setCreateForm(prev => ({ ...prev, created_at: e.target.value }))}
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.startTime')}</label>
-                                <input
-                                    type="datetime-local"
-                                    value={createForm.start_time}
-                                    onChange={e => setCreateForm(prev => ({ ...prev, start_time: e.target.value }))}
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.clockOut')}</label>
-                                <input
-                                    type="datetime-local"
-                                    value={createForm.end_time}
-                                    onChange={e => setCreateForm(prev => ({ ...prev, end_time: e.target.value }))}
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.lastAction')}</label>
-                                <input
-                                    type="datetime-local"
-                                    value={createForm.last_action_time}
-                                    onChange={e => setCreateForm(prev => ({ ...prev, last_action_time: e.target.value }))}
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Row 4: Duration */}
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.duration')}</label>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {/* Start Time & Last Action */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.startTime')}</label>
                                     <input
-                                        type="number"
-                                        value={createForm.active_hours}
-                                        onChange={e => setCreateForm(prev => ({ ...prev, active_hours: parseInt(e.target.value) || 0 }))}
+                                        type="datetime-local"
+                                        value={createForm.start_time}
+                                        onChange={e => setCreateForm(prev => ({ ...prev, start_time: e.target.value }))}
                                         style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
                                     />
-                                    <span style={{ fontSize: '0.85rem', color: '#64748B' }}>{t('table.modals.hours')}</span>
                                 </div>
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: '#475569', fontSize: '0.85rem' }}>{t('table.modals.lastAction')}</label>
                                     <input
-                                        type="number"
-                                        value={createForm.active_minutes}
-                                        onChange={e => setCreateForm(prev => ({ ...prev, active_minutes: parseInt(e.target.value) || 0 }))}
-                                        max="59"
+                                        type="datetime-local"
+                                        value={createForm.last_action_time}
+                                        onChange={e => setCreateForm(prev => ({ ...prev, last_action_time: e.target.value }))}
                                         style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
                                     />
-                                    <span style={{ fontSize: '0.85rem', color: '#64748B' }}>{t('table.modals.minutes')}</span>
                                 </div>
                             </div>
-                        </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setIsCreateOpen(false)} style={{ padding: '0.6rem 1.25rem' }}>{t('table.modals.cancel')}</button>
-                            <button className="btn btn-primary" onClick={handleCreateTask} style={{ padding: '0.6rem 1.25rem' }}>{t('table.modals.create')}</button>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                <button className="btn btn-secondary" onClick={() => setIsCreateOpen(false)} style={{ padding: '0.6rem 1.25rem' }}>{t('table.modals.cancel')}</button>
+                                <button className="btn btn-primary" onClick={handleCreateTask} style={{ padding: '0.6rem 1.25rem' }}>{t('table.modals.create')}</button>
+                            </div>
                         </div>
-                    </div>
+                    )}
+
                 </div>
-            </div >
+            </div>
 
             {isCreateOpen && <div className="overlay active" style={{ zIndex: 3000 }} onClick={() => setIsCreateOpen(false)}></div>}
 
