@@ -87,15 +87,40 @@ export const ReportsPage: React.FC = () => {
         };
     };
 
+    // Returns the UTC ISO string that corresponds to midnight (start) or 23:59:59.999 (end)
+    // of a given YYYY-MM-DD date in the America/Los_Angeles timezone (PST/PDT).
+    const getPSTBound = (dateStr: string, endOfDay: boolean): string => {
+        const timeStr = endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
+        const utcDate = new Date(dateStr + timeStr);
+        // Compute how many ms LA is behind UTC at this moment (handles DST automatically)
+        const utcStr = utcDate.toLocaleString('en-US', { timeZone: 'UTC' });
+        const laStr = utcDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+        const offsetMs = new Date(utcStr).getTime() - new Date(laStr).getTime();
+        return new Date(utcDate.getTime() + offsetMs).toISOString();
+    };
+
     const getFilteredTasks = () => {
-        return tasks.filter(task => {
-            if (filters.employee !== 'all' && task.assigned_to_id !== filters.employee) return false;
-            if (filters.mo !== 'all' && task.mo_reference !== filters.mo) return false;
-            if (filters.operation !== 'all' && task.description !== filters.operation) return false;
-            if (filters.start && task.start_time && task.start_time < filters.start) return false;
-            if (filters.end && task.end_time && task.end_time > filters.end) return false;
-            return true;
-        });
+        const startBound = filters.start ? getPSTBound(filters.start, false) : null;
+        const endBound = filters.end ? getPSTBound(filters.end, true) : null;
+
+        return tasks
+            .filter(task => {
+                if (filters.employee !== 'all' && task.assigned_to_id !== filters.employee) return false;
+                if (filters.mo !== 'all' && task.mo_reference !== filters.mo) return false;
+                if (filters.operation !== 'all' && task.description !== filters.operation) return false;
+
+                // Use start_time (or created_at as fallback) as the task's representative date.
+                // In-progress tasks (null end_time) are included as long as they started in range.
+                const taskDate = task.start_time || task.created_at;
+                if (startBound && taskDate && taskDate < startBound) return false;
+                if (endBound && taskDate && taskDate > endBound) return false;
+                return true;
+            })
+            .sort((a, b) => {
+                const dateA = a.start_time || a.created_at || '';
+                const dateB = b.start_time || b.created_at || '';
+                return dateB.localeCompare(dateA); // newest first
+            });
     };
 
     const updateCharts = () => {
@@ -162,6 +187,36 @@ export const ReportsPage: React.FC = () => {
         }
     };
 
+    const handleExportCSV = () => {
+        const data = getFilteredTasks();
+        const headers = ['Worker', 'Manufacturing Order', 'Operation', 'Start Time (PST)', 'Duration (h)', 'Type', 'Cost ($)'];
+
+        const rows = data.map(task => {
+            const startTimePST = task.start_time
+                ? new Date(task.start_time).toLocaleString('en-US', {
+                    timeZone: 'America/Los_Angeles',
+                    month: '2-digit', day: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', hour12: false
+                })
+                : 'N/A';
+            const hours = ((task.active_seconds || 0) / 3600).toFixed(2);
+            const cost = (task.cost || 0).toFixed(2);
+            const escape = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
+            return [escape(task.employee_name), escape(task.mo_reference), escape(task.description), escape(startTimePST), hours, task.manual ? 'manual' : 'auto', cost].join(',');
+        });
+
+        const csv = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `labour_report${filters.start ? `_${filters.start}` : ''}${filters.end ? `_to_${filters.end}` : ''}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     if (isLoading) return <div className="loading-screen">{t('reports.loading')}</div>;
 
     const filteredList = getFilteredTasks();
@@ -175,7 +230,7 @@ export const ReportsPage: React.FC = () => {
                     <p className="page-subtitle">{t('reports.subtitle')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <button className="btn btn-primary" style={{ width: 'auto' }}>
+                    <button className="btn btn-primary" style={{ width: 'auto' }} onClick={handleExportCSV}>
                         <i className="fa-solid fa-file-export"></i> {t('reports.exportCsv')}
                     </button>
                 </div>
@@ -322,7 +377,11 @@ export const ReportsPage: React.FC = () => {
                                     <td style={{ padding: '1rem', color: 'var(--primary)', fontWeight: 600 }}>{task.mo_reference}</td>
                                     <td style={{ padding: '1rem', color: 'var(--text-main)' }}>{task.description}</td>
                                     <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>
-                                        {task.start_time ? task.start_time.substring(0, 16).replace('T', ', ') : 'N/A'}
+                                        {task.start_time ? new Date(task.start_time).toLocaleString('en-US', {
+                                            timeZone: 'America/Los_Angeles',
+                                            month: '2-digit', day: '2-digit', year: 'numeric',
+                                            hour: '2-digit', minute: '2-digit', hour12: false
+                                        }) + ' PST' : 'N/A'}
                                     </td>
                                     <td style={{ padding: '1rem', color: 'var(--text-main)' }}>
                                         {Math.floor((task.active_seconds || 0) / 3600)}h {Math.floor(((task.active_seconds || 0) % 3600) / 60)}m
