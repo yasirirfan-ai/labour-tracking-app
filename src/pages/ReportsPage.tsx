@@ -192,8 +192,11 @@ export const ReportsPage: React.FC = () => {
         const headers = ['Worker', 'Manufacturing Order', 'Operation', 'Start Time (PST)', 'Duration (h)', 'Type', 'Cost ($)'];
 
         const rows = data.map(task => {
-            const startTimePST = task.start_time
-                ? new Date(task.start_time).toLocaleString('en-US', {
+            // Use created_at (Clock In) first — this is what the user entered.
+            // Fall back to start_time for auto entries or Tab 2 manual entries.
+            const displayDate = task.created_at || task.start_time;
+            const startTimePST = displayDate
+                ? new Date(displayDate).toLocaleString('en-US', {
                     timeZone: 'America/Los_Angeles',
                     month: '2-digit', day: '2-digit', year: 'numeric',
                     hour: '2-digit', minute: '2-digit', hour12: false
@@ -377,7 +380,7 @@ export const ReportsPage: React.FC = () => {
                                     <td style={{ padding: '1rem', color: 'var(--primary)', fontWeight: 600 }}>{task.mo_reference}</td>
                                     <td style={{ padding: '1rem', color: 'var(--text-main)' }}>{task.description}</td>
                                     <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>
-                                        {task.start_time ? new Date(task.start_time).toLocaleString('en-US', {
+                                        {(task.created_at || task.start_time) ? new Date(task.created_at || task.start_time).toLocaleString('en-US', {
                                             timeZone: 'America/Los_Angeles',
                                             month: '2-digit', day: '2-digit', year: 'numeric',
                                             hour: '2-digit', minute: '2-digit', hour12: false
