@@ -294,11 +294,7 @@ export const ControlTablePage: React.FC = () => {
                 now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
                 return now.toISOString().slice(0, 16);
             })(),
-            start_time: (() => {
-                const now = new Date();
-                now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-                return now.toISOString().slice(0, 16);
-            })(),
+            start_time: '', // intentionally blank — Tab 1 copies created_at on save
             end_time: '',
             last_action_time: '',
             status: 'pending',
@@ -328,22 +324,29 @@ export const ControlTablePage: React.FC = () => {
             return;
         }
 
-        // Calculate active_seconds logic:
-        // Prioritize actual time difference if start and end are provided
-        // Otherwise fallback to manual duration inputs
+        // For Tab 1, start_time is not shown — use created_at (clock-in) so the entry
+        // is dated correctly in both the Control Table and Reports filters.
+        const effectiveStartTime = createForm.start_time || createForm.created_at;
+
+        // Calculate duration: prefer actual clock difference, fall back to manual hours/min
         let totalSeconds = 0;
-        if (createForm.start_time && createForm.end_time) {
-            const start = new Date(createForm.start_time).getTime();
+        if (effectiveStartTime && createForm.end_time) {
+            const start = new Date(effectiveStartTime).getTime();
             const end = new Date(createForm.end_time).getTime();
             if (!isNaN(start) && !isNaN(end) && end >= start) {
                 totalSeconds = Math.floor((end - start) / 1000);
             } else {
-                // Fallback
                 totalSeconds = (parseInt(String(createForm.active_hours)) * 3600) + (parseInt(String(createForm.active_minutes)) * 60);
             }
         } else {
             totalSeconds = (parseInt(String(createForm.active_hours)) * 3600) + (parseInt(String(createForm.active_minutes)) * 60);
         }
+
+        // For Tab 2 (Start/Last Action), created_at defaults to "now" (form open time).
+        // Override it with start_time so Clock In column and date filters show the correct work date.
+        const effectiveCreatedAt = createTab === 'startLastAction' && createForm.start_time
+            ? createForm.start_time
+            : (createForm.created_at || new Date().toISOString());
 
         const newTask: any = {
             assigned_to_id: createForm.worker_id,
@@ -351,8 +354,8 @@ export const ControlTablePage: React.FC = () => {
             description: createForm.description,
             status: createForm.status,
             active_seconds: totalSeconds,
-            created_at: createForm.created_at ? new Date(createForm.created_at).toISOString() : new Date().toISOString(),
-            start_time: createForm.start_time ? new Date(createForm.start_time).toISOString() : null,
+            created_at: new Date(effectiveCreatedAt).toISOString(),
+            start_time: effectiveStartTime ? new Date(effectiveStartTime).toISOString() : null,
             last_action_time: createForm.last_action_time ? new Date(createForm.last_action_time).toISOString() : null,
             hourly_rate: createForm.hourly_rate,
             break_seconds: 0,
@@ -361,12 +364,11 @@ export const ControlTablePage: React.FC = () => {
 
         if (createForm.end_time) {
             newTask.end_time = new Date(createForm.end_time).toISOString();
-            // If last action time wasn't manually set, sync it with end time
             if (!createForm.last_action_time) {
                 newTask.last_action_time = newTask.end_time;
             }
-            newTask.status = 'completed'; // Force completed status if end time is present
-        } else if (createForm.start_time && !createForm.last_action_time) {
+            newTask.status = 'completed';
+        } else if (effectiveStartTime && !createForm.last_action_time) {
             newTask.last_action_time = newTask.start_time;
         }
 
@@ -378,6 +380,17 @@ export const ControlTablePage: React.FC = () => {
         } catch (e: any) {
             alert(t('table.errorCreating') + ': ' + e.message);
         }
+    };
+
+    // Returns the UTC Date corresponding to midnight (start) or 23:59:59.999 (end)
+    // of a YYYY-MM-DD date in America/Los_Angeles (PST/PDT), handles DST automatically.
+    const getPSTBound = (dateStr: string, endOfDay: boolean): Date => {
+        const timeStr = endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
+        const utcDate = new Date(dateStr + timeStr);
+        const utcStr = utcDate.toLocaleString('en-US', { timeZone: 'UTC' });
+        const laStr = utcDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+        const offsetMs = new Date(utcStr).getTime() - new Date(laStr).getTime();
+        return new Date(utcDate.getTime() + offsetMs);
     };
 
     const filteredTasks = tasks.filter(t => {
@@ -395,20 +408,17 @@ export const ControlTablePage: React.FC = () => {
             (statusFilter === 'pending' && t.status === 'pending');
 
         let matchesDate = true;
-        if (startDate) {
-            const taskDate = new Date(t.created_at || t.start_time);
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0);
-            if (taskDate < start) matchesDate = false;
-        }
-        if (endDate) {
-            const taskDate = new Date(t.created_at || t.start_time);
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            if (taskDate > end) matchesDate = false;
-        }
+        // Filter by created_at (Clock In) — this is the date shown in the Clock In column.
+        // After Tab 2 fix, created_at = start_time for all manual entries, so this is always correct.
+        const taskDate = new Date(t.created_at || t.start_time);
+        if (startDate && taskDate < getPSTBound(startDate, false)) matchesDate = false;
+        if (endDate && taskDate > getPSTBound(endDate, true)) matchesDate = false;
 
         return matchesSearch && matchesWorker && matchesStatus && matchesDate;
+    }).sort((a, b) => {
+        const dateA = a.created_at || a.start_time || '';
+        const dateB = b.created_at || b.start_time || '';
+        return dateB.localeCompare(dateA); // newest first
     });
 
     // if (isLoading) return <div className="loading-screen">Loading Table...</div>;
@@ -418,41 +428,36 @@ export const ControlTablePage: React.FC = () => {
 
     const applyDateFilter = (filterType: string) => {
         const now = new Date();
+        // Always derive the current date in PST so chips like "Today" are correct
+        // regardless of what UTC says (e.g. PST midnight = UTC 08:00 the same day).
+        const pstDateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }); // "YYYY-MM-DD"
+        const [year, month, day] = pstDateStr.split('-').map(Number);
+        const pstToDateStr = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
         let start = '';
         let end = '';
 
-        if (filterType === 'All') {
-            start = '';
-            end = '';
-        } else if (filterType === 'Today') {
-            start = now.toISOString().split('T')[0];
-            end = now.toISOString().split('T')[0];
+        if (filterType === 'Today') {
+            start = end = pstDateStr;
         } else if (filterType === 'This Week') {
-            const first = now.getDate() - now.getDay();
-            const last = first + 6;
-            const firstDay = new Date(now.setDate(first));
-            const lastDay = new Date(now.setDate(last));
-            start = firstDay.toISOString().split('T')[0];
-            end = lastDay.toISOString().split('T')[0];
+            const dowStr = now.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short' });
+            const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dowStr);
+            start = pstToDateStr(new Date(year, month - 1, day - dow));
+            end = pstToDateStr(new Date(year, month - 1, day - dow + 6));
         } else if (filterType === 'Last Week') {
-            const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            const first = lastWeek.getDate() - lastWeek.getDay();
-            const last = first + 6;
-            const firstDay = new Date(lastWeek.setDate(first));
-            const lastDay = new Date(lastWeek.setDate(last));
-            start = firstDay.toISOString().split('T')[0];
-            end = lastDay.toISOString().split('T')[0];
+            const dowStr = now.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short' });
+            const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dowStr);
+            start = pstToDateStr(new Date(year, month - 1, day - dow - 7));
+            end = pstToDateStr(new Date(year, month - 1, day - dow - 1));
         } else if (filterType === 'This Month') {
-            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            start = firstDay.toISOString().split('T')[0];
-            end = lastDay.toISOString().split('T')[0];
+            start = `${year}-${String(month).padStart(2, '0')}-01`;
+            end = pstToDateStr(new Date(year, month, 0)); // last day of current month
         } else if (filterType === 'Last Month') {
-            const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-            start = firstDay.toISOString().split('T')[0];
-            end = lastDay.toISOString().split('T')[0];
+            const lm = month === 1 ? 12 : month - 1;
+            const ly = month === 1 ? year - 1 : year;
+            start = `${ly}-${String(lm).padStart(2, '0')}-01`;
+            end = pstToDateStr(new Date(ly, lm, 0)); // last day of last month
         }
+        // 'All' leaves start/end as ''
 
         setStartDate(start);
         setEndDate(end);

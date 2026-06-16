@@ -132,25 +132,53 @@ export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, 
                             >
                                 {t('common.details').toUpperCase()}
                             </button>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onDelete(employee.id, employee.active); }}
-                                style={{
-                                    background: '#FEF2F2',
-                                    border: 'none',
-                                    width: '48px',
-                                    borderRadius: '16px',
-                                    color: '#EF4444',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.background = '#FEE2E2'}
-                                onMouseOut={(e) => e.currentTarget.style.background = '#FEF2F2'}
-                            >
-                                <i className="fa-solid fa-trash-can"></i>
-                            </button>
+
+                            {employee.active === false ? (
+                                /* Unarchive button — shown only for archived workers */
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onDelete(employee.id, employee.active); }}
+                                    style={{
+                                        background: '#ECFDF5',
+                                        border: 'none',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '16px',
+                                        color: '#059669',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 800,
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.background = '#D1FAE5'}
+                                    onMouseOut={(e) => e.currentTarget.style.background = '#ECFDF5'}
+                                >
+                                    <i className="fa-solid fa-rotate-left"></i> UNARCHIVE
+                                </button>
+                            ) : (
+                                /* Archive button — shown only for active workers */
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onDelete(employee.id, employee.active); }}
+                                    style={{
+                                        background: '#FEF2F2',
+                                        border: 'none',
+                                        width: '48px',
+                                        borderRadius: '16px',
+                                        color: '#EF4444',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.background = '#FEE2E2'}
+                                    onMouseOut={(e) => e.currentTarget.style.background = '#FEF2F2'}
+                                >
+                                    <i className="fa-solid fa-trash-can"></i>
+                                </button>
+                            )}
                         </div>
                     </div>
                 );
