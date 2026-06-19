@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { sortManufacturingOrders } from '../utils/moSorting';
-
+import { useAuth } from '../context/AuthContext';
+import { logActivity } from '../lib/activityLogger';
 import { useTranslation } from 'react-i18next';
 
 export const ControlTablePage: React.FC = () => {
     const { t } = useTranslation();
+    const { user: currentUser } = useAuth();
     const [tasks, setTasks] = useState<any[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
     const [mos, setMos] = useState<any[]>([]);
     const [operations, setOperations] = useState<any[]>([]);
+    const [activityLogs, setActivityLogs] = useState<any[]>([]);
     // isLoading removed as unused
 
     // Filters
@@ -130,6 +133,7 @@ export const ControlTablePage: React.FC = () => {
             const { data: empData } = await supabase.from('users').select('*').eq('role', 'employee') as { data: any[] };
             const { data: moData } = await supabase.from('manufacturing_orders').select('*').order('created_at', { ascending: false });
             const { data: opData } = await supabase.from('operations').select('*').order('sort_order', { ascending: true });
+            const { data: logsData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false });
 
             if (taskData && empData) {
                 const richTasks = taskData.map((t: any) => {
@@ -144,6 +148,10 @@ export const ControlTablePage: React.FC = () => {
                 setMos(sortedMos);
             }
             if (opData) setOperations(opData.map((o: any) => o.name));
+
+            if (logsData) {
+                setActivityLogs(logsData);
+            }
 
         } catch (err) {
             console.error('Error fetching table data:', err);
@@ -240,6 +248,7 @@ export const ControlTablePage: React.FC = () => {
         }
 
         // Prepare updates
+        const auditName = currentUser?.username === 'admin@gmail.com' ? 'System Admin' : (currentUser?.name || currentUser?.username || 'Manager');
         const updates: any = {
             status: editForm.status,
             active_seconds: totalSeconds,
@@ -247,6 +256,7 @@ export const ControlTablePage: React.FC = () => {
             start_time: editForm.start_time ? new Date(editForm.start_time).toISOString() : null,
             last_action_time: editForm.last_action_time ? new Date(editForm.last_action_time).toISOString() : editingTask.last_action_time,
             hourly_rate: editForm.hourly_rate,
+            reason: `Updated by ${auditName}` // Use existing reason field
         };
 
         // If end_time is provided, force status to completed so it saves correctly
@@ -264,6 +274,21 @@ export const ControlTablePage: React.FC = () => {
         try {
             const { error } = await (supabase.from('tasks') as any).update(updates).eq('id', editingTask.id);
             if (error) throw error;
+
+            // Audit Log
+            if (currentUser) {
+                const auditName = currentUser.username === 'admin@gmail.com' ? 'System Admin' : (currentUser.name || currentUser.username || 'Manager');
+                await logActivity(
+                    editingTask.assigned_to_id,
+                    'task_start', // or appropriate event type
+                    `Manual update by ${auditName}`, // Embed name directly in description
+                    `Status: ${updates.status}, Task ID: ${editingTask.id}`,
+                    editingTask.id,
+                    currentUser.id,
+                    auditName
+                );
+            }
+
             setIsEditOpen(false);
             fetchData();
         } catch (e: any) {
@@ -348,6 +373,7 @@ export const ControlTablePage: React.FC = () => {
             ? createForm.start_time
             : (createForm.created_at || new Date().toISOString());
 
+        const auditName = currentUser?.username === 'admin@gmail.com' ? 'System Admin' : (currentUser?.name || currentUser?.username || 'Manager');
         const newTask: any = {
             assigned_to_id: createForm.worker_id,
             mo_reference: createForm.mo_reference,
@@ -359,7 +385,8 @@ export const ControlTablePage: React.FC = () => {
             last_action_time: createForm.last_action_time ? new Date(createForm.last_action_time).toISOString() : null,
             hourly_rate: createForm.hourly_rate,
             break_seconds: 0,
-            manual: true
+            manual: true,
+            reason: `Created by ${auditName}`
         };
 
         if (createForm.end_time) {
@@ -373,8 +400,23 @@ export const ControlTablePage: React.FC = () => {
         }
 
         try {
-            const { error } = await (supabase.from('tasks') as any).insert(newTask);
+            const { data: createdTask, error } = await (supabase.from('tasks') as any).insert(newTask).select().single();
             if (error) throw error;
+
+            // Audit Log
+            if (currentUser && createdTask) {
+                const auditName = currentUser.username === 'admin@gmail.com' ? 'System Admin' : (currentUser.name || currentUser.username || 'Manager');
+                await logActivity(
+                    newTask.assigned_to_id,
+                    'clock_in',
+                    `Manual entry by ${auditName}`, // Embed name directly in description
+                    `MO: ${newTask.mo_reference}, Task ID: ${createdTask.id}`,
+                    createdTask.id,
+                    currentUser.id,
+                    auditName
+                );
+            }
+
             setIsCreateOpen(false);
             fetchData();
         } catch (e: any) {
@@ -577,6 +619,7 @@ export const ControlTablePage: React.FC = () => {
                             <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.lastAction')}</th>
                             <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.duration')}</th>
                             <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.status')}</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Audit Record</th>
                             <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>{t('table.columns.edit')}</th>
                         </tr>
                     </thead>
@@ -616,6 +659,41 @@ export const ControlTablePage: React.FC = () => {
                                     </div>
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem' }}>{getStatusLabel(task.status)}</td>
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#64748B' }}>
+                                    {(() => {
+                                        // 1. Check Task.reason (Most reliable direct audit)
+                                        if (task.reason && task.reason.includes('by ')) {
+                                            const name = task.reason.split('by ')[1];
+                                            const type = (task.reason.toLowerCase().includes('create') || task.manual) ? 'Manual Creation' : 'Manual Update';
+                                            return (
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <span style={{ fontWeight: 600, color: 'var(--primary)' }}>By: {name}</span>
+                                                    <span style={{ fontSize: '0.7rem' }}>{type}</span>
+                                                </div>
+                                            );
+                                        }
+
+                                        // 2. Fallback to Activity Logs extraction
+                                        const logs = activityLogs.filter(l => l.related_task_id === task.id);
+                                        const log = logs[0];
+
+                                        if (log) {
+                                            const description = log.description || '';
+                                            const hasManager = description.includes('by ');
+                                            const name = hasManager ? description.split('by ')[1] : (log.performed_by_name || 'Manager');
+
+                                            if (name) {
+                                                return (
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <span style={{ fontWeight: 600, color: 'var(--primary)' }}>By: {name}</span>
+                                                        <span style={{ fontSize: '0.7rem' }}>{description}</span>
+                                                    </div>
+                                                );
+                                            }
+                                        }
+                                        return <span style={{ fontStyle: 'italic', color: '#94A3B8' }}>Worker action</span>;
+                                    })()}
+                                </td>
                                 <td style={{ padding: '0.75rem 1rem', textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                                     <button
                                         onClick={() => handleEditClick(task)}

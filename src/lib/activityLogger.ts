@@ -6,7 +6,9 @@ export const logActivity = async (
     eventType: ActivityLog['event_type'],
     description: string,
     details?: string,
-    taskId?: string
+    taskId?: string,
+    performedBy?: string,
+    performedByName?: string
 ) => {
     try {
         const { error } = await (supabase.from('activity_logs') as any).insert({
@@ -15,7 +17,9 @@ export const logActivity = async (
             description,
             details,
             related_task_id: taskId,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            performed_by: performedBy,
+            performed_by_name: performedByName
         });
         if (error) throw error;
     } catch (err) {

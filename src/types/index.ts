@@ -163,6 +163,8 @@ export interface ActivityLog {
     description: string;
     details?: string;
     timestamp: string;
+    performed_by?: string; // User ID
+    performed_by_name?: string; // Display name
 }
 
 export interface Task {
@@ -181,6 +183,7 @@ export interface Task {
     created_at: string;
     manual: boolean;
     reason?: string;
+    audit_log?: string; // Format: "Action by Name at Timestamp"
 }
 
 export interface ManufacturingOrder {
