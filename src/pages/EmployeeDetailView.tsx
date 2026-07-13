@@ -49,6 +49,8 @@ export const EmployeeDetailView: React.FC = () => {
     const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
     const [isCalculateModalOpen, setIsCalculateModalOpen] = useState(false);
     const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+    const [isResetPinModalOpen, setIsResetPinModalOpen] = useState(false);
+    const [showPin, setShowPin] = useState(false);
     const [adjustmentType, setAdjustmentType] = useState<'pto' | 'sick'>('pto');
     const [calculateAsOfDate, setCalculateAsOfDate] = useState(new Date().toISOString().split('T')[0]);
     const [adjustmentForm, setAdjustmentForm] = useState({ amount: 0, direction: 'add' as 'add' | 'deduct', description: '', effectiveDate: new Date().toISOString().split('T')[0] });
@@ -1174,6 +1176,35 @@ export const EmployeeDetailView: React.FC = () => {
                                 </div>
                             )}
 
+                            {isResetPinModalOpen && (
+                                <div className="modal-overlay" onClick={() => setIsResetPinModalOpen(false)}>
+                                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                                        <div className="modal-header">
+                                            <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <i className="fa-solid fa-key" style={{ color: '#eab308' }}></i> {t('employeeDetail.personal.resetPin', 'Reset PIN')}
+                                            </h2>
+                                            <button className="close-modal" onClick={() => setIsResetPinModalOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                                        </div>
+                                        <div className="modal-body" style={{ padding: '20px', color: '#334155' }}>
+                                            <p>Are you sure you want to reset this worker's PIN? A new 4-digit PIN will be randomly generated.</p>
+                                        </div>
+                                        <div className="modal-footer">
+                                            <button className="modal-cancel-btn" onClick={() => setIsResetPinModalOpen(false)}>{t('common.cancel', 'Cancel')}</button>
+                                            <button className="modal-save-btn" onClick={() => {
+                                                const newPin = Math.floor(1000 + Math.random() * 9000).toString();
+                                                setEmployee(prev => prev ? { ...prev, pin: newPin } : null);
+                                                setToast({ message: 'New PIN generated: ' + newPin + '. Remember to save changes.', type: 'success' });
+                                                setTimeout(() => setToast(null), 5000);
+                                                setIsResetPinModalOpen(false);
+                                                setShowPin(true);
+                                            }} style={{ backgroundColor: '#eab308' }}>
+                                                {t('common.confirm', 'Confirm')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Basic Information */}
                             <div className="info-card">
                                 <div className="card-header">
@@ -1336,6 +1367,48 @@ export const EmployeeDetailView: React.FC = () => {
                                     <div className="info-field full-width">
                                         <label>{t('common.facebook', 'Facebook')}</label>
                                         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}><i className="fa-solid fa-facebook" style={{ color: "#94a3b8" }}></i><input type="text" className="info-input" style={{ flex: 1 }} value={employee.facebook_url || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, facebook_url: e.target.value } : null)} /></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Security & Access */}
+                            <div className="info-card">
+                                <div className="card-header">
+                                    <i className="fa-solid fa-lock"></i>
+                                    <h3>{t('employeeDetail.personal.security', 'Security & Access')}</h3>
+                                </div>
+                                <div className="card-grid">
+                                    <div className="info-field full-width">
+                                        <label>{t('employeeDetail.personal.pin', 'Worker PIN')}</label>
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                                            <div style={{ position: 'relative', flex: 1 }}>
+                                                <input 
+                                                    type={showPin ? "text" : "password"} 
+                                                    className="info-input" 
+                                                    readOnly 
+                                                    value={employee.pin || ''} 
+                                                    placeholder="No PIN Set"
+                                                    style={{ width: '100%', backgroundColor: '#f1f5f9', color: '#64748b', paddingRight: '40px' }} 
+                                                />
+                                                {employee.pin && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowPin(!showPin)}
+                                                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '0.25rem' }}
+                                                        title={showPin ? 'Hide PIN' : 'Show PIN'}
+                                                    >
+                                                        <i className={`fa-solid ${showPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <button 
+                                                className="modal-save-btn" 
+                                                onClick={() => setIsResetPinModalOpen(true)}
+                                                style={{ whiteSpace: 'nowrap', backgroundColor: '#eab308' }}
+                                            >
+                                                <i className="fa-solid fa-key"></i> {t('employeeDetail.personal.resetPin', 'Reset PIN')}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
