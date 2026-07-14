@@ -124,7 +124,7 @@ export const FuturePlanningPage: React.FC = () => {
         return emp ? emp.name : 'Unknown Employee';
     };
 
-    if (isLoading) return <div className="loading-screen">Loading Future Planning...</div>;
+    if (isLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>Loading Future Planning...</span></div>;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', paddingBottom: '100px' }}>

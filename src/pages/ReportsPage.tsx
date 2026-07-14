@@ -220,7 +220,7 @@ export const ReportsPage: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
-    if (isLoading) return <div className="loading-screen">{t('reports.loading')}</div>;
+    if (isLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>{t('reports.loading')}</span></div>;
 
     const filteredList = getFilteredTasks();
     const currentStats = calculateStats(filteredList);

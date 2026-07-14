@@ -140,7 +140,7 @@ export const EmployeeDetailView: React.FC = () => {
         }
     }, [employee?.first_name, employee?.last_name]);
 
-    if (loading) return <div className="loading-screen">{t('common.loading')}</div>;
+    if (loading) return <div className="loading-screen"><div className="loading-spinner"></div><span>{t('common.loading')}</span></div>;
     if (!employee || !initialEmployee) return <div>{t('common.notFound')}</div>;
 
     const isDirty = JSON.stringify(employee) !== JSON.stringify(initialEmployee);

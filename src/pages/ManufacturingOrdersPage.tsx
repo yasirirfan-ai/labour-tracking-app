@@ -212,7 +212,7 @@ export const ManufacturingOrdersPage: React.FC = () => {
             o.sku?.toLowerCase().includes(term));
     });
 
-    if (isLoading) return <div className="loading-screen">{t('mo.loading')}</div>;
+    if (isLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>{t('mo.loading')}</span></div>;
 
     return (
         <>

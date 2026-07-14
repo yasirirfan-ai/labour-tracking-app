@@ -185,7 +185,7 @@ export const EmployeeActivityPage: React.FC = () => {
         };
     };
 
-    if (isLoading) return <div className="loading-screen">Loading Activity...</div>;
+    if (isLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>Loading Activity...</span></div>;
 
     return (
         <div style={{ paddingBottom: '200px' }}>

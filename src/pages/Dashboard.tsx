@@ -62,7 +62,7 @@ export const Dashboard: React.FC = () => {
         }
     };
 
-    if (isLoading) return <div className="loading-screen">{t('common.loading')}</div>;
+    if (isLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>{t('common.loading')}</span></div>;
 
     const getActiveCountForMo = (moRef: string) => {
         return tasks.filter(t => t.mo_reference === moRef && t.status === 'active').length;

@@ -91,7 +91,7 @@ export const WorkersPage: React.FC = () => {
         navigate(`/workers/${employee.id}`);
     };
 
-    if (isLoading) return <div className="loading-screen">{t('common.loading')}</div>;
+    if (isLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>{t('common.loading')}</span></div>;
 
     return (
         <div className="workers-page">

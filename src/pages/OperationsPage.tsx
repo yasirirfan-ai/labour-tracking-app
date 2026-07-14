@@ -49,7 +49,7 @@ export const OperationsPage: React.FC = () => {
         setIsEditOpen(true);
     };
 
-    if (isLoading) return <div className="loading-screen">{t('operations.loading')}</div>;
+    if (isLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>{t('operations.loading')}</span></div>;
 
     return (
         <>

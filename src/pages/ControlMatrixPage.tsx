@@ -221,7 +221,7 @@ export const ControlMatrixPage: React.FC = () => {
         );
     };
 
-    if (isLoading) return <div className="loading-screen">{t('common.loading')}</div>;
+    if (isLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>{t('common.loading')}</span></div>;
 
     const selectedWorker = employees.find(e => e.id === selectedWorkerId);
 

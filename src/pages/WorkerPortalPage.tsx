@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
-import { completeAllTasks, pauseAllActiveTasks } from '../lib/taskService';
+import { completeAllTasks, pauseAllActiveTasks, performTaskAction } from '../lib/taskService';
 import { Navigate } from 'react-router-dom';
 import { trainingService } from '../lib/trainingService';
 import type { TrainingMaterial } from '../lib/trainingService';
@@ -277,7 +277,7 @@ export const WorkerPortalPage: React.FC = () => {
             }
         }));
     };
-    const [notification, setNotification] = useState<{ show: boolean, message: string, severity: string } | null>(null);
+    const [notification, setNotification] = useState<{ show: boolean, message: string, severity: string, title?: string } | null>(null);
     const [myLeaveRequests, setMyLeaveRequests] = useState<any[]>([]);
     const [editMode, setEditMode] = useState(false);
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -629,7 +629,7 @@ export const WorkerPortalPage: React.FC = () => {
         }
     };
 
-    if (authLoading) return <div className="loading-screen">{t('common.authenticating')}</div>;
+    if (authLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>{t('common.authenticating')}</span></div>;
     if (!user) return <Navigate to="/login" replace />;
 
     if (pendingPolicies.length > 0) {
@@ -758,6 +758,78 @@ export const WorkerPortalPage: React.FC = () => {
         } catch (err) {
             console.error(err);
             alert('Failed to end break');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleTaskAction = async (task: any, action: 'start' | 'pause' | 'resume' | 'complete') => {
+        if (!user) return;
+
+        if (action === 'start' || action === 'resume') {
+            // Check 1: Scheduled Date check
+            const match = task.reason?.match(/Scheduled Date:\s*([^\s|]+)/);
+            const scheduledDate = match ? match[1] : null;
+            if (scheduledDate) {
+                const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+                if (scheduledDate !== todayStr) {
+                    setNotification({
+                        show: true,
+                        message: `You cannot start this task today. It is scheduled for ${scheduledDate}.`,
+                        severity: 'warning'
+                    });
+                    setTimeout(() => setNotification(null), 6000);
+                    return;
+                }
+            }
+
+            // Check 2: Clock-in check
+            if (!isClockedIn) {
+                setNotification({
+                    show: true,
+                    message: 'Please clock in first to start this task.',
+                    severity: 'warning'
+                });
+                setTimeout(() => setNotification(null), 6000);
+                return;
+            }
+
+            // If clocked in but on break, automatically resume from break
+            if (localUser?.availability === 'break') {
+                setLoading(true);
+                try {
+                    await updateUserStatus(user.id, 'present', 'available');
+                    await logActivity(user.id, 'break_end', 'Worker ended break automatically by starting task');
+                    await fetchUserStatus();
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        }
+
+        setLoading(true);
+        try {
+            const success = await performTaskAction(task, action);
+            if (success) {
+                await fetchActiveTasks();
+            } else {
+                setNotification({
+                    show: true,
+                    message: 'Failed to update task. Please try again.',
+                    severity: 'error'
+                });
+                setTimeout(() => setNotification(null), 5000);
+            }
+        } catch (err) {
+            console.error(err);
+            setNotification({
+                show: true,
+                message: 'Failed to perform task action.',
+                severity: 'error'
+            });
+            setTimeout(() => setNotification(null), 5000);
         } finally {
             setLoading(false);
         }
@@ -1366,7 +1438,7 @@ export const WorkerPortalPage: React.FC = () => {
                     </div>
                     <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
-                            {notification.severity === 'success' ? t('common.success') : t('common.attentionRequired')}
+                            {notification.title || (notification.severity === 'success' ? t('common.success') : t('common.attentionRequired'))}
                         </div>
                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>{notification.message}</div>
                     </div>
@@ -1640,6 +1712,95 @@ export const WorkerPortalPage: React.FC = () => {
                                                                 {notes}
                                                             </div>
                                                         )}
+                                                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+                                                            {task.status === 'pending' && (
+                                                                <button
+                                                                    onClick={() => handleTaskAction(task, 'start')}
+                                                                    style={{
+                                                                        flex: 1,
+                                                                        padding: '0.6rem 1rem',
+                                                                        borderRadius: '12px',
+                                                                        border: 'none',
+                                                                        background: 'var(--primary)',
+                                                                        color: 'white',
+                                                                        fontWeight: 800,
+                                                                        fontSize: '0.85rem',
+                                                                        cursor: 'pointer',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        gap: '0.5rem'
+                                                                    }}
+                                                                >
+                                                                    <i className="fa-solid fa-play"></i> Start Task
+                                                                </button>
+                                                            )}
+                                                            {(task.status === 'active' || task.status === 'clocked_in') && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleTaskAction(task, 'complete')}
+                                                                        style={{
+                                                                            flex: 1,
+                                                                            padding: '0.6rem 1rem',
+                                                                            borderRadius: '12px',
+                                                                            border: 'none',
+                                                                            background: 'var(--success)',
+                                                                            color: 'white',
+                                                                            fontWeight: 800,
+                                                                            fontSize: '0.85rem',
+                                                                            cursor: 'pointer',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            gap: '0.5rem'
+                                                                        }}
+                                                                    >
+                                                                        <i className="fa-solid fa-check"></i> Complete
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleTaskAction(task, 'pause')}
+                                                                        style={{
+                                                                            padding: '0.6rem 1.25rem',
+                                                                            borderRadius: '12px',
+                                                                            border: '1.5px solid var(--border)',
+                                                                            background: 'var(--bg-main)',
+                                                                            color: 'var(--text-main)',
+                                                                            fontWeight: 800,
+                                                                            fontSize: '0.85rem',
+                                                                            cursor: 'pointer',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            gap: '0.5rem'
+                                                                        }}
+                                                                    >
+                                                                        <i className="fa-solid fa-pause"></i> Pause
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            {(task.status === 'paused' || task.status === 'break') && (
+                                                                <button
+                                                                    onClick={() => handleTaskAction(task, 'resume')}
+                                                                    style={{
+                                                                        flex: 1,
+                                                                        padding: '0.6rem 1rem',
+                                                                        borderRadius: '12px',
+                                                                        border: 'none',
+                                                                        background: 'var(--primary)',
+                                                                        color: 'white',
+                                                                        fontWeight: 800,
+                                                                        fontSize: '0.85rem',
+                                                                        cursor: 'pointer',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        gap: '0.5rem'
+                                                                    }}
+                                                                >
+                                                                    <i className="fa-solid fa-play"></i> Resume Task
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </li>
                                                 );
                                             })}

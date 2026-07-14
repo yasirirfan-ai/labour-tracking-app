@@ -136,7 +136,8 @@ export const ControlTablePage: React.FC = () => {
             const { data: logsData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false });
 
             if (taskData && empData) {
-                const richTasks = taskData.map((t: any) => {
+                const nonPendingTasks = taskData.filter((t: any) => t.status !== 'pending');
+                const richTasks = nonPendingTasks.map((t: any) => {
                     const emp = empData.find(e => e.id === t.assigned_to_id);
                     return { ...t, worker_name: emp?.name || 'Unknown', worker_id_str: emp?.worker_id || '-', worker_avatar: emp?.name?.[0] || '?' };
                 });
