@@ -24,6 +24,7 @@ export const ControlMatrixPage: React.FC = () => {
     const [isPauseModalOpen, setIsPauseModalOpen] = useState(false);
     const [pauseTaskId, setPauseTaskId] = useState<string | null>(null);
     const [pauseReason, setPauseReason] = useState('');
+    const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
     // const [pauseError, setPauseError] = useState('');
 
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -139,8 +140,11 @@ export const ControlMatrixPage: React.FC = () => {
         }
     };
 
-    const deleteTask = async (taskId: string) => {
-        if (!confirm(t('matrix.removeAssignment'))) return;
+    const deleteTask = (taskId: string) => {
+        setDeletingTaskId(taskId);
+    };
+
+    const confirmDeleteTask = async (taskId: string) => {
         try {
             const { error } = await supabase.from('tasks').delete().eq('id', taskId);
             if (error) throw error;
@@ -175,8 +179,13 @@ export const ControlMatrixPage: React.FC = () => {
         const task = tasks.find(t => t.id === pauseTaskId);
         if (!task) return;
 
+        if (!pauseReason.trim()) {
+            alert('Reason is required to pause a task.');
+            return;
+        }
+
         // Manual pause via modal
-        await handleTaskAction(task, 'pause', pauseReason || t('matrix.manualPause'));
+        await handleTaskAction(task, 'pause', pauseReason.trim());
         setIsPauseModalOpen(false);
         setPauseTaskId(null);
     };
@@ -510,6 +519,7 @@ export const ControlMatrixPage: React.FC = () => {
                         value={pauseReason}
                         onChange={(e) => setPauseReason(e.target.value)}
                         placeholder={t('matrix.pauseReasonPlaceholder')}
+                        required
                         style={{
                             width: '100%',
                             padding: '0.75rem',
@@ -555,6 +565,38 @@ export const ControlMatrixPage: React.FC = () => {
                     </div>
                 </div>
             </div >
+
+            {deletingTaskId && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', zIndex: 10002, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'white', width: '100%', maxWidth: '400px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
+                        <div className="modal-header" style={{ background: 'var(--bg-card)', padding: '1.25rem 2rem', color: 'var(--text-main)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}><i className="fa-regular fa-trash-can" style={{ marginRight: '8px', color: '#ef4444' }}></i> Cancel Assignment</h3>
+                            <button className="close-modal" onClick={() => setDeletingTaskId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="modal-body" style={{ padding: '1.5rem', color: 'var(--text-main)' }}>
+                            <p style={{ margin: 0, lineHeight: '1.5' }}>{t('matrix.removeAssignment')}</p>
+                        </div>
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+                            <button 
+                                style={{ padding: '0.5rem 1.25rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', color: 'var(--text-main)', cursor: 'pointer' }}
+                                onClick={() => setDeletingTaskId(null)}
+                            >
+                                {t('table.modals.cancel')}
+                            </button>
+                            <button 
+                                style={{ padding: '0.5rem 1.25rem', borderRadius: '8px', border: 'none', background: '#ef4444', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+                                onClick={async () => {
+                                    const id = deletingTaskId;
+                                    setDeletingTaskId(null);
+                                    await confirmDeleteTask(id);
+                                }}
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

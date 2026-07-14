@@ -14,6 +14,8 @@ export const EmployeeActivityPage: React.FC = () => {
     // Clock Out Modal State
     const [showClockOutModal, setShowClockOutModal] = useState(false);
     const [clockOutWorkerId, setClockOutWorkerId] = useState<string | null>(null);
+    const [breakModalWorker, setBreakModalWorker] = useState<User | null>(null);
+    const [breakReasonText, setBreakReasonText] = useState('');
 
     useEffect(() => {
         fetchData();
@@ -239,7 +241,14 @@ export const EmployeeActivityPage: React.FC = () => {
                                     ) : (
                                         <>
                                             <button
-                                                onClick={() => toggleBreak(worker, isOnBreak ? 'Returned' : 'Lunch Break')} // Simplified reason for now
+                                                onClick={() => {
+                                                    if (isOnBreak) {
+                                                        toggleBreak(worker, 'Returned');
+                                                    } else {
+                                                        setBreakReasonText('');
+                                                        setBreakModalWorker(worker);
+                                                    }
+                                                }}
                                                 style={{
                                                     padding: '0.6rem 1.25rem', borderRadius: '8px', fontWeight: 600,
                                                     background: isOnBreak ? '#DCFCE7' : '#FEF3C7',
@@ -269,9 +278,9 @@ export const EmployeeActivityPage: React.FC = () => {
                                 <div style={{ padding: '0 1.5rem 1.5rem', borderTop: '1px solid #F1F5F9', animation: 'fadeIn 0.3s' }}>
                                     {/* Stats Row */}
                                     <div className="summary-grid">
-                                        <SummaryStat label="Shift Duration" value={`${(stats.shift_duration / 3600).toFixed(2)} hrs`} />
-                                        <SummaryStat label="Break Duration" value={`${(stats.break_duration / 3600).toFixed(2)} hrs`} />
-                                        <SummaryStat label="Task Activity" value={`${(stats.task_duration / 3600).toFixed(2)} hrs`} />
+                                        <SummaryStat label="Shift Duration" value={`${Math.floor(stats.shift_duration / 60)}m ${Math.round(stats.shift_duration % 60)}s`} />
+                                        <SummaryStat label="Break Duration" value={`${Math.floor(stats.break_duration / 60)}m ${Math.round(stats.break_duration % 60)}s`} />
+                                        <SummaryStat label="Task Activity" value={`${Math.floor(stats.task_duration / 60)}m ${Math.round(stats.task_duration % 60)}s`} />
                                         <SummaryStat label="Est. Earnings" value={`$${stats.earned.toFixed(2)}`} />
                                     </div>
 
@@ -338,6 +347,72 @@ export const EmployeeActivityPage: React.FC = () => {
                             </button>
                         </div>
                         <button onClick={() => setShowClockOutModal(false)} style={{ marginTop: '1rem', width: '100%', padding: '0.75rem', background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            {breakModalWorker && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', zIndex: 10002, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'white', width: '100%', maxWidth: '400px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
+                        <div className="modal-header" style={{ background: 'var(--bg-card)', padding: '1.25rem 2rem', color: 'var(--text-main)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}><i className="fa-solid fa-mug-hot" style={{ marginRight: '8px', color: 'var(--accent)' }}></i> Start Break</h3>
+                            <button className="close-modal" onClick={() => setBreakModalWorker(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="modal-body" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                <label style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.85rem' }}>Reason for Break <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                    {['Lunch Break', 'Restroom Break', 'Coffee Break', 'Short Rest', 'Personal Errand'].map(chip => (
+                                        <button
+                                            type="button"
+                                            key={chip}
+                                            onClick={() => setBreakReasonText(chip)}
+                                            style={{
+                                                padding: '0.4rem 0.8rem',
+                                                borderRadius: '20px',
+                                                border: '1px solid var(--border)',
+                                                background: breakReasonText === chip ? 'var(--primary)' : 'var(--bg-main)',
+                                                color: breakReasonText === chip ? 'white' : 'var(--text-main)',
+                                                fontSize: '0.8rem',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {chip}
+                                        </button>
+                                    ))}
+                                </div>
+                                <textarea
+                                    value={breakReasonText}
+                                    onChange={e => setBreakReasonText(e.target.value)}
+                                    placeholder="e.g. Lunch Break, Restroom Break, Coffee Break"
+                                    style={{ width: '100%', minHeight: '80px', resize: 'vertical', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.7rem', fontFamily: 'inherit', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+                            <button 
+                                style={{ padding: '0.5rem 1.25rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', color: 'var(--text-main)', cursor: 'pointer' }}
+                                onClick={() => setBreakModalWorker(null)}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                style={{ padding: '0.5rem 1.25rem', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+                                onClick={() => {
+                                    if (!breakReasonText.trim()) {
+                                        alert('Reason is required to start a break.');
+                                        return;
+                                    }
+                                    toggleBreak(breakModalWorker, breakReasonText.trim());
+                                    setBreakModalWorker(null);
+                                }}
+                            >
+                                Start Break
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

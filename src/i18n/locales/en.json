@@ -154,7 +154,7 @@
     "noWorkersClockedIn": "No workers clocked in",
     "pauseTask": "Pause Task",
     "pauseReasonPlaceholder": "e.g. Machine Maintenance",
-    "pauseMessage": "Enter a reason for pausing this task (optional).",
+    "pauseMessage": "Enter a reason for pausing this task (mandatory).",
     "confirmPause": "Confirm Pause",
     "alreadyAssigned": "Worker is already assigned to this operation!",
     "errorAssigning": "Error assigning worker",

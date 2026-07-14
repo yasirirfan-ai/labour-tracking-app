@@ -22,8 +22,13 @@ export const WorkerPortalPage: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [activeTasks, setActiveTasks] = useState<any[]>([]);
     const [disciplinaryIncidents, setDisciplinaryIncidents] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'personal_info' | 'conduct' | 'settings' | 'training' | 'timeoff'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'personal_info' | 'conduct' | 'settings' | 'training' | 'timeoff' | 'activity_logs'>('dashboard');
     const [leaveHistory, setLeaveHistory] = useState<any[]>([]);
+    const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
+    const [breakReason, setBreakReason] = useState('');
+    const [isClockOutModalOpen, setIsClockOutModalOpen] = useState(false);
+    const [myActivityLogs, setMyActivityLogs] = useState<any[]>([]);
+    const [activityLogsPage, setActivityLogsPage] = useState(1);
     const [requestHistoryPage, setRequestHistoryPage] = useState(1);
     const [ledgerPage, setLedgerPage] = useState(1);
     const [historyTypeFilter, setHistoryTypeFilter] = useState<'all' | 'pto' | 'sick'>('all');
@@ -132,6 +137,23 @@ export const WorkerPortalPage: React.FC = () => {
         if (error) { console.error('Error fetching leave requests:', error); return; }
         if (data) setMyLeaveRequests(data);
     };
+
+    const fetchMyActivityLogs = async () => {
+        if (!user) return;
+        const { data, error } = await supabase
+            .from('activity_logs')
+            .select('*')
+            .eq('worker_id', user.id)
+            .order('timestamp', { ascending: false });
+        if (error) { console.error('Error fetching activity logs:', error); return; }
+        if (data) setMyActivityLogs(data);
+    };
+
+    useEffect(() => {
+        if (user?.id && activeTab === 'activity_logs') {
+            fetchMyActivityLogs();
+        }
+    }, [user?.id, activeTab]);
 
     useEffect(() => {
         let interval: any;
@@ -682,9 +704,11 @@ export const WorkerPortalPage: React.FC = () => {
     };
 
     const handleClockOut = async () => {
-        if (!user) return;
-        if (!window.confirm("Are you sure you want to clock out? All active tasks will be marked as completed.")) return;
+        setIsClockOutModalOpen(true);
+    };
 
+    const confirmClockOut = async () => {
+        if (!user) return;
         setLoading(true);
         try {
             await completeAllTasks(user.id);
@@ -692,6 +716,7 @@ export const WorkerPortalPage: React.FC = () => {
             await logActivity(user.id, 'clock_out', 'Worker clocked out via portal');
             await fetchUserStatus();
             setShowBreakOverlay(false);
+            setIsClockOutModalOpen(false);
         } catch (err) {
             console.error(err);
             alert('Failed to clock out');
@@ -700,13 +725,14 @@ export const WorkerPortalPage: React.FC = () => {
         }
     };
 
-    const handleTakeBreak = async (isAuto = false) => {
+    const handleTakeBreak = async (isAuto = false, customReason?: string) => {
         if (!user) return;
         setLoading(true);
         try {
-            await pauseAllActiveTasks(user.id, isAuto ? 'Break Required (5-Hour Limit)' : 'Worker requested break');
+            const finalReason = isAuto ? 'Break Required (5-Hour Limit)' : (customReason || 'Worker requested break');
+            await pauseAllActiveTasks(user.id, finalReason);
             await updateUserStatus(user.id, 'present', 'break');
-            await logActivity(user.id, 'break_start', isAuto ? 'Forced break due to 5-hour limit' : 'Worker started break');
+            await logActivity(user.id, 'break_start', finalReason);
             await fetchUserStatus();
             if (isAuto) {
                 setShowBreakOverlay(true);
@@ -1294,6 +1320,9 @@ export const WorkerPortalPage: React.FC = () => {
                 .portal-nav-item.active i {
                     color: var(--primary);
                 }
+                .sidebar.collapsed .portal-nav-item span {
+                    display: none;
+                }
                 .sidebar-toggle {
                     background: rgba(255, 255, 255, 0.1);
                     border: none;
@@ -1400,6 +1429,11 @@ export const WorkerPortalPage: React.FC = () => {
                         </div>
                     </li>
                     <li>
+                        <div className={`portal-nav-item ${activeTab === 'activity_logs' ? 'active' : ''}`} onClick={() => { setActiveTab('activity_logs'); setIsMobileOpen(false); }}>
+                            <i className="fa-solid fa-clock-rotate-left"></i> <span>{t('workerPortal.tabs.activityLogs', 'Activity Logs')}</span>
+                        </div>
+                    </li>
+                    <li>
                         <div className={`portal-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setIsMobileOpen(false); }}>
                             <i className="fa-solid fa-sliders"></i> <span>{t('workerPortal.tabs.settings')}</span>
                         </div>
@@ -1441,7 +1475,8 @@ export const WorkerPortalPage: React.FC = () => {
                                 activeTab === 'personal_info' ? t('workerPortal.tabs.personalInfo') :
                                     activeTab === 'conduct' ? t('workerPortal.conduct.title') :
                                         activeTab === 'settings' ? t('workerPortal.settings.title') :
-                                            activeTab === 'training' ? t('workerPortal.tabs.training') : t('workerPortal.tabs.timeOff')}
+                                            activeTab === 'training' ? t('workerPortal.tabs.training') :
+                                                activeTab === 'timeoff' ? t('workerPortal.tabs.timeOff') : t('workerPortal.tabs.activityLogs', 'Activity Logs')}
                         </h2>
                         </div>
                     </div>
@@ -1571,7 +1606,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                         <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.endBreak')}
                                                     </button>
                                                 ) : (
-                                                    <button onClick={() => handleTakeBreak()} className="clock-btn break-btn">
+                                                    <button onClick={() => { setBreakReason(''); setIsBreakModalOpen(true); }} className="clock-btn break-btn">
                                                         <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.takeBreak')}
                                                     </button>
                                                 )}
@@ -1587,12 +1622,27 @@ export const WorkerPortalPage: React.FC = () => {
                                     <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>{t('workerPortal.activeTasks')}</div>
                                     {activeTasks.length > 0 ? (
                                         <ul style={{ listStyle: 'none', padding: 0, margin: 0, flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                                            {activeTasks.map(task => (
-                                                <li key={task.id} style={{ padding: '1.5rem', border: '1px solid var(--border)', borderRadius: '20px', background: 'var(--bg-main)', transition: 'transform 0.2s' }}>
-                                                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>{task.description}</div>
-                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontWeight: 600 }}>Ref: {task.mo_reference}</div>
-                                                </li>
-                                            ))}
+                                            {activeTasks.map(task => {
+                                                const match = task.reason?.match(/Scheduled Date:\s*([^\s|]+)(?:\s*\|\s*Notes:\s*(.*))?/);
+                                                const scheduledDate = match ? match[1] : null;
+                                                const notes = match ? match[2] : task.reason;
+                                                return (
+                                                    <li key={task.id} style={{ padding: '1.5rem', border: '1px solid var(--border)', borderRadius: '20px', background: 'var(--bg-main)', transition: 'transform 0.2s' }}>
+                                                        <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>{task.description}</div>
+                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontWeight: 600 }}>Ref: {task.mo_reference}</div>
+                                                        {scheduledDate && (
+                                                            <div style={{ fontSize: '0.85rem', color: '#f59e0b', marginTop: '0.25rem', fontWeight: 700 }}>
+                                                                <i className="fa-regular fa-calendar-check" style={{ marginRight: '5px' }}></i> Scheduled: {scheduledDate}
+                                                            </div>
+                                                        )}
+                                                        {notes && notes !== 'None' && (
+                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem', fontStyle: 'italic' }}>
+                                                                {notes}
+                                                            </div>
+                                                        )}
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                     ) : (
                                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem', color: 'var(--text-muted)', fontStyle: 'italic', background: 'var(--bg-main)', borderRadius: '20px', border: '1.5px dashed var(--border)' }}>{t('workerPortal.noActiveTasks')}</div>
@@ -2614,6 +2664,124 @@ export const WorkerPortalPage: React.FC = () => {
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'activity_logs' && (
+                        <div className="activity-logs-tab-content" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%' }}>
+                            <div className="section-title-row">
+                                <i className="fa-solid fa-clock-rotate-left"></i>
+                                <h2 style={{ fontSize: '2rem', color: 'var(--text-main)' }}>{t('workerPortal.activityLogs.title', 'Activity Logs')}</h2>
+                            </div>
+
+                            <div className="info-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                <div className="card-header">
+                                    <i className="fa-solid fa-list-check"></i>
+                                    <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.activityLogs.subtitle', 'Recent Activity')}</h3>
+                                </div>
+                                <div style={{ overflowX: 'auto' }}>
+                                    {myActivityLogs.length === 0 ? (
+                                        <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                            {t('workerPortal.activityLogs.noLogs', 'No activity logs found.')}
+                                        </div>
+                                    ) : (
+                                        <table className="info-table">
+                                            <thead>
+                                                <tr>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.activityLogs.table.time', 'Time')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.activityLogs.table.event', 'Event')}</th>
+                                                    <th style={{ color: 'var(--text-muted)' }}>{t('workerPortal.activityLogs.table.details', 'Details')}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {(() => {
+                                                    const perPage = 10;
+                                                    const startIndex = (activityLogsPage - 1) * perPage;
+                                                    const paginated = myActivityLogs.slice(startIndex, startIndex + perPage);
+
+                                                    return paginated.map((log: any) => {
+                                                        const eventTypeLabels: Record<string, string> = {
+                                                            clock_in: 'Clock In',
+                                                            clock_out: 'Clock Out',
+                                                            break_start: 'Start Break',
+                                                            break_end: 'End Break',
+                                                            task_start: 'Start Task',
+                                                            task_end: 'End Task',
+                                                            task_pause: 'Pause Task',
+                                                            task_resume: 'Resume Task',
+                                                        };
+                                                        const label = eventTypeLabels[log.event_type] || log.event_type;
+
+                                                        let badgeBg = '#f1f5f9';
+                                                        let badgeColor = '#475569';
+                                                        if (log.event_type === 'clock_in' || log.event_type === 'break_end' || log.event_type === 'task_resume') {
+                                                            badgeBg = '#dcfce7';
+                                                            badgeColor = '#15803d';
+                                                        } else if (log.event_type === 'clock_out' || log.event_type === 'task_pause') {
+                                                            badgeBg = '#fee2e2';
+                                                            badgeColor = '#dc2626';
+                                                        } else if (log.event_type === 'break_start') {
+                                                            badgeBg = '#fef3c7';
+                                                            badgeColor = '#d97706';
+                                                        } else if (log.event_type === 'task_start') {
+                                                            badgeBg = '#e0f2fe';
+                                                            badgeColor = '#0369a1';
+                                                        }
+
+                                                        return (
+                                                            <tr key={log.id}>
+                                                                <td style={{ color: 'var(--text-main)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                                                                    {new Date(log.timestamp).toLocaleString()}
+                                                                </td>
+                                                                <td>
+                                                                    <span style={{
+                                                                        background: badgeBg,
+                                                                        color: badgeColor,
+                                                                        fontWeight: 700,
+                                                                        padding: '0.2rem 0.6rem',
+                                                                        borderRadius: '6px',
+                                                                        fontSize: '0.75rem',
+                                                                        textTransform: 'uppercase',
+                                                                    }}>
+                                                                        {label}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>
+                                                                    {log.details || '—'}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    });
+                                                })()}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+                                {(() => {
+                                    const perPage = 10;
+                                    const totalPages = Math.ceil(myActivityLogs.length / perPage);
+                                    if (totalPages <= 1) return null;
+                                    return (
+                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--border)' }}>
+                                            <button 
+                                                onClick={() => setActivityLogsPage(p => Math.max(1, p - 1))}
+                                                disabled={activityLogsPage === 1}
+                                                style={{ padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', cursor: activityLogsPage === 1 ? 'not-allowed' : 'pointer', opacity: activityLogsPage === 1 ? 0.5 : 1 }}
+                                            >
+                                                <i className="fa-solid fa-chevron-left"></i>
+                                            </button>
+                                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>{activityLogsPage} / {totalPages}</span>
+                                            <button 
+                                                onClick={() => setActivityLogsPage(p => Math.min(totalPages, p + 1))}
+                                                disabled={activityLogsPage === totalPages}
+                                                style={{ padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', cursor: activityLogsPage === totalPages ? 'not-allowed' : 'pointer', opacity: activityLogsPage === totalPages ? 0.5 : 1 }}
+                                            >
+                                                <i className="fa-solid fa-chevron-right"></i>
+                                            </button>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </main>
 
@@ -2782,6 +2950,92 @@ export const WorkerPortalPage: React.FC = () => {
                         >
                             {t('workerPortal.break.return')}
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {isBreakModalOpen && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', zIndex: 10002, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-card)', width: '100%', maxWidth: '400px', borderRadius: '24px', overflow: 'hidden', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+                        <div className="modal-header" style={{ background: 'var(--bg-card)', padding: '1.25rem 2rem', color: 'var(--text-main)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}><i className="fa-solid fa-mug-hot" style={{ marginRight: '8px', color: 'var(--accent)' }}></i> Start Break</h3>
+                            <button className="close-modal" onClick={() => setIsBreakModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="modal-body" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div className="info-field">
+                                <label style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.75rem', display: 'block' }}>Reason for Break <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    {['Lunch Break', 'Restroom Break', 'Coffee Break', 'Short Rest', 'Personal Errand'].map(chip => (
+                                        <button
+                                            type="button"
+                                            key={chip}
+                                            onClick={() => setBreakReason(chip)}
+                                            style={{
+                                                padding: '0.4rem 0.8rem',
+                                                borderRadius: '20px',
+                                                border: '1px solid var(--border)',
+                                                background: breakReason === chip ? 'var(--primary)' : 'var(--bg-main)',
+                                                color: breakReason === chip ? 'white' : 'var(--text-main)',
+                                                fontSize: '0.8rem',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {chip}
+                                        </button>
+                                    ))}
+                                </div>
+                                <textarea
+                                    className="info-input"
+                                    value={breakReason}
+                                    onChange={e => setBreakReason(e.target.value)}
+                                    placeholder="e.g. Lunch, Restroom, Personal"
+                                    style={{ width: '100%', minHeight: '80px', resize: 'vertical', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.7rem', background: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: 'inherit' }}
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+                            <button className="modal-cancel-btn" onClick={() => setIsBreakModalOpen(false)}>Cancel</button>
+                            <button 
+                                className="modal-save-btn" 
+                                onClick={() => {
+                                    if (!breakReason.trim()) {
+                                        alert('Reason is required to start a break.');
+                                        return;
+                                    }
+                                    handleTakeBreak(false, breakReason.trim());
+                                    setIsBreakModalOpen(false);
+                                }}
+                            >
+                                Start Break
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isClockOutModalOpen && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', zIndex: 10002, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-card)', width: '100%', maxWidth: '400px', borderRadius: '24px', overflow: 'hidden', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+                        <div className="modal-header" style={{ background: '#ef4444', padding: '1.25rem 2rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}><i className="fa-solid fa-stop" style={{ marginRight: '8px' }}></i> Clock Out</h3>
+                            <button className="close-modal" onClick={() => setIsClockOutModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'white' }}><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="modal-body" style={{ padding: '1.5rem', color: 'var(--text-main)' }}>
+                            <p style={{ margin: 0, lineHeight: '1.5' }}>Are you sure you want to clock out? All active tasks will be automatically marked as completed.</p>
+                        </div>
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+                            <button className="modal-cancel-btn" onClick={() => setIsClockOutModalOpen(false)}>Cancel</button>
+                            <button 
+                                className="modal-save-btn" 
+                                style={{ background: '#ef4444' }}
+                                onClick={confirmClockOut}
+                            >
+                                Confirm Clock Out
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -172,6 +172,48 @@ export const ControlTablePage: React.FC = () => {
         return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
     };
 
+    const getWorkerShiftTimesForDate = (workerId: string, taskDateIso: string) => {
+        if (!taskDateIso || !activityLogs || activityLogs.length === 0) {
+            return { clockIn: null, clockOut: null };
+        }
+        const taskTime = new Date(taskDateIso).getTime();
+        const workerLogs = activityLogs.filter(l => l.worker_id === workerId);
+        
+        // Find the clock_in log that is closest to but BEFORE (or equal to) the task's timestamp
+        const clockInLogsBeforeTask = workerLogs
+            .filter(l => l.event_type === 'clock_in' && new Date(l.timestamp).getTime() <= taskTime)
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            
+        const clockInLog = clockInLogsBeforeTask[0];
+        
+        if (!clockInLog) {
+            // Fallback to the first clock_in of the same calendar day if no log precedes the task timestamp
+            const taskDateStr = new Date(taskDateIso).toDateString();
+            const sameDayClockIn = workerLogs.find(l => 
+                l.event_type === 'clock_in' && 
+                new Date(l.timestamp).toDateString() === taskDateStr
+            );
+            return {
+                clockIn: sameDayClockIn ? sameDayClockIn.timestamp : null,
+                clockOut: null
+            };
+        }
+        
+        const clockInTime = new Date(clockInLog.timestamp).getTime();
+        
+        // Find the earliest clock_out log AFTER that clock_in log
+        const clockOutLogsAfterClockIn = workerLogs
+            .filter(l => l.event_type === 'clock_out' && new Date(l.timestamp).getTime() >= clockInTime)
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+            
+        const clockOutLog = clockOutLogsAfterClockIn[0];
+        
+        return {
+            clockIn: clockInLog.timestamp,
+            clockOut: clockOutLog ? clockOutLog.timestamp : null
+        };
+    };
+
     const formatTimeOnly = (isoString: string) => {
         if (!isoString) return '-';
         const d = new Date(isoString);
@@ -640,13 +682,25 @@ export const ControlTablePage: React.FC = () => {
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{task.description}</td>
                                 <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
-                                    {formatDateTime(task.created_at)}
+                                    {(() => {
+                                        const { clockIn } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at);
+                                        return clockIn ? formatDateTime(clockIn) : formatDateTime(task.created_at);
+                                    })()}
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
                                     {formatTimeOnly(task.start_time)}
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
-                                    {formatDateTime(task.end_time)}
+                                    {(() => {
+                                        const { clockIn, clockOut } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at);
+                                        if (clockOut) {
+                                            return formatDateTime(clockOut);
+                                        }
+                                        if (clockIn || task.status !== 'completed') {
+                                            return <span style={{ color: '#16A34A', fontWeight: 600 }}>Still Clocked In</span>;
+                                        }
+                                        return task.end_time ? formatDateTime(task.end_time) : '-';
+                                    })()}
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
                                     {formatTimeOnly(task.last_action_time)}

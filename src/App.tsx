@@ -18,6 +18,7 @@ import { DisciplineAdminPage } from './pages/DisciplineAdminPage';
 import { NfcManagementPage } from './pages/NfcManagementPage';
 import { WorkerSelectPage } from './pages/WorkerSelectPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { FuturePlanningPage } from './pages/FuturePlanningPage';
 
 const ProtectedRoute = ({ children, role }: { children: React.ReactNode; role?: 'manager' | 'employee' }) => {
   const { user, loading } = useAuth();
@@ -64,6 +65,7 @@ function App() {
             <Route path="discipline" element={<DisciplineAdminPage />} />
             <Route path="leave-requests" element={<LeaveRequestsPage />} />
             <Route path="nfc" element={<NfcManagementPage />} />
+            <Route path="future-planning" element={<FuturePlanningPage />} />
           </Route>
         </Routes>
       </AuthProvider>
