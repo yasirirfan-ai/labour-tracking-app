@@ -3,13 +3,14 @@ import { supabase } from '../lib/supabase';
 import type { User, ActivityLog } from '../types';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
 import { pauseAllActiveTasks, resumeAllAutoPausedTasks, completeAllTasks, pauseAllTasksManual } from '../lib/taskService';
+import { todayPST, pstDayStart, pstDayEnd, formatTimePST } from '../lib/timezone';
 
 export const EmployeeActivityPage: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [logs, setLogs] = useState<ActivityLog[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [expandedWorkerId, setExpandedWorkerId] = useState<string | null>(null);
-    const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]); // Default Today
+    const [filterDate, setFilterDate] = useState(todayPST()); // Default today in PST
 
     // Clock Out Modal State
     const [showClockOutModal, setShowClockOutModal] = useState(false);
@@ -29,15 +30,16 @@ export const EmployeeActivityPage: React.FC = () => {
             const { data: userData } = await supabase.from('users').select('*').eq('role', 'employee').order('name');
             if (userData) setUsers(userData as User[]);
 
-            // 2. Fetch Logs for Timeline
-            // We filter by date locally or in query. Let's filter in query for efficiency if possible
-            const startOfDay = new Date(filterDate).toISOString();
-            const endOfDay = new Date(new Date(filterDate).getTime() + 86400000).toISOString();
+            // 2. Fetch Logs for Timeline — date boundaries in PST (UTC-8)
+            // pstDayStart("2026-07-15") → "2026-07-15T08:00:00.000Z" (midnight PST)
+            // pstDayEnd("2026-07-15")   → "2026-07-16T07:59:59.999Z" (end of PST day)
+            const startOfDay = pstDayStart(filterDate);
+            const endOfDay   = pstDayEnd(filterDate);
 
             const { data: logData } = await supabase.from('activity_logs')
                 .select('*')
                 .gte('timestamp', startOfDay)
-                .lt('timestamp', endOfDay)
+                .lte('timestamp', endOfDay)
                 .order('timestamp', { ascending: false }); // Descending for timeline flow
 
             if (logData) setLogs(logData as ActivityLog[]);
@@ -298,7 +300,7 @@ export const EmployeeActivityPage: React.FC = () => {
                                                 </thead>
                                                 <tbody style={{ background: 'white' }}>
                                                     {timeline.map(log => {
-                                                        const time = new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                                        const time = formatTimePST(log.timestamp);
                                                         return (
                                                             <tr key={log.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
                                                                 <td className="sticky-column" style={{ padding: '0.75rem 1rem', color: '#64748B', fontFamily: 'monospace' }}>{time}</td>
