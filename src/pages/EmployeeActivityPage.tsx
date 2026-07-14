@@ -11,6 +11,7 @@ export const EmployeeActivityPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [expandedWorkerId, setExpandedWorkerId] = useState<string | null>(null);
     const [filterDate, setFilterDate] = useState(todayPST()); // Default today in PST
+    const [logPage, setLogPage] = useState(1);
 
     // Clock Out Modal State
     const [showClockOutModal, setShowClockOutModal] = useState(false);
@@ -27,7 +28,7 @@ export const EmployeeActivityPage: React.FC = () => {
     const fetchData = async () => {
         try {
             // 1. Fetch Users
-            const { data: userData } = await supabase.from('users').select('*').eq('role', 'employee').order('name');
+            const { data: userData } = await supabase.from('users').select('*').eq('role', 'employee').eq('active', true).order('name');
             if (userData) setUsers(userData as User[]);
 
             // 2. Fetch Logs for Timeline — date boundaries in PST (UTC-8)
@@ -218,7 +219,7 @@ export const EmployeeActivityPage: React.FC = () => {
                         <div key={worker.id} style={{ background: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                             {/* Card Header */}
                             <div style={{ padding: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center', background: isClockedIn ? '#fff' : '#F8FAFC' }}>
-                                <div onClick={() => setExpandedWorkerId(isExpanded ? null : worker.id)} style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', flex: 1, minWidth: '200px' }}>
+                                <div onClick={() => { setLogPage(1); setExpandedWorkerId(isExpanded ? null : worker.id); }} style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', flex: 1, minWidth: '200px' }}>
                                     <div style={{
                                         width: '48px', height: '48px', borderRadius: '50%',
                                         background: isClockedIn ? (isOnBreak ? '#F59E0B' : '#10B981') : '#CBD5E1',
@@ -299,7 +300,7 @@ export const EmployeeActivityPage: React.FC = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody style={{ background: 'white' }}>
-                                                    {timeline.map(log => {
+                                                    {timeline.slice((logPage - 1) * 10, logPage * 10).map(log => {
                                                         const time = formatTimePST(log.timestamp);
                                                         return (
                                                             <tr key={log.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
@@ -321,6 +322,48 @@ export const EmployeeActivityPage: React.FC = () => {
                                             </table>
                                         ) : (
                                             <div style={{ padding: '2rem', textAlign: 'center', color: '#94A3B8' }}>No activity logs for this day.</div>
+                                        )}
+
+                                        {timeline.length > 0 && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', padding: '0.75rem 1rem', borderTop: '1px solid #E2E8F0', background: 'white' }}>
+                                                <div style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>
+                                                    Showing {Math.min(timeline.length, (logPage - 1) * 10 + 1)} to {Math.min(timeline.length, logPage * 10)} of {timeline.length} entries
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button
+                                                        disabled={logPage === 1}
+                                                        onClick={() => setLogPage(prev => Math.max(1, prev - 1))}
+                                                        style={{
+                                                            padding: '0.4rem 0.8rem',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #CBD5E1',
+                                                            background: logPage === 1 ? '#F1F5F9' : 'white',
+                                                            color: logPage === 1 ? '#94A3B8' : '#334155',
+                                                            cursor: logPage === 1 ? 'default' : 'pointer',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.8rem'
+                                                        }}
+                                                    >
+                                                        Previous
+                                                    </button>
+                                                    <button
+                                                        disabled={logPage * 10 >= timeline.length}
+                                                        onClick={() => setLogPage(prev => prev + 1)}
+                                                        style={{
+                                                            padding: '0.4rem 0.8rem',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #CBD5E1',
+                                                            background: logPage * 10 >= timeline.length ? '#F1F5F9' : 'white',
+                                                            color: logPage * 10 >= timeline.length ? '#94A3B8' : '#334155',
+                                                            cursor: logPage * 10 >= timeline.length ? 'default' : 'pointer',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.8rem'
+                                                        }}
+                                                    >
+                                                        Next
+                                                    </button>
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
                                 </div>

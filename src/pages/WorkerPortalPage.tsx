@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import emailjs from '@emailjs/browser';
 import { syncLeaveBalances } from '../lib/accrualService';
+import { formatTimePST, todayPST, pstDayStart, pstDayEnd } from '../lib/timezone';
 
 export const WorkerPortalPage: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -28,6 +29,7 @@ export const WorkerPortalPage: React.FC = () => {
     const [breakReason, setBreakReason] = useState('');
     const [isClockOutModalOpen, setIsClockOutModalOpen] = useState(false);
     const [myActivityLogs, setMyActivityLogs] = useState<any[]>([]);
+    const [dashboardLogsPage, setDashboardLogsPage] = useState(1);
     const [activityLogsPage, setActivityLogsPage] = useState(1);
     const [requestHistoryPage, setRequestHistoryPage] = useState(1);
     const [ledgerPage, setLedgerPage] = useState(1);
@@ -149,8 +151,64 @@ export const WorkerPortalPage: React.FC = () => {
         if (data) setMyActivityLogs(data);
     };
 
+    const getTodayShiftHours = () => {
+        const todayStr = todayPST();
+        const startISO = pstDayStart(todayStr);
+        const endISO = pstDayEnd(todayStr);
+
+        const startMs = new Date(startISO).getTime();
+        const endMs = new Date(endISO).getTime();
+
+        // Filter logs belonging to today PST
+        const todayLogs = myActivityLogs.filter(log => {
+            const time = new Date(log.timestamp).getTime();
+            return time >= startMs && time <= endMs;
+        });
+
+        let shiftStart: number | null = null;
+        let totalShiftTime = 0;
+        let totalBreakTime = 0;
+        let breakStart: number | null = null;
+
+        // Sort logs chronologically
+        const sortedLogs = [...todayLogs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        sortedLogs.forEach(log => {
+            const time = new Date(log.timestamp).getTime();
+
+            if (log.event_type === 'clock_in') {
+                shiftStart = time;
+            } else if (log.event_type === 'clock_out') {
+                if (shiftStart) {
+                    totalShiftTime += (time - shiftStart);
+                    shiftStart = null;
+                }
+            } else if (log.event_type === 'break_start') {
+                breakStart = time;
+            } else if (log.event_type === 'break_end') {
+                if (breakStart) {
+                    totalBreakTime += (time - breakStart);
+                    breakStart = null;
+                }
+            }
+        });
+
+        const timeNow = currentTime.getTime();
+        if (isClockedIn && shiftStart) {
+            totalShiftTime += (timeNow - shiftStart);
+        }
+
+        if (localUser?.availability === 'break' && breakStart) {
+            const currentBreakDuration = (timeNow - breakStart);
+            totalBreakTime += currentBreakDuration;
+        }
+
+        const netPayableMs = Math.max(0, totalShiftTime - totalBreakTime);
+        return (netPayableMs / 1000 / 3600).toFixed(2);
+    };
+
     useEffect(() => {
-        if (user?.id && activeTab === 'activity_logs') {
+        if (user?.id && (activeTab === 'activity_logs' || activeTab === 'dashboard')) {
             fetchMyActivityLogs();
         }
     }, [user?.id, activeTab]);
@@ -695,6 +753,7 @@ export const WorkerPortalPage: React.FC = () => {
             await updateUserStatus(user.id, 'present', 'available');
             await logActivity(user.id, 'clock_in', 'Worker clocked in via portal');
             await fetchUserStatus();
+            await fetchMyActivityLogs();
         } catch (err) {
             console.error(err);
             alert('Failed to clock in');
@@ -715,6 +774,7 @@ export const WorkerPortalPage: React.FC = () => {
             await updateUserStatus(user.id, 'offline', 'available');
             await logActivity(user.id, 'clock_out', 'Worker clocked out via portal');
             await fetchUserStatus();
+            await fetchMyActivityLogs();
             setShowBreakOverlay(false);
             setIsClockOutModalOpen(false);
         } catch (err) {
@@ -734,6 +794,7 @@ export const WorkerPortalPage: React.FC = () => {
             await updateUserStatus(user.id, 'present', 'break');
             await logActivity(user.id, 'break_start', finalReason);
             await fetchUserStatus();
+            await fetchMyActivityLogs();
             if (isAuto) {
                 setShowBreakOverlay(true);
             }
@@ -754,6 +815,7 @@ export const WorkerPortalPage: React.FC = () => {
             // We don't auto-resume tasks here because the user might want choice, 
             // but we could call resumeAllAutoPausedTasks(user.id) if preferred.
             await fetchUserStatus();
+            await fetchMyActivityLogs();
             setShowBreakOverlay(false);
         } catch (err) {
             console.error(err);
@@ -814,6 +876,7 @@ export const WorkerPortalPage: React.FC = () => {
             const success = await performTaskAction(task, action);
             if (success) {
                 await fetchActiveTasks();
+                await fetchMyActivityLogs();
             } else {
                 setNotification({
                     show: true,
@@ -1500,11 +1563,7 @@ export const WorkerPortalPage: React.FC = () => {
                             <i className="fa-solid fa-calendar-day"></i> <span>{t('workerPortal.tabs.timeOff')}</span>
                         </div>
                     </li>
-                    <li>
-                        <div className={`portal-nav-item ${activeTab === 'activity_logs' ? 'active' : ''}`} onClick={() => { setActiveTab('activity_logs'); setIsMobileOpen(false); }}>
-                            <i className="fa-solid fa-clock-rotate-left"></i> <span>{t('workerPortal.tabs.activityLogs', 'Activity Logs')}</span>
-                        </div>
-                    </li>
+
                     <li>
                         <div className={`portal-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setIsMobileOpen(false); }}>
                             <i className="fa-solid fa-sliders"></i> <span>{t('workerPortal.tabs.settings')}</span>
@@ -1604,147 +1663,207 @@ export const WorkerPortalPage: React.FC = () => {
                 </header>
 
                 <div className="worker-content" style={{ padding: '2.5rem 3.5rem' }}>
-                    {activeTab === 'dashboard' && nfcStatus !== 'idle' && (
-                        <div
-                            className={`nfc-status-bar ${nfcStatus === 'error' ? 'nfc-status-error' : nfcStatus === 'reading' ? 'nfc-status-reading' : ''}`}
-                            style={{ marginBottom: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', width: '100%', cursor: (nfcStatus === 'error') ? 'pointer' : 'default' }} onClick={() => (nfcStatus === 'error') && startNfcListening()}>
-                                {nfcStatus === 'listening' && <div className="nfc-heartbeat" style={{ marginRight: '10px' }}></div>}
-                                {nfcStatus === 'listening' ? t('workerPortal.nfcActive') :
-                                    nfcStatus === 'reading' ? t('workerPortal.nfcReading') :
-                                        nfcStatus === 'error' ? t('workerPortal.nfcError') : t('workerPortal.nfcOffline')}
-                            </div>
-
-                            <div style={{ width: '100%', display: 'flex', gap: '1rem' }} onClick={e => e.stopPropagation()}>
-                                <input
-                                    type="text"
-                                    placeholder={t('workerPortal.simulateNfc')}
-                                    style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && e.currentTarget.value) {
-                                            processNfcTap(e.currentTarget.value);
-                                            e.currentTarget.value = '';
-                                        }
-                                    }}
-                                />
-                                <button
-                                    onClick={(e) => {
-                                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                                        if (input.value) {
-                                            processNfcTap(input.value);
-                                            input.value = '';
-                                        }
-                                    }}
-                                    className="btn btn-primary"
-                                    style={{ padding: '0.75rem 2rem' }}
-                                >
-                                    {t('workerPortal.scan')}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                    {activeTab === 'dashboard' && nfcStatus === 'idle' && (
-                        <div className="nfc-status-bar" onClick={startNfcListening} style={{ cursor: 'pointer', background: 'rgba(245, 158, 11, 0.1)', borderColor: 'var(--accent)', color: 'var(--accent)', borderRadius: '12px' }}>
-                            <i className="fa-solid fa-hand-pointer" style={{ marginRight: '10px' }}></i>
-                            {t('workerPortal.nfcPending')}
-                        </div>
-                    )}
-
                     {activeTab === 'dashboard' && (
-                        <div className="worker-dashboard-grid" style={{ width: '100%' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                                <div className={`on-duty-banner ${!isClockedIn ? 'off-duty-banner' : ''}`}>
-                                    <div className="banner-content">
-                                        <div className="banner-status">
-                                            <div style={{ width: '12px', height: '12px', background: isClockedIn ? 'var(--success)' : 'var(--text-muted)', borderRadius: '50%', boxShadow: isClockedIn ? '0 0 15px var(--success)' : 'none' }}></div>
-                                            {isClockedIn ? t('workerPortal.onDuty') : t('workerPortal.offDuty')}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', width: '100%' }}>
+                            {/* Top Row: NFC Scan (Left) & Today's Summary (Right) */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem', alignItems: 'stretch' }}>
+                                {/* Left Side: NFC Section */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {nfcStatus !== 'idle' && (
+                                        <div
+                                            className="status-card"
+                                            style={{ margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '1.5rem 2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '160px', boxSizing: 'border-box' }}
+                                        >
+                                            <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'block' }}>NFC System</div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', flex: 1, justifyContent: 'center' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', width: '100%', fontSize: '0.9rem', fontWeight: 800, color: nfcStatus === 'error' ? 'var(--danger)' : 'var(--success)' }}>
+                                                    {nfcStatus === 'listening' && <div className="nfc-heartbeat" style={{ marginRight: '10px' }}></div>}
+                                                    {nfcStatus === 'listening' ? t('workerPortal.nfcActive') :
+                                                        nfcStatus === 'reading' ? t('workerPortal.nfcReading') :
+                                                            nfcStatus === 'error' ? 'Web NFC Not Supported. Simulator Active.' : t('workerPortal.nfcOffline')}
+                                                </div>
+
+                                                <div style={{ display: 'flex', gap: '0.75rem', width: '100%', marginTop: '0.25rem' }} onClick={e => e.stopPropagation()}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder={t('workerPortal.simulateNfc')}
+                                                        style={{ flex: 1, maxWidth: '200px', padding: '0.5rem 0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.85rem' }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' && e.currentTarget.value) {
+                                                                processNfcTap(e.currentTarget.value);
+                                                                e.currentTarget.value = '';
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button
+                                                        onClick={(e) => {
+                                                            const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                                                            if (input.value) {
+                                                                processNfcTap(input.value);
+                                                                input.value = '';
+                                                            }
+                                                        }}
+                                                        className="btn btn-primary"
+                                                        style={{ padding: '0.5rem 1.5rem', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800 }}
+                                                    >
+                                                        {t('workerPortal.scan')}
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <h1 className="banner-title">{isClockedIn ? t('workerPortal.workerLoggedIn') : t('workerPortal.shiftNotStarted')}</h1>
-                                        <div className="banner-time">
-                                            <i className="fa-regular fa-clock" style={{ marginRight: '10px' }}></i>
-                                            {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                                    )}
+                                    {nfcStatus === 'idle' && (
+                                        <div 
+                                            className="status-card"
+                                            onClick={startNfcListening} 
+                                            style={{ margin: 0, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '1.5rem 2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '160px', boxSizing: 'border-box' }}
+                                        >
+                                            <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'block' }}>NFC System</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--accent)', fontWeight: 800, fontSize: '0.95rem', gap: '0.5rem' }}>
+                                                <i className="fa-solid fa-hand-pointer"></i>
+                                                {t('workerPortal.nfcPending')}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Right Side: Today's Summary Card */}
+                                <div className="status-card" style={{ margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '1.5rem 2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '160px', boxSizing: 'border-box' }}>
+                                    <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'block' }}>{t('workerPortal.todaySummary')}</div>
+                                    <div className="responsive-grid-2" style={{ display: 'grid', gap: '1rem', flex: 1, alignItems: 'center' }}>
+                                        <div style={{ padding: '0.75rem 1rem', background: 'var(--primary-bg)', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.1rem' }}>{t('workerPortal.totalHours')}</div>
+                                            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1.1 }}>{getTodayShiftHours()}</div>
+                                        </div>
+                                        <div style={{ padding: '0.75rem 1rem', background: 'var(--success-bg)', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--success)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.1rem' }}>{t('workerPortal.efficiency')}</div>
+                                            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1.1 }}>
+                                                {disciplinaryIncidents.length === 0 ? 100 : Math.max(50, 100 - disciplinaryIncidents.length * 15)}%
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="banner-actions">
-                                        {!isClockedIn ? (
-                                            <button onClick={handleClockIn} className="clock-btn clock-in">
-                                                <i className="fa-solid fa-play"></i> {t('workerPortal.clockIn')}
-                                            </button>
-                                        ) : (
-                                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                                                {localUser?.availability === 'break' ? (
-                                                    <button onClick={handleEndBreak} className="clock-btn break-btn" style={{ background: '#10b981' }}>
-                                                        <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.endBreak')}
-                                                    </button>
-                                                ) : (
-                                                    <button onClick={() => { setBreakReason(''); setIsBreakModalOpen(true); }} className="clock-btn break-btn">
-                                                        <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.takeBreak')}
-                                                    </button>
-                                                )}
-                                                <button onClick={handleClockOut} className="clock-btn clock-out">
-                                                    <i className="fa-solid fa-stop"></i> {t('workerPortal.clockOut')}
-                                                </button>
+                                </div>
+                            </div>
+
+                            {/* Middle Section: Green Banner (Left) & Redesigned Active Assignments Grid (Right) */}
+                            <div className="worker-dashboard-grid" style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr 2.2fr', gap: '2.5rem', alignItems: 'stretch' }}>
+                                <div>
+                                    <div className={`on-duty-banner ${!isClockedIn ? 'off-duty-banner' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem', height: '280px', justifyContent: 'space-between', borderRadius: '24px', margin: 0, boxSizing: 'border-box', alignItems: 'flex-start' }}>
+                                        <div style={{ textAlign: 'left', width: '100%' }}>
+                                            <div className="banner-status" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem', justifyContent: 'flex-start' }}>
+                                                <div style={{ width: '12px', height: '12px', background: isClockedIn ? 'var(--success)' : 'var(--text-muted)', borderRadius: '50%', boxShadow: isClockedIn ? '0 0 15px var(--success)' : 'none' }}></div>
+                                                {isClockedIn ? t('workerPortal.onDuty') : t('workerPortal.offDuty')}
                                             </div>
-                                        )}
+                                            <h1 className="banner-title" style={{ fontSize: '1.6rem', fontWeight: 900, margin: '0 0 0.5rem 0', textAlign: 'left' }}>{isClockedIn ? t('workerPortal.workerLoggedIn') : t('workerPortal.shiftNotStarted')}</h1>
+                                            <div className="banner-time" style={{ fontSize: '0.9rem', fontWeight: 700, opacity: 0.9, textAlign: 'left' }}>
+                                                <i className="fa-regular fa-clock" style={{ marginRight: '10px' }}></i>
+                                                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                                            </div>
+                                        </div>
+                                        <div className="banner-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+                                            {!isClockedIn ? (
+                                                <button onClick={handleClockIn} className="clock-btn clock-in" style={{ width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                                                    <i className="fa-solid fa-play"></i> {t('workerPortal.clockIn')}
+                                                </button>
+                                            ) : (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+                                                    {localUser?.availability === 'break' ? (
+                                                        <button onClick={handleEndBreak} className="clock-btn break-btn" style={{ background: '#10b981', width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                                                            <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.endBreak')}
+                                                        </button>
+                                                    ) : (
+                                                        <button onClick={() => { setBreakReason(''); setIsBreakModalOpen(true); }} className="clock-btn break-btn" style={{ width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                                                            <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.takeBreak')}
+                                                        </button>
+                                                    )}
+                                                    <button onClick={handleClockOut} className="clock-btn clock-out" style={{ width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                                                        <i className="fa-solid fa-stop"></i> {t('workerPortal.clockOut')}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="status-card" style={{ display: 'flex', flexDirection: 'column', width: '100%', margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                                    <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>{t('workerPortal.activeTasks')}</div>
-                                    {activeTasks.length > 0 ? (
-                                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                                            {activeTasks.map(task => {
-                                                const match = task.reason?.match(/Scheduled Date:\s*([^\s|]+)(?:\s*\|\s*Notes:\s*(.*))?/);
-                                                const scheduledDate = match ? match[1] : null;
-                                                const notes = match ? match[2] : task.reason;
-                                                return (
-                                                    <li key={task.id} style={{ padding: '1.5rem', border: '1px solid var(--border)', borderRadius: '20px', background: 'var(--bg-main)', transition: 'transform 0.2s' }}>
-                                                        <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>{task.description}</div>
-                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontWeight: 600 }}>Ref: {task.mo_reference}</div>
-                                                        {scheduledDate && (
-                                                            <div style={{ fontSize: '0.85rem', color: '#f59e0b', marginTop: '0.25rem', fontWeight: 700 }}>
-                                                                <i className="fa-regular fa-calendar-check" style={{ marginRight: '5px' }}></i> Scheduled: {scheduledDate}
+                                <div className="status-card" style={{ display: 'flex', flexDirection: 'column', width: '100%', margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '1.5rem 2rem', borderRadius: '24px', height: '280px', boxSizing: 'border-box' }}>
+                                    <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <i className="fa-solid fa-list-check" style={{ color: 'var(--primary)' }}></i>
+                                        {t('workerPortal.activeTasks')}
+                                    </div>
+                                    <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+                                        {activeTasks.length > 0 ? (
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                                                {activeTasks.map(task => {
+                                                    const match = task.reason?.match(/Scheduled Date:\s*([^\s|]+)(?:\s*\|\s*Notes:\s*(.*))?/);
+                                                    const scheduledDate = match ? match[1] : null;
+                                                    const notes = match ? match[2] : task.reason;
+
+                                                    let statusBg = 'var(--primary-bg)';
+                                                    let statusColor = 'var(--primary)';
+                                                    if (task.status === 'active' || task.status === 'clocked_in') {
+                                                        statusBg = 'var(--success-bg)';
+                                                        statusColor = 'var(--success)';
+                                                    } else if (task.status === 'paused' || task.status === 'break') {
+                                                        statusBg = 'var(--warning-bg)';
+                                                        statusColor = 'var(--warning)';
+                                                    }
+
+                                                    return (
+                                                        <div key={task.id} style={{
+                                                            padding: '1.25rem',
+                                                            border: '1px solid var(--border)',
+                                                            borderRadius: '20px',
+                                                            background: 'var(--bg-main)',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            justifyContent: 'space-between',
+                                                            transition: 'all 0.2s',
+                                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                                            e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.transform = 'translateY(0)';
+                                                            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)';
+                                                        }}
+                                                        >
+                                                            <div>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                                                                    <span style={{ display: 'inline-block', padding: '0.25rem 0.6rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, background: statusBg, color: statusColor, textTransform: 'uppercase' }}>
+                                                                        {task.status}
+                                                                    </span>
+                                                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', background: 'rgba(0,0,0,0.03)', padding: '0.25rem 0.5rem', borderRadius: '6px' }}>
+                                                                        Ref: {task.mo_reference}
+                                                                    </span>
+                                                                </div>
+                                                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 0.5rem 0', lineHeight: 1.3 }}>
+                                                                    {task.description}
+                                                                </h3>
+                                                                {scheduledDate && (
+                                                                    <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '0.5rem' }}>
+                                                                        <i className="fa-regular fa-calendar-check"></i>
+                                                                        Scheduled: {scheduledDate}
+                                                                    </div>
+                                                                )}
+                                                                {notes && notes !== 'None' && (
+                                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic', background: 'rgba(0,0,0,0.02)', padding: '0.5rem 0.75rem', borderRadius: '8px', marginBottom: '1rem' }}>
+                                                                        {notes}
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        )}
-                                                        {notes && notes !== 'None' && (
-                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem', fontStyle: 'italic' }}>
-                                                                {notes}
-                                                            </div>
-                                                        )}
-                                                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
-                                                            {task.status === 'pending' && (
-                                                                <button
-                                                                    onClick={() => handleTaskAction(task, 'start')}
-                                                                    style={{
-                                                                        flex: 1,
-                                                                        padding: '0.6rem 1rem',
-                                                                        borderRadius: '12px',
-                                                                        border: 'none',
-                                                                        background: 'var(--primary)',
-                                                                        color: 'white',
-                                                                        fontWeight: 800,
-                                                                        fontSize: '0.85rem',
-                                                                        cursor: 'pointer',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        justifyContent: 'center',
-                                                                        gap: '0.5rem'
-                                                                    }}
-                                                                >
-                                                                    <i className="fa-solid fa-play"></i> Start Task
-                                                                </button>
-                                                            )}
-                                                            {(task.status === 'active' || task.status === 'clocked_in') && (
-                                                                <>
+
+                                                            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                                                                {task.status === 'pending' && (
                                                                     <button
-                                                                        onClick={() => handleTaskAction(task, 'complete')}
+                                                                        onClick={() => handleTaskAction(task, 'start')}
                                                                         style={{
                                                                             flex: 1,
-                                                                            padding: '0.6rem 1rem',
+                                                                            padding: '0.65rem 1rem',
                                                                             borderRadius: '12px',
                                                                             border: 'none',
-                                                                            background: 'var(--success)',
+                                                                            background: 'var(--primary)',
                                                                             color: 'white',
                                                                             fontWeight: 800,
                                                                             fontSize: '0.85rem',
@@ -1752,102 +1871,203 @@ export const WorkerPortalPage: React.FC = () => {
                                                                             display: 'flex',
                                                                             alignItems: 'center',
                                                                             justifyContent: 'center',
-                                                                            gap: '0.5rem'
+                                                                            gap: '0.5rem',
+                                                                            transition: 'background 0.2s'
                                                                         }}
                                                                     >
-                                                                        <i className="fa-solid fa-check"></i> Complete
+                                                                        <i className="fa-solid fa-play"></i> Start Task
                                                                     </button>
+                                                                )}
+                                                                {(task.status === 'active' || task.status === 'clocked_in') && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => handleTaskAction(task, 'complete')}
+                                                                            style={{
+                                                                                flex: 1,
+                                                                                padding: '0.65rem 1rem',
+                                                                                borderRadius: '12px',
+                                                                                border: 'none',
+                                                                                background: 'var(--success)',
+                                                                                color: 'white',
+                                                                                fontWeight: 800,
+                                                                                fontSize: '0.85rem',
+                                                                                cursor: 'pointer',
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center',
+                                                                                gap: '0.5rem',
+                                                                                transition: 'background 0.2s'
+                                                                            }}
+                                                                        >
+                                                                            <i className="fa-solid fa-check"></i> Complete
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleTaskAction(task, 'pause')}
+                                                                            style={{
+                                                                                padding: '0.65rem 1.25rem',
+                                                                                borderRadius: '12px',
+                                                                                border: '1.5px solid var(--border)',
+                                                                                background: 'var(--bg-main)',
+                                                                                color: 'var(--text-main)',
+                                                                                fontWeight: 800,
+                                                                                fontSize: '0.85rem',
+                                                                                cursor: 'pointer',
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center',
+                                                                                gap: '0.5rem',
+                                                                                transition: 'background 0.2s'
+                                                                            }}
+                                                                        >
+                                                                            <i className="fa-solid fa-pause"></i> Pause
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                                {(task.status === 'paused' || task.status === 'break') && (
                                                                     <button
-                                                                        onClick={() => handleTaskAction(task, 'pause')}
+                                                                        onClick={() => handleTaskAction(task, 'resume')}
                                                                         style={{
-                                                                            padding: '0.6rem 1.25rem',
+                                                                            flex: 1,
+                                                                            padding: '0.65rem 1rem',
                                                                             borderRadius: '12px',
-                                                                            border: '1.5px solid var(--border)',
-                                                                            background: 'var(--bg-main)',
-                                                                            color: 'var(--text-main)',
+                                                                            border: 'none',
+                                                                            background: 'var(--primary)',
+                                                                            color: 'white',
                                                                             fontWeight: 800,
                                                                             fontSize: '0.85rem',
                                                                             cursor: 'pointer',
                                                                             display: 'flex',
                                                                             alignItems: 'center',
                                                                             justifyContent: 'center',
-                                                                            gap: '0.5rem'
+                                                                            gap: '0.5rem',
+                                                                            transition: 'background 0.2s'
                                                                         }}
                                                                     >
-                                                                        <i className="fa-solid fa-pause"></i> Pause
+                                                                        <i className="fa-solid fa-play"></i> Resume Task
                                                                     </button>
-                                                                </>
-                                                            )}
-                                                            {(task.status === 'paused' || task.status === 'break') && (
-                                                                <button
-                                                                    onClick={() => handleTaskAction(task, 'resume')}
-                                                                    style={{
-                                                                        flex: 1,
-                                                                        padding: '0.6rem 1rem',
-                                                                        borderRadius: '12px',
-                                                                        border: 'none',
-                                                                        background: 'var(--primary)',
-                                                                        color: 'white',
-                                                                        fontWeight: 800,
-                                                                        fontSize: '0.85rem',
-                                                                        cursor: 'pointer',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        justifyContent: 'center',
-                                                                        gap: '0.5rem'
-                                                                    }}
-                                                                >
-                                                                    <i className="fa-solid fa-play"></i> Resume Task
-                                                                </button>
-                                                            )}
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </li>
-                                                );
-                                            })}
-                                        </ul>
-                                    ) : (
-                                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem', color: 'var(--text-muted)', fontStyle: 'italic', background: 'var(--bg-main)', borderRadius: '20px', border: '1.5px dashed var(--border)' }}>{t('workerPortal.noActiveTasks')}</div>
-                                    )}
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontStyle: 'italic', background: 'var(--bg-main)', borderRadius: '20px', border: '1.5px dashed var(--border)' }}>{t('workerPortal.noActiveTasks')}</div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                                <div className="status-card" style={{ margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                                    <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>{t('workerPortal.todaySummary')}</div>
-                                    <div className="responsive-grid-2" style={{ display: 'grid', gap: '1rem' }}>
-                                        <div style={{ padding: '1.5rem', background: 'var(--primary-bg)', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem' }}>{t('workerPortal.totalHours')}</div>
-                                            <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>8.5</div>
-                                        </div>
-                                        <div style={{ padding: '1.5rem', background: 'var(--success-bg)', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem' }}>{t('workerPortal.efficiency')}</div>
-                                            <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>94%</div>
-                                        </div>
-                                    </div>
+                            {/* Activity Logs card (Full Width) with Pagination */}
+                            <div className="status-card" style={{ margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', width: '100%', padding: '2rem', borderRadius: '24px', boxSizing: 'border-box' }}>
+                                <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>
+                                    <i className="fa-solid fa-clock-rotate-left" style={{ marginRight: '6px' }}></i>
+                                    {t('workerPortal.activityLogs.title', 'Recent Activity')}
                                 </div>
+                                <div style={{ overflowX: 'auto' }}>
+                                    {myActivityLogs.length === 0 ? (
+                                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', background: 'var(--bg-main)', borderRadius: '12px' }}>
+                                            {t('workerPortal.activityLogs.noLogs', 'No activity logs found.')}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <table className="info-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                                <thead>
+                                                    <tr style={{ borderBottom: '1.5px solid var(--border)' }}>
+                                                        <th style={{ color: 'var(--text-muted)', textAlign: 'left', padding: '0.6rem 0.8rem', fontWeight: 600 }}>{t('workerPortal.activityLogs.table.time', 'Time')}</th>
+                                                        <th style={{ color: 'var(--text-muted)', textAlign: 'left', padding: '0.6rem 0.8rem', fontWeight: 600 }}>{t('workerPortal.activityLogs.table.event', 'Event')}</th>
+                                                        <th style={{ color: 'var(--text-muted)', textAlign: 'left', padding: '0.6rem 0.8rem', fontWeight: 600 }}>{t('workerPortal.activityLogs.table.details', 'Details')}</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {myActivityLogs.slice((dashboardLogsPage - 1) * 10, dashboardLogsPage * 10).map((log: any) => {
+                                                        const eventTypeLabels: Record<string, string> = {
+                                                            clock_in: 'Clock In',
+                                                            clock_out: 'Clock Out',
+                                                            break_start: 'Start Break',
+                                                            break_end: 'End Break',
+                                                            task_start: 'Start Task',
+                                                            task_end: 'End Task',
+                                                            task_pause: 'Pause Task',
+                                                            task_resume: 'Resume Task',
+                                                            task_complete: 'Complete Task'
+                                                        };
+                                                        const label = eventTypeLabels[log.event_type] || log.event_type;
 
-                                <div className="status-card" style={{ margin: 0, flex: 1, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                                    <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>{t('workerPortal.notifications')}</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                        <div style={{ padding: '1.25rem', background: 'var(--warning-bg)', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                            <div style={{ width: '40px', height: '40px', background: 'var(--accent)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                                                <i className="fa-solid fa-bullhorn"></i>
+                                                        let badgeBg = '#f1f5f9';
+                                                        let badgeColor = '#475569';
+                                                        if (log.event_type === 'clock_in' || log.event_type === 'break_end' || log.event_type === 'task_resume') {
+                                                            badgeBg = '#dcfce7';
+                                                            badgeColor = '#15803d';
+                                                        } else if (log.event_type === 'clock_out' || log.event_type === 'task_pause') {
+                                                            badgeBg = '#fee2e2';
+                                                            badgeColor = '#b91c1c';
+                                                        } else if (log.event_type === 'break_start') {
+                                                            badgeBg = '#fef3c7';
+                                                            badgeColor = '#b45309';
+                                                        }
+
+                                                        return (
+                                                            <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                                <td style={{ padding: '0.6rem 0.8rem', color: 'var(--text-main)', fontWeight: 600, fontFamily: 'monospace' }}>
+                                                                    {formatTimePST(log.timestamp)}
+                                                                </td>
+                                                                <td style={{ padding: '0.6rem 0.8rem' }}>
+                                                                    <span style={{ display: 'inline-block', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: badgeBg, color: badgeColor }}>
+                                                                        {label.toUpperCase()}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ padding: '0.6rem 0.8rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                                    {log.description}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+
+                                            {/* Pagination Controls */}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', padding: '0 0.5rem' }}>
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                                    Showing {Math.min(myActivityLogs.length, (dashboardLogsPage - 1) * 10 + 1)} to {Math.min(myActivityLogs.length, dashboardLogsPage * 10)} of {myActivityLogs.length} entries
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button
+                                                        disabled={dashboardLogsPage === 1}
+                                                        onClick={() => setDashboardLogsPage(prev => Math.max(1, prev - 1))}
+                                                        style={{
+                                                            padding: '0.4rem 0.8rem',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid var(--border)',
+                                                            background: dashboardLogsPage === 1 ? 'var(--bg-main)' : 'white',
+                                                            color: dashboardLogsPage === 1 ? 'var(--text-muted)' : 'var(--text-main)',
+                                                            cursor: dashboardLogsPage === 1 ? 'default' : 'pointer',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.8rem'
+                                                        }}
+                                                    >
+                                                        Previous
+                                                    </button>
+                                                    <button
+                                                        disabled={dashboardLogsPage * 10 >= myActivityLogs.length}
+                                                        onClick={() => setDashboardLogsPage(prev => prev + 1)}
+                                                        style={{
+                                                            padding: '0.4rem 0.8rem',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid var(--border)',
+                                                            background: dashboardLogsPage * 10 >= myActivityLogs.length ? 'var(--bg-main)' : 'white',
+                                                            color: dashboardLogsPage * 10 >= myActivityLogs.length ? 'var(--text-muted)' : 'var(--text-main)',
+                                                            cursor: dashboardLogsPage * 10 >= myActivityLogs.length ? 'default' : 'pointer',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.8rem'
+                                                        }}
+                                                    >
+                                                        Next
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' }}>{t('workerPortal.newPolicy')}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t('workerPortal.updateSop')}</div>
-                                            </div>
-                                        </div>
-                                        <div style={{ padding: '1.25rem', background: 'var(--primary-bg)', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                            <div style={{ width: '40px', height: '40px', background: 'var(--primary)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                                                <i className="fa-solid fa-calendar-check"></i>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' }}>{t('workerPortal.monthlyReview')}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t('workerPortal.scheduledFriday')}</div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>

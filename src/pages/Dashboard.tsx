@@ -39,7 +39,7 @@ export const Dashboard: React.FC = () => {
 
                 setStats({
                     activeWorkers,
-                    totalWorkers: userData.length,
+                    totalWorkers: userData.filter(u => u.active !== false).length,
                     runningTimers,
                     todayHours: parseFloat((totalSec / 3600).toFixed(1)),
                     todayCost: parseFloat(totalCost.toFixed(2))

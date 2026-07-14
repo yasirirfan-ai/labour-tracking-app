@@ -110,7 +110,7 @@ export const DisciplineAdminPage: React.FC = () => {
 
     const fetchWorkers = async () => {
         try {
-            const { data, error } = await supabase.from('users').select('id, name, worker_id');
+            const { data, error } = await supabase.from('users').select('id, name, worker_id').eq('active', true);
             if (error) {
                 console.error('Supabase error fetching workers:', error);
                 return;

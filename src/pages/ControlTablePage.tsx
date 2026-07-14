@@ -594,7 +594,7 @@ export const ControlTablePage: React.FC = () => {
 
                 <select value={workerFilter} onChange={(e) => setWorkerFilter(e.target.value)} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none', background: 'white' }}>
                     <option value="all">{t('table.allWorkers')}</option>
-                    {employees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
+                    {employees.filter(e => e.active !== false).map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
                 </select>
 
                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none', background: 'white' }}>
@@ -965,7 +965,7 @@ export const ControlTablePage: React.FC = () => {
                                     style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem', background: 'white' }}
                                 >
                                     <option value="">{t('table.modals.selectWorker')}</option>
-                                    {employees.map(e => (
+                                    {employees.filter(e => e.active !== false).map(e => (
                                         <option key={e.id} value={e.id}>{e.name}</option>
                                     ))}
                                 </select>
@@ -1039,7 +1039,7 @@ export const ControlTablePage: React.FC = () => {
                                     style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem', background: 'white' }}
                                 >
                                     <option value="">{t('table.modals.selectWorker')}</option>
-                                    {employees.map(e => (
+                                    {employees.filter(e => e.active !== false).map(e => (
                                         <option key={e.id} value={e.id}>{e.name}</option>
                                     ))}
                                 </select>

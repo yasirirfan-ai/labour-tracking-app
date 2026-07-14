@@ -51,7 +51,7 @@ export const ReportsPage: React.FC = () => {
                 });
 
                 setTasks(richTasks);
-                setEmployees(userData || []);
+                setEmployees((userData || []).filter((u: any) => u.active !== false));
                 setMos(moData || []);
                 setOps(opData || []);
                 setTrainingMaterials(trMaterials || []);

@@ -61,8 +61,51 @@ export const WorkerSelectPage: React.FC = () => {
 
     if (loading) {
         return (
-            <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
-                <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#64748b' }}>Loading Workers...</div>
+            <div style={{ 
+                height: '100vh', 
+                width: '100vw',
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                background: 'radial-gradient(circle at 50% 50%, #f8fafc 0%, #e2e8f0 100%)',
+                fontFamily: "'Inter', sans-serif"
+            }}>
+                <style>{`
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                    @keyframes pulse {
+                        0%, 100% { opacity: 0.6; }
+                        50% { opacity: 1; }
+                    }
+                    .custom-spinner {
+                        width: 50px;
+                        height: 50px;
+                        border: 4px solid rgba(37, 99, 235, 0.1);
+                        border-top-color: #2563eb;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                        margin-bottom: 1.5rem;
+                        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.1);
+                    }
+                    .loading-text {
+                        font-size: 1.15rem;
+                        fontWeight: 800;
+                        color: #1e293b;
+                        letter-spacing: 0.05em;
+                        text-transform: uppercase;
+                        animation: pulse 1.5s ease-in-out infinite;
+                        font-family: 'Inter', sans-serif;
+                    }
+                `}</style>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div className="custom-spinner"></div>
+                    <div className="loading-text">
+                        Loading Profiles...
+                    </div>
+                </div>
             </div>
         );
     }

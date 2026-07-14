@@ -54,7 +54,7 @@ export const ControlMatrixPage: React.FC = () => {
         try {
             const { data: moData } = await supabase.from('manufacturing_orders').select('*');
             const { data: opData } = await supabase.from('operations').select('*').order('sort_order', { ascending: true });
-            const { data: empData } = await supabase.from('users').select('*').eq('role', 'employee').order('name', { ascending: true });
+            const { data: empData } = await supabase.from('users').select('*').eq('role', 'employee').eq('active', true).order('name', { ascending: true });
             const { data: taskData } = await supabase.from('tasks').select('*');
 
             if (moData) {
