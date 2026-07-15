@@ -43,10 +43,13 @@ export const ReportsPage: React.FC = () => {
             if (taskData && userData) {
                 const richTasks = taskData.map((t: any) => {
                     const emp = userData.find(u => u.id === t.assigned_to_id);
+                    const rate = (t.hourly_rate !== undefined && t.hourly_rate !== null && parseFloat(t.hourly_rate) > 0)
+                        ? parseFloat(t.hourly_rate)
+                        : (emp?.hourly_rate || 0);
                     return {
                         ...t,
                         employee_name: emp?.name || 'Unknown',
-                        cost: ((t.active_seconds || 0) / 3600) * (emp?.hourly_rate || 0)
+                        cost: ((t.active_seconds || 0) / 3600) * rate
                     };
                 });
 

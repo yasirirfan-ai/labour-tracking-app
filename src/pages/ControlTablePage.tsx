@@ -22,6 +22,63 @@ export const ControlTablePage: React.FC = () => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
+    // Columns Visibility Filter
+    const [showColumnFilter, setShowColumnFilter] = useState(false);
+    const [visibleColumns, setVisibleColumns] = useState({
+        mo: false, // Default hidden
+        operation: false, // Default hidden
+        startTime: false, // Default hidden
+        lastAction: false, // Default hidden
+        status: false // Default hidden
+    });
+
+    const toggleColumn = (col: keyof typeof visibleColumns) => {
+        setVisibleColumns(prev => ({ ...prev, [col]: !prev[col] }));
+    };
+
+
+
+    // State for viewing break details in right-side drawer
+    const [breakDetailTask, setBreakDetailTask] = useState<any>(null);
+    const [isEditBreaksOpen, setIsEditBreaksOpen] = useState(false);
+
+    // Edited breaks in modal
+    const [editBreaks, setEditBreaks] = useState<any[]>([]);
+
+    // Custom Premium Alert/Confirm Dialog State
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: (() => void) | null;
+        isAlert?: boolean;
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: null
+    });
+
+    const showCustomConfirm = (message: string, onConfirm: () => void, title = 'Confirm Action') => {
+        setConfirmModal({
+            isOpen: true,
+            title,
+            message,
+            onConfirm,
+            isAlert: false
+        });
+    };
+
+    const showCustomAlert = (message: string, title = 'Alert') => {
+        setConfirmModal({
+            isOpen: true,
+            title,
+            message,
+            onConfirm: null,
+            isAlert: true
+        });
+    };
+
     // Edit Modal State
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<any>(null);
@@ -133,15 +190,63 @@ export const ControlTablePage: React.FC = () => {
             const { data: empData } = await supabase.from('users').select('*').eq('role', 'employee') as { data: any[] };
             const { data: moData } = await supabase.from('manufacturing_orders').select('*').order('created_at', { ascending: false });
             const { data: opData } = await supabase.from('operations').select('*').order('sort_order', { ascending: true });
-            const { data: logsData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false });
+            const { data: logsData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }) as { data: any[] };
 
-            if (taskData && empData) {
-                const nonPendingTasks = taskData.filter((t: any) => t.status !== 'pending');
-                const richTasks = nonPendingTasks.map((t: any) => {
+            if (logsData) {
+                setActivityLogs(logsData);
+            }
+            if (taskData && empData && logsData) {
+                const richTasks = taskData.map((t: any) => {
                     const emp = empData.find(e => e.id === t.assigned_to_id);
                     return { ...t, worker_name: emp?.name || 'Unknown', worker_id_str: emp?.worker_id || '-', worker_avatar: emp?.name?.[0] || '?' };
                 });
-                setTasks(richTasks);
+
+                const virtualTasks: any[] = [];
+                empData.forEach((emp: any) => {
+                    const workerLogs = logsData
+                        .filter((l: any) => l.worker_id === emp.id)
+                        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+                    const clockIns = workerLogs.filter((l: any) => l.event_type === 'clock_in');
+                    clockIns.forEach((ci: any) => {
+                        const ciTime = new Date(ci.timestamp).getTime();
+                        const nextClockOut = workerLogs.find((l: any) => 
+                            l.event_type === 'clock_out' && new Date(l.timestamp).getTime() > ciTime
+                        );
+                        const coTime = nextClockOut ? new Date(nextClockOut.timestamp).getTime() : Infinity;
+
+                        const hasTasksInShift = richTasks.some((t: any) => {
+                            if (t.assigned_to_id !== emp.id) return false;
+                            const taskTime = new Date(t.created_at || t.start_time).getTime();
+                            return taskTime >= ciTime - 60000 && taskTime <= coTime + 60000;
+                        });
+
+                        if (!hasTasksInShift) {
+                            virtualTasks.push({
+                                id: `virtual_${emp.id}_${ci.timestamp}`,
+                                assigned_to_id: emp.id,
+                                mo_reference: '',
+                                description: 'Clocked In (No active task)',
+                                status: nextClockOut ? 'completed' : 'clocked_in',
+                                active_seconds: 0,
+                                created_at: ci.timestamp,
+                                start_time: null,
+                                end_time: nextClockOut ? nextClockOut.timestamp : null,
+                                hourly_rate: emp.hourly_rate || 0,
+                                break_seconds: 0,
+                                manual: false,
+                                reason: nextClockOut ? 'Shift Completed' : 'Shift Active',
+                                worker_name: emp.name || 'Unknown',
+                                worker_id_str: emp.worker_id || '-',
+                                worker_avatar: emp.name?.[0] || '?',
+                                is_virtual: true
+                            });
+                        }
+                    });
+                });
+
+                const combinedTasks = [...richTasks, ...virtualTasks];
+                setTasks(combinedTasks);
                 setEmployees(empData);
             }
             if (moData) {
@@ -149,10 +254,6 @@ export const ControlTablePage: React.FC = () => {
                 setMos(sortedMos);
             }
             if (opData) setOperations(opData.map((o: any) => o.name));
-
-            if (logsData) {
-                setActivityLogs(logsData);
-            }
 
         } catch (err) {
             console.error('Error fetching table data:', err);
@@ -180,39 +281,24 @@ export const ControlTablePage: React.FC = () => {
         const taskTime = new Date(taskDateIso).getTime();
         const workerLogs = activityLogs.filter(l => l.worker_id === workerId);
         
-        // Find the clock_in log that is closest to but BEFORE (or equal to) the task's timestamp
-        const clockInLogsBeforeTask = workerLogs
-            .filter(l => l.event_type === 'clock_in' && new Date(l.timestamp).getTime() <= taskTime)
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-            
-        const clockInLog = clockInLogsBeforeTask[0];
-        
-        if (!clockInLog) {
-            // Fallback to the first clock_in of the same calendar day if no log precedes the task timestamp
-            const taskDateStr = new Date(taskDateIso).toDateString();
-            const sameDayClockIn = workerLogs.find(l => 
-                l.event_type === 'clock_in' && 
-                new Date(l.timestamp).toDateString() === taskDateStr
+        // Find a shift where taskTime falls within [clockIn - 60s, clockOut + 60s]
+        const clockIns = workerLogs.filter(l => l.event_type === 'clock_in');
+        for (const ci of clockIns) {
+            const ciTime = new Date(ci.timestamp).getTime();
+            const nextClockOut = workerLogs.find(l => 
+                l.event_type === 'clock_out' && new Date(l.timestamp).getTime() > ciTime
             );
-            return {
-                clockIn: sameDayClockIn ? sameDayClockIn.timestamp : null,
-                clockOut: null
-            };
+            const coTime = nextClockOut ? new Date(nextClockOut.timestamp).getTime() : Infinity;
+            
+            if (taskTime >= ciTime - 60000 && taskTime <= coTime + 60000) {
+                return {
+                    clockIn: ci.timestamp,
+                    clockOut: nextClockOut ? nextClockOut.timestamp : null
+                };
+            }
         }
         
-        const clockInTime = new Date(clockInLog.timestamp).getTime();
-        
-        // Find the earliest clock_out log AFTER that clock_in log
-        const clockOutLogsAfterClockIn = workerLogs
-            .filter(l => l.event_type === 'clock_out' && new Date(l.timestamp).getTime() >= clockInTime)
-            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-            
-        const clockOutLog = clockOutLogsAfterClockIn[0];
-        
-        return {
-            clockIn: clockInLog.timestamp,
-            clockOut: clockOutLog ? clockOutLog.timestamp : null
-        };
+        return { clockIn: null, clockOut: null };
     };
 
     const formatTimeOnly = (isoString: string) => {
@@ -239,6 +325,99 @@ export const ControlTablePage: React.FC = () => {
         return <span className="status-badge badge-gray" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.pending')}</span>;
     };
 
+    const getBreaksForShift = (workerId: string, task: any) => {
+        if (!activityLogs || activityLogs.length === 0) return [];
+        
+        const taskTimeIso = task.created_at || task.start_time || task.end_time;
+        const { clockIn, clockOut } = getWorkerShiftTimesForDate(workerId, taskTimeIso);
+        const shiftStart = clockIn ? new Date(clockIn).getTime() : new Date(taskTimeIso).getTime();
+        const shiftEnd = clockOut ? new Date(clockOut).getTime() : (task.end_time ? new Date(task.end_time).getTime() : Infinity);
+
+        const workerLogs = activityLogs
+            .filter(l => l.worker_id === workerId)
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+            
+        const allBreaks: any[] = [];
+        let activeBreak: any = null;
+
+        workerLogs.forEach(log => {
+            if (log.event_type === 'break_start') {
+                if (!activeBreak) {
+                    activeBreak = {
+                        id: log.id,
+                        start_time: log.timestamp,
+                        end_time: null,
+                        reason: log.description || 'Rest Break'
+                    };
+                }
+            } else if (log.event_type === 'break_end') {
+                if (activeBreak) {
+                    activeBreak.end_time = log.timestamp;
+                    const duration = Math.floor((new Date(log.timestamp).getTime() - new Date(activeBreak.start_time).getTime()) / 1000);
+                    activeBreak.duration_seconds = Math.max(0, duration);
+                    allBreaks.push(activeBreak);
+                    activeBreak = null;
+                }
+            }
+        });
+
+        if (activeBreak) {
+            const end = clockOut ? new Date(clockOut).getTime() : new Date().getTime();
+            const duration = Math.floor((end - new Date(activeBreak.start_time).getTime()) / 1000);
+            activeBreak.duration_seconds = Math.max(0, duration);
+            allBreaks.push(activeBreak);
+        }
+        
+        return allBreaks.filter(b => {
+            const bStart = new Date(b.start_time).getTime();
+            return bStart >= shiftStart - 60000 && bStart <= shiftEnd + 60000;
+        });
+    };
+
+    const formatToInputDateTime = (isoString: string | null) => {
+        if (!isoString) return '';
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n: number) => n < 10 ? '0' + n : n;
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    const handleAddBreakRow = () => {
+        const defaultStart = editForm.start_time || editForm.created_at || (editingTask && (editingTask.start_time || editingTask.created_at)) || new Date().toISOString().substring(0, 16);
+        const startMs = new Date(defaultStart).getTime();
+        const defaultEnd = new Date(startMs + 15 * 60 * 1000).toISOString().substring(0, 16);
+
+        setEditBreaks(prev => [
+            ...prev,
+            {
+                id: null,
+                start_time: formatToInputDateTime(new Date(defaultStart).toISOString()),
+                end_time: formatToInputDateTime(new Date(defaultEnd).toISOString()),
+                reason: 'Rest Break',
+                duration_seconds: 900
+            }
+        ]);
+    };
+
+    const handleRemoveBreakRow = (index: number) => {
+        setEditBreaks(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleBreakChange = (index: number, key: string, value: any) => {
+        setEditBreaks(prev => prev.map((b, i) => {
+            if (i !== index) return b;
+            const updated = { ...b, [key]: value };
+            if (updated.start_time && updated.end_time) {
+                const s = new Date(updated.start_time).getTime();
+                const e = new Date(updated.end_time).getTime();
+                if (!isNaN(s) && !isNaN(e) && e >= s) {
+                    updated.duration_seconds = Math.floor((e - s) / 1000);
+                }
+            }
+            return updated;
+        }));
+    };
+
     const handleEditClick = (task: any) => {
         setEditingTask(task);
 
@@ -246,6 +425,14 @@ export const ControlTablePage: React.FC = () => {
         const totalSec = task.active_seconds || 0;
         const h = Math.floor(totalSec / 3600);
         const m = Math.floor((totalSec % 3600) / 60);
+
+        const taskBreaks = getBreaksForShift(task.assigned_to_id, task);
+        const mappedBreaks = taskBreaks.map((b: any) => ({
+            ...b,
+            start_time: b.start_time ? formatToInputDateTime(b.start_time) : '',
+            end_time: b.end_time ? formatToInputDateTime(b.end_time) : ''
+        }));
+        setEditBreaks(mappedBreaks);
 
         setEditForm({
             created_at: task.created_at ? task.created_at.substring(0, 16) : '',
@@ -260,14 +447,174 @@ export const ControlTablePage: React.FC = () => {
         setIsEditOpen(true);
     };
 
+    const handleUpdateBreaksOnly = async () => {
+        if (!editingTask) return;
+
+        try {
+            // Delete old break logs matching the shift time range
+            const taskTime = editingTask.created_at || editingTask.start_time;
+            const { clockIn, clockOut } = getWorkerShiftTimesForDate(editingTask.assigned_to_id, taskTime);
+            const shiftStart = clockIn || taskTime;
+            const shiftEnd = clockOut || editingTask.end_time || new Date().toISOString();
+
+            await (supabase.from('activity_logs') as any)
+                .delete()
+                .eq('worker_id', editingTask.assigned_to_id)
+                .in('event_type', ['break_start', 'break_end'])
+                .gte('timestamp', new Date(shiftStart).toISOString())
+                .lte('timestamp', new Date(shiftEnd).toISOString());
+
+            // Insert new break logs
+            if (editBreaks.length > 0) {
+                const logsToInsert: any[] = [];
+                editBreaks.forEach(b => {
+                    if (b.start_time) {
+                        logsToInsert.push({
+                            worker_id: editingTask.assigned_to_id,
+                            event_type: 'break_start',
+                            related_task_id: editingTask.is_virtual ? null : editingTask.id,
+                            description: b.reason || 'Rest Break',
+                            timestamp: new Date(b.start_time).toISOString()
+                        });
+                    }
+                    if (b.end_time) {
+                        logsToInsert.push({
+                            worker_id: editingTask.assigned_to_id,
+                            event_type: 'break_end',
+                            related_task_id: editingTask.is_virtual ? null : editingTask.id,
+                            description: 'Returned from Break',
+                            timestamp: new Date(b.end_time).toISOString()
+                        });
+                    }
+                });
+
+                if (logsToInsert.length > 0) {
+                    const { error: insertError } = await (supabase.from('activity_logs') as any).insert(logsToInsert);
+                    if (insertError) throw insertError;
+                }
+            }
+
+            await fetchData();
+            
+            // Refresh breakDetailTask state to reflect changes in the drawer
+            if (editingTask.is_virtual) {
+                setBreakDetailTask({
+                    ...editingTask
+                });
+            } else {
+                const { data: updatedTasks } = await (supabase.from('tasks') as any).select('*').eq('id', editingTask.id);
+                if (updatedTasks && updatedTasks[0]) {
+                    const emp = employees.find(e => e.id === updatedTasks[0].assigned_to_id);
+                    setBreakDetailTask({
+                        ...updatedTasks[0],
+                        worker_name: emp?.name || 'Unknown',
+                        worker_id_str: emp?.worker_id || '-',
+                        worker_avatar: emp?.name?.[0] || '?'
+                    });
+                } else {
+                    setBreakDetailTask(null);
+                }
+            }
+
+            setIsEditBreaksOpen(false);
+        } catch (err) {
+            console.error('Error updating breaks:', err);
+            alert('Failed to update breaks.');
+        }
+    };
+
     const handleUpdateTask = async () => {
         if (!editingTask) return;
+
+        if (editingTask.is_virtual) {
+            try {
+                const { clockIn, clockOut } = getWorkerShiftTimesForDate(editingTask.assigned_to_id, editingTask.created_at);
+                
+                // 1. Update clock_in log:
+                if (clockIn && editForm.created_at) {
+                    const newClockInIso = new Date(editForm.created_at).toISOString();
+                    await (supabase.from('activity_logs') as any)
+                        .update({ timestamp: newClockInIso })
+                        .eq('worker_id', editingTask.assigned_to_id)
+                        .eq('event_type', 'clock_in')
+                        .eq('timestamp', clockIn);
+                }
+                
+                // 2. Update clock_out log:
+                if (editForm.end_time) {
+                    const newClockOutIso = new Date(editForm.end_time).toISOString();
+                    if (clockOut) {
+                        await (supabase.from('activity_logs') as any)
+                            .update({ timestamp: newClockOutIso })
+                            .eq('worker_id', editingTask.assigned_to_id)
+                            .eq('event_type', 'clock_out')
+                            .eq('timestamp', clockOut);
+                    } else {
+                        await (supabase.from('activity_logs') as any).insert({
+                            worker_id: editingTask.assigned_to_id,
+                            event_type: 'clock_out',
+                            description: 'Worker clocked out via admin',
+                            timestamp: newClockOutIso
+                        });
+                    }
+                } else if (clockOut) {
+                    await (supabase.from('activity_logs') as any)
+                        .delete()
+                        .eq('worker_id', editingTask.assigned_to_id)
+                        .eq('event_type', 'clock_out')
+                        .eq('timestamp', clockOut);
+                }
+
+                // 3. Update breaks (delete old, insert new):
+                const prevStart = clockIn || editingTask.created_at;
+                const prevEnd = clockOut || editingTask.end_time || new Date().toISOString();
+
+                await (supabase.from('activity_logs') as any)
+                    .delete()
+                    .eq('worker_id', editingTask.assigned_to_id)
+                    .in('event_type', ['break_start', 'break_end'])
+                    .gte('timestamp', new Date(prevStart).toISOString())
+                    .lte('timestamp', new Date(prevEnd).toISOString());
+
+                if (editBreaks.length > 0) {
+                    const logsToInsert: any[] = [];
+                    editBreaks.forEach(b => {
+                        if (b.start_time) {
+                            logsToInsert.push({
+                                worker_id: editingTask.assigned_to_id,
+                                event_type: 'break_start',
+                                description: b.reason || 'Rest Break',
+                                timestamp: new Date(b.start_time).toISOString()
+                            });
+                        }
+                        if (b.end_time) {
+                            logsToInsert.push({
+                                worker_id: editingTask.assigned_to_id,
+                                event_type: 'break_end',
+                                description: 'Break ended',
+                                timestamp: new Date(b.end_time).toISOString()
+                            });
+                        }
+                    });
+                    if (logsToInsert.length > 0) {
+                        const { error: breakErr } = await (supabase.from('activity_logs') as any).insert(logsToInsert);
+                        if (breakErr) throw breakErr;
+                    }
+                }
+
+                setIsEditOpen(false);
+                fetchData();
+            } catch (err: any) {
+                showCustomAlert('Error updating shift logs: ' + err.message);
+            }
+            return;
+        }
 
         // Check if worker is on break when setting to active
         if (editForm.status === 'active') {
             const worker = employees.find(e => e.id === editingTask.assigned_to_id);
             if (worker && worker.availability === 'break') {
-                alert(t('matrix.cannotActionBreak', { action: 'start', name: worker.name }));
+                showCustomAlert(t('matrix.cannotActionBreak', { action: 'start', name: worker.name }));
                 return;
             }
         }
@@ -290,11 +637,16 @@ export const ControlTablePage: React.FC = () => {
             totalSeconds = (parseInt(String(editForm.active_hours)) * 3600) + (parseInt(String(editForm.active_minutes)) * 60);
         }
 
+        // Calculate total break seconds
+        const totalBreakSeconds = editBreaks.reduce((sum, b) => sum + (b.duration_seconds || 0), 0);
+
         // Prepare updates
         const auditName = currentUser?.username === 'admin@gmail.com' ? 'System Admin' : (currentUser?.name || currentUser?.username || 'Manager');
         const updates: any = {
             status: editForm.status,
             active_seconds: totalSeconds,
+            break_seconds: totalBreakSeconds,
+            total_duration_seconds: totalSeconds + totalBreakSeconds,
             created_at: editForm.created_at ? new Date(editForm.created_at).toISOString() : editingTask.created_at,
             start_time: editForm.start_time ? new Date(editForm.start_time).toISOString() : null,
             last_action_time: editForm.last_action_time ? new Date(editForm.last_action_time).toISOString() : editingTask.last_action_time,
@@ -318,6 +670,48 @@ export const ControlTablePage: React.FC = () => {
             const { error } = await (supabase.from('tasks') as any).update(updates).eq('id', editingTask.id);
             if (error) throw error;
 
+            // Delete old break logs matching the shift time range
+            const taskTime = editingTask.created_at || editingTask.start_time;
+            const { clockIn, clockOut } = getWorkerShiftTimesForDate(editingTask.assigned_to_id, taskTime);
+            const shiftStart = clockIn || taskTime;
+            const shiftEnd = clockOut || editingTask.end_time || new Date().toISOString();
+
+            await (supabase.from('activity_logs') as any)
+                .delete()
+                .eq('worker_id', editingTask.assigned_to_id)
+                .in('event_type', ['break_start', 'break_end'])
+                .gte('timestamp', new Date(shiftStart).toISOString())
+                .lte('timestamp', new Date(shiftEnd).toISOString());
+
+            // Insert new break logs
+            if (editBreaks.length > 0) {
+                const logsToInsert: any[] = [];
+                editBreaks.forEach(b => {
+                    if (b.start_time) {
+                        logsToInsert.push({
+                            worker_id: editingTask.assigned_to_id,
+                            event_type: 'break_start',
+                            related_task_id: editingTask.id,
+                            description: b.reason || 'Rest Break',
+                            timestamp: new Date(b.start_time).toISOString()
+                        });
+                    }
+                    if (b.end_time) {
+                        logsToInsert.push({
+                            worker_id: editingTask.assigned_to_id,
+                            event_type: 'break_end',
+                            related_task_id: editingTask.id,
+                            description: 'Break ended',
+                            timestamp: new Date(b.end_time).toISOString()
+                        });
+                    }
+                });
+                if (logsToInsert.length > 0) {
+                    const { error: breakErr } = await (supabase.from('activity_logs') as any).insert(logsToInsert);
+                    if (breakErr) throw breakErr;
+                }
+            }
+
             // Audit Log
             if (currentUser) {
                 const auditName = currentUser.username === 'admin@gmail.com' ? 'System Admin' : (currentUser.name || currentUser.username || 'Manager');
@@ -335,18 +729,55 @@ export const ControlTablePage: React.FC = () => {
             setIsEditOpen(false);
             fetchData();
         } catch (e: any) {
-            alert(t('table.errorUpdating') + ': ' + e.message);
+            showCustomAlert(t('table.errorUpdating') + ': ' + e.message);
         }
     };
 
     const handleDeleteTask = async (id: string) => {
-        if (!confirm(t('table.deleteConfirm'))) return;
-        try {
-            const { error } = await supabase.from('tasks').delete().eq('id', id);
-            if (error) throw error;
-            fetchData();
-        } catch (err: any) {
-            alert(t('table.errorDeleting') + ': ' + err.message);
+        const performDelete = async () => {
+            if (id.startsWith('virtual_')) {
+                try {
+                    const parts = id.split('_');
+                    const workerId = parts[1];
+                    const ciTimestamp = parts.slice(2).join('_');
+                    
+                    const { clockIn, clockOut } = getWorkerShiftTimesForDate(workerId, ciTimestamp);
+                    const shiftStart = clockIn || ciTimestamp;
+                    const shiftEnd = clockOut || new Date().toISOString();
+                    
+                    await (supabase.from('activity_logs') as any)
+                        .delete()
+                        .eq('worker_id', workerId)
+                        .gte('timestamp', new Date(shiftStart).toISOString())
+                        .lte('timestamp', new Date(shiftEnd).toISOString());
+                    
+                    fetchData();
+                } catch (err: any) {
+                    showCustomAlert('Error deleting shift: ' + err.message);
+                }
+            } else {
+                try {
+                    const { error } = await supabase.from('tasks').delete().eq('id', id);
+                    if (error) throw error;
+                    fetchData();
+                } catch (err: any) {
+                    showCustomAlert(t('table.errorDeleting') + ': ' + err.message);
+                }
+            }
+        };
+
+        if (id.startsWith('virtual_')) {
+            showCustomConfirm(
+                'Are you sure you want to delete this shift record? This will delete the clock-in/out logs and breaks.',
+                performDelete,
+                'Delete Shift Record'
+            );
+        } else {
+            showCustomConfirm(
+                t('table.deleteConfirm'),
+                performDelete,
+                'Delete Task'
+            );
         }
     };
 
@@ -377,18 +808,18 @@ export const ControlTablePage: React.FC = () => {
         // Tab 1 (Clock In/Out): only Worker is required
         // Tab 2 (Start/Last Action): Worker, MO, and Operation are all required
         if (!createForm.worker_id) {
-            alert(t('table.modals.worker') + ' is required.');
+            showCustomAlert(t('table.modals.worker') + ' is required.');
             return;
         }
         if (createTab === 'startLastAction' && (!createForm.mo_reference || !createForm.description)) {
-            alert(t('table.modals.validationError'));
+            showCustomAlert(t('table.modals.validationError'));
             return;
         }
 
         const emp = employees.find(e => e.id === createForm.worker_id);
 
         if (createForm.status === 'active' && emp?.availability === 'break') {
-            alert(t('matrix.cannotActionBreak', { action: 'start', name: emp.name }));
+            showCustomAlert(t('matrix.cannotActionBreak', { action: 'start', name: emp.name }));
             return;
         }
 
@@ -463,19 +894,35 @@ export const ControlTablePage: React.FC = () => {
             setIsCreateOpen(false);
             fetchData();
         } catch (e: any) {
-            alert(t('table.errorCreating') + ': ' + e.message);
+            showCustomAlert(t('table.errorCreating') + ': ' + e.message);
         }
     };
 
     // Returns the UTC Date corresponding to midnight (start) or 23:59:59.999 (end)
     // of a YYYY-MM-DD date in America/Los_Angeles (PST/PDT), handles DST automatically.
     const getPSTBound = (dateStr: string, endOfDay: boolean): Date => {
-        const timeStr = endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
-        const utcDate = new Date(dateStr + timeStr);
-        const utcStr = utcDate.toLocaleString('en-US', { timeZone: 'UTC' });
-        const laStr = utcDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
-        const offsetMs = new Date(utcStr).getTime() - new Date(laStr).getTime();
-        return new Date(utcDate.getTime() + offsetMs);
+        const date = new Date(dateStr + (endOfDay ? 'T23:59:59.999' : 'T00:00:00.000'));
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Los_Angeles',
+            year: 'numeric', month: 'numeric', day: 'numeric',
+            hour: 'numeric', minute: 'numeric', second: 'numeric',
+            hour12: false
+        });
+        
+        const parts = formatter.formatToParts(date);
+        const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0', 10);
+        
+        const y = getPart('year');
+        const m = getPart('month');
+        const d = getPart('day');
+        const hr = getPart('hour');
+        const min = getPart('minute');
+        const sec = getPart('second');
+        
+        const pstTimestamp = Date.UTC(y, m - 1, d, hr === 24 ? 0 : hr, min, sec);
+        const diff = date.getTime() - pstTimestamp;
+        
+        return new Date(date.getTime() + diff);
     };
 
     const filteredTasks = tasks.filter(t => {
@@ -498,6 +945,9 @@ export const ControlTablePage: React.FC = () => {
         const taskDate = new Date(t.created_at || t.start_time);
         if (startDate && taskDate < getPSTBound(startDate, false)) matchesDate = false;
         if (endDate && taskDate > getPSTBound(endDate, true)) matchesDate = false;
+
+        const { clockIn } = getWorkerShiftTimesForDate(t.assigned_to_id, t.created_at || t.start_time);
+        if (!clockIn && !t.manual) return false;
 
         return matchesSearch && matchesWorker && matchesStatus && matchesDate;
     }).sort((a, b) => {
@@ -580,24 +1030,24 @@ export const ControlTablePage: React.FC = () => {
             </div>
 
             {/* Search Filter Bar (Restored Inline Styles) */}
-            <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+            <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', background: 'var(--bg-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
-                    <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }}></i>
+                    <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}></i>
                     <input
                         type="text"
                         placeholder={t('table.searchPlaceholder')}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.25rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
+                        style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.25rem', borderRadius: '8px', border: '1px solid var(--border)', outline: 'none', background: 'var(--bg-body)', color: 'var(--text-main)' }}
                     />
                 </div>
 
-                <select value={workerFilter} onChange={(e) => setWorkerFilter(e.target.value)} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none', background: 'white' }}>
+                <select value={workerFilter} onChange={(e) => setWorkerFilter(e.target.value)} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', outline: 'none', background: 'var(--bg-body)', color: 'var(--text-main)' }}>
                     <option value="all">{t('table.allWorkers')}</option>
-                    {employees.filter(e => e.active !== false).map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
+                    {employees.filter(e => e.active !== false).map(e => <option key={e.id} value={e.name} style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>{e.name}</option>)}
                 </select>
 
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none', background: 'white' }}>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', outline: 'none', background: 'var(--bg-body)', color: 'var(--text-main)' }}>
                     <option value="all">{t('table.allStatuses')}</option>
                     <option value="timer running">{t('table.statusLabels.timerRunning')}</option>
                     <option value="clocked in">{t('table.statusLabels.clockedIn')}</option>
@@ -606,18 +1056,76 @@ export const ControlTablePage: React.FC = () => {
                     <option value="pending">{t('table.statusLabels.pending')}</option>
                 </select>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#F8FAFC', padding: '0.25rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748B' }}>{t('table.from')}</span>
-                    <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setActiveChip(''); }} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: '#475569' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-body)', padding: '0.25rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('table.from')}</span>
+                    <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setActiveChip(''); }} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--text-main)' }} />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#F8FAFC', padding: '0.25rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748B' }}>{t('table.to')}</span>
-                    <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setActiveChip(''); }} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: '#475569' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-body)', padding: '0.25rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('table.to')}</span>
+                    <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setActiveChip(''); }} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--text-main)' }} />
                 </div>
 
-                <button className="btn btn-secondary" onClick={resetFilters} style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}>
+                <button className="btn btn-secondary" onClick={resetFilters} style={{ background: 'var(--bg-body)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
                     {t('table.reset')}
                 </button>
+
+                <div style={{ position: 'relative' }}>
+                    <button 
+                        className="btn btn-secondary" 
+                        onClick={() => setShowColumnFilter(prev => !prev)} 
+                        style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
+                    >
+                        <i className="fa-solid fa-sliders"></i>
+                        Columns Filter
+                    </button>
+                    {showColumnFilter && (
+                        <div style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: '100%',
+                            marginTop: '0.5rem',
+                            background: 'var(--bg-card)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '12px',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)',
+                            padding: '1rem',
+                            zIndex: 100,
+                            minWidth: '220px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.75rem'
+                        }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Toggle Columns
+                            </div>
+                            
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
+                                <input type="checkbox" checked={visibleColumns.mo} onChange={() => toggleColumn('mo')} />
+                                MO Reference
+                            </label>
+                            
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
+                                <input type="checkbox" checked={visibleColumns.operation} onChange={() => toggleColumn('operation')} />
+                                Operation (Description)
+                            </label>
+                            
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
+                                <input type="checkbox" checked={visibleColumns.startTime} onChange={() => toggleColumn('startTime')} />
+                                Start Time
+                            </label>
+                            
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
+                                <input type="checkbox" checked={visibleColumns.lastAction} onChange={() => toggleColumn('lastAction')} />
+                                Last Action
+                            </label>
+                            
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
+                                <input type="checkbox" checked={visibleColumns.status} onChange={() => toggleColumn('status')} />
+                                Status
+                            </label>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Date Filter Chips Row - BELOW Search Bar */}
@@ -651,72 +1159,98 @@ export const ControlTablePage: React.FC = () => {
             <div className="table-responsive-container">
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                     <thead>
-                        <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
-                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.workerId')}</th>
-                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569', left: '100px' }}>{t('table.columns.name')}</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.mo')}</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.operation')}</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.clockIn')}</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.startTime')}</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.clockOut')}</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.lastAction')}</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.duration')}</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>{t('table.columns.status')}</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Audit Record</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>{t('table.columns.edit')}</th>
+                        <tr style={{ background: 'var(--bg-body)', borderBottom: '2px solid var(--border)' }}>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)', background: 'var(--bg-body)' }}>{t('table.columns.workerId')}</th>
+                            <th className="sticky-column" style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)', left: '100px', background: 'var(--bg-body)' }}>{t('table.columns.name')}</th>
+                            {visibleColumns.mo && <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)' }}>{t('table.columns.mo')}</th>}
+                            {visibleColumns.operation && <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)' }}>{t('table.columns.operation')}</th>}
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)' }}>{t('table.columns.clockIn')}</th>
+                            {visibleColumns.startTime && <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)' }}>{t('table.columns.startTime')}</th>}
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)' }}>{t('table.columns.clockOut')}</th>
+                            {visibleColumns.lastAction && <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)' }}>{t('table.columns.lastAction')}</th>}
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)' }}>{t('table.columns.duration')}</th>
+                            {visibleColumns.status && <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)' }}>{t('table.columns.status')}</th>}
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-main)' }}>Audit Record</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>{t('table.columns.edit')}</th>
                         </tr>
                     </thead>
-                    <tbody style={{ background: 'white' }}>
+                    <tbody style={{ background: 'var(--bg-card)' }}>
                         {filteredTasks.map(task => (
-                            <tr key={task.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#64748B', fontFamily: `'JetBrains Mono', monospace` }}>{task.worker_id_str}</td>
-                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', left: '100px' }}>
+                            <React.Fragment key={task.id}>
+                                <tr 
+                                    onClick={() => setBreakDetailTask(task)}
+                                    style={{ 
+                                        borderBottom: '1px solid var(--border)', 
+                                        background: 'var(--bg-card)', 
+                                        color: 'var(--text-main)',
+                                        cursor: 'pointer'
+                                    }}
+                                    className="table-row-clickable"
+                                >
+                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-muted)', fontFamily: `'JetBrains Mono', monospace`, background: 'var(--bg-card)' }}>{task.worker_id_str}</td>
+                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', left: '100px', background: 'var(--bg-card)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <div style={{ width: '32px', height: '32px', background: 'var(--primary)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '0.8rem' }}>
                                             {task.worker_avatar}
                                         </div>
-                                        <span style={{ fontWeight: 600, color: '#1E293B' }}>{task.worker_name}</span>
+                                        <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{task.worker_name}</span>
                                     </div>
                                 </td>
-                                <td style={{ padding: '0.75rem 1rem' }}>
-                                    <span className="badge badge-blue" style={{ fontSize: '0.75rem' }}>{task.mo_reference}</span>
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{task.description}</td>
-                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
+                                {visibleColumns.mo && (
+                                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                        <span className="badge badge-blue" style={{ fontSize: '0.75rem' }}>{task.mo_reference}</span>
+                                    </td>
+                                )}
+                                {visibleColumns.operation && <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{task.description}</td>}
+                                <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
                                     {(() => {
-                                        const { clockIn } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at);
-                                        return clockIn ? formatDateTime(clockIn) : formatDateTime(task.created_at);
+                                        const taskTime = task.created_at || task.start_time;
+                                        const { clockIn } = getWorkerShiftTimesForDate(task.assigned_to_id, taskTime);
+                                        return clockIn ? formatDateTime(clockIn) : (taskTime ? formatDateTime(taskTime) : '-');
                                     })()}
                                 </td>
-                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
-                                    {formatTimeOnly(task.start_time)}
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
-                                    {(() => {
-                                        const { clockIn, clockOut } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at);
-                                        if (clockOut) {
-                                            return formatDateTime(clockOut);
-                                        }
-                                        if (clockIn || task.status !== 'completed') {
-                                            return <span style={{ color: '#16A34A', fontWeight: 600 }}>Still Clocked In</span>;
-                                        }
-                                        return task.end_time ? formatDateTime(task.end_time) : '-';
-                                    })()}
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
-                                    {formatTimeOnly(task.last_action_time)}
-                                </td>
+                                {visibleColumns.startTime && (
+                                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                        {formatTimeOnly(task.start_time)}
+                                    </td>
+                                )}
+                                <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                     {(() => {
+                                         const { clockOut } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at || task.start_time);
+                                         if (clockOut) return formatDateTime(clockOut);
+                                         return 'Still Clocked In';
+                                     })()}
+                                 </td>
+                                {visibleColumns.lastAction && (
+                                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                        {formatTimeOnly(task.last_action_time)}
+                                    </td>
+                                )}
                                 <td style={{ padding: '0.75rem 1rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <span style={{ fontFamily: `'JetBrains Mono', monospace`, color: '#334155', fontWeight: 600 }}>
-                                            {formatCurrentTime(task)}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem' }}>{getStatusLabel(task.status)}</td>
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#64748B' }}>
+                                     <span style={{ fontFamily: `'JetBrains Mono', monospace`, color: 'var(--text-main)', fontWeight: 600 }}>
+                                         {(() => {
+                                             const { clockIn, clockOut } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at || task.start_time);
+                                             if (clockIn) {
+                                                 const start = new Date(clockIn).getTime();
+                                                 const end = clockOut ? new Date(clockOut).getTime() : new Date().getTime();
+                                                 let totalSeconds = Math.max(0, Math.floor((end - start) / 1000));
+                                                 
+                                                 const breaks = getBreaksForShift(task.assigned_to_id, task);
+                                                 const totalBreakSeconds = breaks.reduce((sum, b) => sum + b.duration_seconds, 0);
+                                                 totalSeconds = Math.max(0, totalSeconds - totalBreakSeconds);
+ 
+                                                 const h = Math.floor(totalSeconds / 3600);
+                                                 const m = Math.floor((totalSeconds % 3600) / 60);
+                                                 const s = totalSeconds % 60;
+                                                 return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
+                                             }
+                                             return formatCurrentTime(task);
+                                         })()}
+                                     </span>
+                                 </td>
+                                {visibleColumns.status && <td style={{ padding: '0.75rem 1rem' }}>{getStatusLabel(task.status)}</td>}
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                                     {(() => {
-                                        // 1. Check Task.reason (Most reliable direct audit)
                                         if (task.reason && task.reason.includes('by ')) {
                                             const name = task.reason.split('by ')[1];
                                             const type = (task.reason.toLowerCase().includes('create') || task.manual) ? 'Manual Creation' : 'Manual Update';
@@ -728,7 +1262,6 @@ export const ControlTablePage: React.FC = () => {
                                             );
                                         }
 
-                                        // 2. Fallback to Activity Logs extraction
                                         const logs = activityLogs.filter(l => l.related_task_id === task.id);
                                         const log = logs[0];
 
@@ -746,32 +1279,361 @@ export const ControlTablePage: React.FC = () => {
                                                 );
                                             }
                                         }
-                                        return <span style={{ fontStyle: 'italic', color: '#94A3B8' }}>Worker action</span>;
+                                        return <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Worker action</span>;
                                     })()}
                                 </td>
-                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                    <button
-                                        onClick={() => handleEditClick(task)}
-                                        className="icon-btn"
-                                        title={t('table.columns.edit')}
-                                        style={{ color: '#475569', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
-                                    >
-                                        <i className="fa-solid fa-pen-to-square"></i>
-                                    </button>
-                                    <button
-                                        onClick={() => handleDeleteTask(task.id)}
-                                        className="icon-btn delete"
-                                        title={t('common.delete')}
-                                        style={{ color: '#EF4444', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
-                                    >
-                                        <i className="fa-regular fa-trash-can"></i>
-                                    </button>
+                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleEditClick(task); }}
+                                            className="icon-btn"
+                                            title={t('table.columns.edit')}
+                                            style={{ color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
+                                        >
+                                            <i className="fa-solid fa-pen-to-square"></i>
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
+                                            className="icon-btn delete"
+                                            title={t('common.delete')}
+                                            style={{ color: '#EF4444', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
+                                        >
+                                            <i className="fa-regular fa-trash-can"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
-                        ))}
+                            {/* Inline breaks row removed in favor of right-side sliding drawer details */}
+                        </React.Fragment>
+                    ))}
                     </tbody>
                 </table>
             </div>
+
+            {/* Break History Drawer (Slides out from right) */}
+            {breakDetailTask && (
+                <>
+                    <style>{`
+                        @keyframes slideIn {
+                            from { transform: translateX(100%); }
+                            to { transform: translateX(0); }
+                        }
+                    `}</style>
+                    {/* Backdrop */}
+                    <div 
+                        onClick={() => setBreakDetailTask(null)}
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100vw',
+                            height: '100vh',
+                            background: 'rgba(0, 0, 0, 0.4)',
+                            backdropFilter: 'blur(4px)',
+                            zIndex: 2999,
+                            transition: 'opacity 0.2s'
+                        }}
+                    />
+                    {/* Drawer */}
+                    <div 
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            right: 0,
+                            width: 'min(450px, 100%)',
+                            height: '100vh',
+                            background: 'white',
+                            boxShadow: '-10px 0 30px rgba(0, 0, 0, 0.15)',
+                            zIndex: 3000,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            animation: 'slideIn 0.25s ease-out',
+                            borderLeft: '1px solid var(--border)'
+                        }}
+                    >
+                        {/* Header */}
+                        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                    Shift Break Breakdown
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                    {breakDetailTask.worker_name} ({breakDetailTask.worker_id_str})
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setBreakDetailTask(null)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}
+                            >
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                            {/* Summary Card */}
+                            <div style={{ background: 'var(--bg-body)', borderRadius: '10px', padding: '1rem', border: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Shift Status</span>
+                                    <span className="status-badge" style={{ display: 'inline-block' }}>
+                                        {getStatusLabel(breakDetailTask.status)}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Total Break Time</span>
+                                    <span style={{ fontSize: '1rem', fontWeight: 700, color: '#D97706', fontFamily: `'JetBrains Mono', monospace` }}>
+                                        {(() => {
+                                            const breaks = getBreaksForShift(breakDetailTask.assigned_to_id, breakDetailTask);
+                                            const totalBreakSeconds = breaks.reduce((sum, b) => sum + b.duration_seconds, 0);
+                                            const bh = Math.floor(totalBreakSeconds / 3600);
+                                            const bm = Math.floor((totalBreakSeconds % 3600) / 60);
+                                            const bs = totalBreakSeconds % 60;
+                                            return [bh, bm, bs].map(v => v < 10 ? "0" + v : v).join(":");
+                                        })()}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Break Logs */}
+                            <div>
+                                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                    Break Timeline ({getBreaksForShift(breakDetailTask.assigned_to_id, breakDetailTask).length})
+                                </h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    {(() => {
+                                        const breaks = getBreaksForShift(breakDetailTask.assigned_to_id, breakDetailTask);
+                                        if (breaks.length === 0) {
+                                            return (
+                                                <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', background: 'var(--bg-body)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
+                                                    <i className="fa-solid fa-mug-hot" style={{ fontSize: '1.5rem', marginBottom: '0.5rem', display: 'block', color: 'var(--text-muted)' }}></i>
+                                                    No breaks recorded for this shift.
+                                                </div>
+                                            );
+                                        }
+                                        return breaks.map((b: any, idx: number) => (
+                                            <div 
+                                                key={b.id || idx}
+                                                style={{
+                                                    background: 'white',
+                                                    border: '1px solid var(--border)',
+                                                    borderRadius: '8px',
+                                                    padding: '0.75rem 1rem',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center'
+                                                }}
+                                            >
+                                                <div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#F59E0B' }} />
+                                                        <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.85rem' }}>
+                                                            {b.reason || 'Rest Break'}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', paddingLeft: '12px' }}>
+                                                        {formatTimeOnly(b.start_time)} - {b.end_time ? formatTimeOnly(b.end_time) : 'Active'}
+                                                    </div>
+                                                </div>
+                                                <div style={{ fontWeight: 600, fontSize: '0.85rem', fontFamily: `'JetBrains Mono', monospace`, background: '#FEF3C7', padding: '2px 6px', borderRadius: '4px', color: '#B45309' }}>
+                                                    {(() => {
+                                                        const bh = Math.floor(b.duration_seconds / 3600);
+                                                        const bm = Math.floor((b.duration_seconds % 3600) / 60);
+                                                        const bs = b.duration_seconds % 60;
+                                                        return [bh, bm, bs].map(v => v < 10 ? "0" + v : v).join(":");
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div style={{ padding: '1.25rem', borderTop: '1px solid var(--border)', display: 'flex', gap: '0.75rem' }}>
+                            <button
+                                onClick={() => {
+                                    setEditingTask(breakDetailTask);
+                                    const breaks = getBreaksForShift(breakDetailTask.assigned_to_id, breakDetailTask);
+                                    setEditBreaks(breaks.map((b: any) => ({
+                                        ...b,
+                                        start_time: b.start_time ? formatToInputDateTime(b.start_time) : '',
+                                        end_time: b.end_time ? formatToInputDateTime(b.end_time) : ''
+                                    })));
+                                    setIsEditBreaksOpen(true);
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: '0.6rem',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    background: '#F59E0B',
+                                    color: 'white',
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                            >
+                                <i className="fa-solid fa-pen-to-square"></i>
+                                Edit Breaks Only
+                            </button>
+                            <button
+                                onClick={() => setBreakDetailTask(null)}
+                                style={{
+                                    padding: '0.6rem 1.25rem',
+                                    borderRadius: '6px',
+                                    border: '1.5px solid var(--border)',
+                                    background: 'white',
+                                    color: 'var(--text-muted)',
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Edit Breaks Modal (Dedicated to only editing breaks) */}
+            {isEditBreaksOpen && editingTask && (
+                <>
+                    {/* Backdrop */}
+                    <div 
+                        onClick={() => setIsEditBreaksOpen(false)}
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100vw',
+                            height: '100vh',
+                            background: 'rgba(0, 0, 0, 0.4)',
+                            backdropFilter: 'blur(4px)',
+                            zIndex: 3001,
+                            transition: 'opacity 0.2s'
+                        }}
+                    />
+                    {/* Modal */}
+                    <div style={{
+                        position: 'fixed',
+                        left: '50%',
+                        top: '50%',
+                        transform: `translate(-50%, -50%)`,
+                        width: 'min(650px, 95%)',
+                        height: 'auto',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        borderRadius: '12px',
+                        zIndex: 3002,
+                        background: 'white',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}>
+                        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                    Edit Breaks Only
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                    {editingTask.worker_name} • {editingTask.description}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setIsEditBreaksOpen(false)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}
+                            >
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <div style={{ padding: '1.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <label style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.85rem' }}>Shift Break Logs</label>
+                                <button 
+                                    type="button"
+                                    className="btn btn-secondary" 
+                                    onClick={handleAddBreakRow}
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}
+                                >
+                                    <i className="fa-solid fa-plus"></i> Add Break
+                                </button>
+                            </div>
+                            
+                            {editBreaks.length === 0 ? (
+                                <div style={{ fontSize: '0.85rem', color: '#94A3B8', padding: '1.5rem', textAlign: 'center', background: '#F8FAFC', borderRadius: '8px', border: '1px dashed #E2E8F0', fontStyle: 'italic', marginBottom: '1.5rem' }}>
+                                    No breaks recorded for this shift. Click "Add Break" to insert one.
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '350px', overflowY: 'auto', paddingRight: '0.25rem', marginBottom: '1.5rem' }}>
+                                    {editBreaks.map((b, index) => (
+                                        <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: '#F8FAFC', padding: '0.75rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                            <div style={{ flex: 2 }}>
+                                                <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600, marginBottom: '2px' }}>Start Time</span>
+                                                <input 
+                                                    type="datetime-local" 
+                                                    value={b.start_time} 
+                                                    onChange={e => handleBreakChange(index, 'start_time', e.target.value)} 
+                                                    style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
+                                                />
+                                            </div>
+                                            <div style={{ flex: 2 }}>
+                                                <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600, marginBottom: '2px' }}>End Time</span>
+                                                <input 
+                                                    type="datetime-local" 
+                                                    value={b.end_time} 
+                                                    onChange={e => handleBreakChange(index, 'end_time', e.target.value)} 
+                                                    style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
+                                                />
+                                            </div>
+                                            <div style={{ flex: 2 }}>
+                                                <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600, marginBottom: '2px' }}>Reason</span>
+                                                <input 
+                                                    type="text" 
+                                                    value={b.reason} 
+                                                    onChange={e => handleBreakChange(index, 'reason', e.target.value)} 
+                                                    placeholder="e.g. Lunch Break"
+                                                    style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
+                                                />
+                                            </div>
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleRemoveBreakRow(index)} 
+                                                style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '0.5rem 0.25rem 0', alignSelf: 'center' }}
+                                                title="Delete Break"
+                                            >
+                                                <i className="fa-regular fa-trash-can"></i>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setIsEditBreaksOpen(false)} 
+                                    style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    className="btn btn-primary" 
+                                    onClick={handleUpdateBreaksOnly} 
+                                    style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                    Save Breaks Only
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* Edit Modal (Compact) */}
             <div className={`offcanvas ${isEditOpen ? 'show' : ''}`} style={{
@@ -893,6 +1755,69 @@ export const ControlTablePage: React.FC = () => {
                                         <option value="completed">{t('table.statusLabels.completed')}</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                    <label style={{ fontWeight: 600, color: '#475569', fontSize: '0.85rem' }}>Itemized Breaks</label>
+                                    <button 
+                                        type="button"
+                                        className="btn btn-secondary" 
+                                        onClick={handleAddBreakRow}
+                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}
+                                    >
+                                        <i className="fa-solid fa-plus"></i> Add Break
+                                    </button>
+                                </div>
+                                
+                                {editBreaks.length === 0 ? (
+                                    <div style={{ fontSize: '0.8rem', color: '#94A3B8', padding: '0.5rem', textAlign: 'center', background: '#F8FAFC', borderRadius: '6px', fontStyle: 'italic' }}>
+                                        No breaks recorded for this shift.
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                                        {editBreaks.map((b, index) => (
+                                            <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: '#F8FAFC', padding: '0.5rem', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+                                                <div style={{ flex: 2 }}>
+                                                    <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600 }}>Start Time</span>
+                                                    <input 
+                                                        type="datetime-local" 
+                                                        value={b.start_time} 
+                                                        onChange={e => handleBreakChange(index, 'start_time', e.target.value)} 
+                                                        style={{ width: '100%', padding: '0.25rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
+                                                    />
+                                                </div>
+                                                <div style={{ flex: 2 }}>
+                                                    <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600 }}>End Time</span>
+                                                    <input 
+                                                        type="datetime-local" 
+                                                        value={b.end_time} 
+                                                        onChange={e => handleBreakChange(index, 'end_time', e.target.value)} 
+                                                        style={{ width: '100%', padding: '0.25rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
+                                                    />
+                                                </div>
+                                                <div style={{ flex: 2 }}>
+                                                    <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600 }}>Reason</span>
+                                                    <input 
+                                                        type="text" 
+                                                        value={b.reason} 
+                                                        onChange={e => handleBreakChange(index, 'reason', e.target.value)} 
+                                                        placeholder="Lunch, etc."
+                                                        style={{ width: '100%', padding: '0.25rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
+                                                    />
+                                                </div>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleRemoveBreakRow(index)} 
+                                                    style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '0.5rem 0.25rem 0', alignSelf: 'center' }}
+                                                    title="Delete Break"
+                                                >
+                                                    <i className="fa-regular fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
@@ -1126,6 +2051,70 @@ export const ControlTablePage: React.FC = () => {
             {isCreateOpen && <div className="overlay active" style={{ zIndex: 3000 }} onClick={() => setIsCreateOpen(false)}></div>}
 
             {isEditOpen && <div className="overlay active" style={{ zIndex: 3000 }} onClick={() => setIsEditOpen(false)}></div>}
+
+            {/* Custom Premium Alert/Confirm Dialog */}
+            {confirmModal.isOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    background: 'rgba(15, 23, 42, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                }}>
+                    <div style={{
+                        background: 'var(--bg-card)',
+                        color: 'var(--text-main)',
+                        padding: '2rem',
+                        borderRadius: '16px',
+                        width: 'min(440px, 90%)',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.15)',
+                        border: '1px solid var(--border)',
+                    }}>
+                        <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <i className={confirmModal.isAlert ? "fa-solid fa-triangle-exclamation" : "fa-solid fa-circle-question"} style={{ color: confirmModal.isAlert ? 'var(--primary)' : '#EF4444' }}></i>
+                            {confirmModal.title}
+                        </h3>
+                        <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                            {confirmModal.message}
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                            {!confirmModal.isAlert && (
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                                    style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem', fontWeight: 600, background: 'var(--bg-body)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                            <button 
+                                className="btn btn-primary" 
+                                onClick={() => {
+                                    if (confirmModal.onConfirm) confirmModal.onConfirm();
+                                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                                }}
+                                style={{ 
+                                    padding: '0.6rem 1.5rem', 
+                                    fontSize: '0.85rem', 
+                                    fontWeight: 600, 
+                                    background: confirmModal.isAlert ? 'var(--primary)' : '#EF4444', 
+                                    border: 'none',
+                                    color: 'white',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.15)'
+                                }}
+                            >
+                                {confirmModal.isAlert ? 'OK' : 'Confirm'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

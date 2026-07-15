@@ -34,7 +34,10 @@ export const Dashboard: React.FC = () => {
                 const totalSec = taskData.reduce((acc, t: any) => acc + (t.active_seconds || 0), 0);
                 const totalCost = taskData.reduce((acc, t: any) => {
                     const emp = userData.find(u => u.id === t.assigned_to_id);
-                    return acc + (((t.active_seconds || 0) / 3600) * (emp?.hourly_rate || 0));
+                    const rate = (t.hourly_rate !== undefined && t.hourly_rate !== null && parseFloat(t.hourly_rate) > 0) 
+                        ? parseFloat(t.hourly_rate) 
+                        : (emp?.hourly_rate || 0);
+                    return acc + (((t.active_seconds || 0) / 3600) * rate);
                 }, 0);
 
                 setStats({

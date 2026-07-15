@@ -123,7 +123,8 @@ export const ControlMatrixPage: React.FC = () => {
                 status: 'pending', // Waiting to start
                 active_seconds: 0,
                 hourly_rate: rate,
-                start_time: null
+                start_time: null,
+                created_at: new Date().toISOString()
             };
 
             // Using 'any' cast to bypass strict typing issues with Supabase generated types if they are out of sync

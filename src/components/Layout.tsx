@@ -62,8 +62,7 @@ export const Layout: React.FC = () => {
 
         const pollForWorkerActivities = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('activity_logs')
+                const { data, error } = await (supabase.from('activity_logs') as any)
                     .select('id, worker_id, event_type, description, timestamp')
                     .in('event_type', ['clock_in', 'clock_out', 'break_start', 'break_end'])
                     .order('timestamp', { ascending: false })

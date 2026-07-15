@@ -36,7 +36,6 @@ export function pstDayStart(dateStr: string): string {
 export function pstDayEnd(dateStr: string): string {
     // 23:59:59 PST = next day 07:59:59 UTC
     const [y, m, d] = dateStr.split('-').map(Number);
-    const nextDay = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0, 0));
     // nextDay midnight UTC = end of PST day = nextDay 00:00 UTC minus 1ms... 
     // Actually: 23:59:59.999 PST = (next day) 07:59:59.999 UTC
     const end = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) - PST_OFFSET_MS);

@@ -68,9 +68,57 @@ function App() {
             <Route path="future-planning" element={<FuturePlanningPage />} />
           </Route>
         </Routes>
+        <StagingIndicator />
       </AuthProvider>
     </Router>
   );
 }
+
+const StagingIndicator = () => {
+  const isStaging = import.meta.env.VITE_SUPABASE_URL?.includes('shmrlavsryzorpbrdqcn');
+  if (!isStaging) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: '1.5rem',
+      right: '1.5rem',
+      background: 'rgba(239, 68, 68, 0.95)',
+      color: 'white',
+      padding: '0.6rem 1.2rem',
+      borderRadius: '30px',
+      fontSize: '0.8rem',
+      fontWeight: 800,
+      zIndex: 99999,
+      boxShadow: '0 8px 32px 0 rgba(239, 68, 68, 0.3)',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      pointerEvents: 'none',
+      fontFamily: "'Inter', sans-serif",
+      userSelect: 'none'
+    }}>
+      <span style={{
+        display: 'inline-block',
+        width: '8px',
+        height: '8px',
+        background: 'white',
+        borderRadius: '50%',
+        animation: 'pulseStaging 1.5s infinite'
+      }}></span>
+      Staging Database Active
+      <style>{`
+        @keyframes pulseStaging {
+          0%, 100% { opacity: 0.4; transform: scale(0.9); }
+          50% { opacity: 1; transform: scale(1.1); }
+        }
+      `}</style>
+    </div>
+  );
+};
 
 export default App;
