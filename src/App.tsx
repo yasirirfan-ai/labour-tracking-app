@@ -25,8 +25,12 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode; role?: 
 
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (role && user.role !== role) {
-    return <Navigate to={user.role === 'manager' ? '/' : '/worker-portal'} replace />;
+
+  // Admin and Manager share the same dashboard for now, so a 'manager' route
+  // requirement is satisfied by either role.
+  const hasRequiredRole = !role || user.role === role || (role === 'manager' && user.role === 'admin');
+  if (!hasRequiredRole) {
+    return <Navigate to={(user.role === 'manager' || user.role === 'admin') ? '/' : '/worker-portal'} replace />;
   }
 
   return <>{children}</>;

@@ -3,7 +3,7 @@ export interface User {
     worker_id: string;
     username: string;
     name: string;
-    role: 'manager' | 'employee';
+    role: 'manager' | 'employee' | 'admin';
     password?: string;
     pin?: string;
     hourly_rate: number;
@@ -158,7 +158,7 @@ export interface PolicyAcknowledgment {
 export interface ActivityLog {
     id: string;
     worker_id: string;
-    event_type: 'clock_in' | 'clock_out' | 'break_start' | 'break_end' | 'task_start' | 'task_stop' | 'task_pause' | 'task_resume' | 'task_complete';
+    event_type: 'clock_in' | 'clock_out' | 'break_start' | 'break_end' | 'task_start' | 'task_stop' | 'task_pause' | 'task_resume' | 'task_complete' | 'overtime_warning';
     related_task_id?: string;
     description: string;
     details?: string;

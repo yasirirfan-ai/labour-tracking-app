@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import Chart from 'chart.js/auto';
 import { trainingService } from '../lib/trainingService';
 import type { TrainingMaterial } from '../lib/trainingService';
+import { buildShiftsForWorker } from '../lib/shifts';
 import { useTranslation } from 'react-i18next';
 
 export const ReportsPage: React.FC = () => {
@@ -37,23 +38,73 @@ export const ReportsPage: React.FC = () => {
             const { data: userData } = await supabase.from('users').select('*').eq('role', 'employee') as { data: any[] };
             const { data: moData } = await supabase.from('manufacturing_orders').select('*') as { data: any[] };
             const { data: opData } = await supabase.from('operations').select('*') as { data: any[] };
+            const { data: logsData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: true }) as { data: any[] };
             
             const trMaterials = await trainingService.getAllMaterials();
 
-            if (taskData && userData) {
+            if (taskData && userData && logsData) {
+                const taskCoveredKeys = new Set<string>();
+
                 const richTasks = taskData.map((t: any) => {
                     const emp = userData.find(u => u.id === t.assigned_to_id);
                     const rate = (t.hourly_rate !== undefined && t.hourly_rate !== null && parseFloat(t.hourly_rate) > 0)
                         ? parseFloat(t.hourly_rate)
                         : (emp?.hourly_rate || 0);
+                    
+                    let activeSecs = t.active_seconds || 0;
+                    if ((t.status === 'active' || t.status === 'in_progress' || t.status === 'clocked_in') && t.last_action_time) {
+                        const diff = Math.floor((Date.now() - new Date(t.last_action_time).getTime()) / 1000);
+                        if (diff > 0) activeSecs += diff;
+                    }
+
+                    const ref = t.start_time || t.created_at;
+                    if (ref) {
+                        const d = new Date(ref).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                        taskCoveredKeys.add(`${emp?.id}_${d}`);
+                    }
+
                     return {
                         ...t,
                         employee_name: emp?.name || 'Unknown',
-                        cost: ((t.active_seconds || 0) / 3600) * rate
+                        active_seconds: activeSecs,
+                        cost: (activeSecs / 3600) * rate
                     };
                 });
 
-                setTasks(richTasks);
+                const virtualTasks: any[] = [];
+                userData.filter((u: any) => u.active !== false).forEach((emp: any) => {
+                    const empLogs = logsData
+                        .filter((l: any) => l.worker_id === emp.id)
+                        .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+                    const pairedShifts = buildShiftsForWorker(empLogs);
+
+                    pairedShifts.forEach((shift) => {
+                        const inMs = new Date(shift.clockIn.timestamp).getTime();
+                        const outMs = shift.clockOut ? new Date(shift.clockOut.timestamp).getTime() : Date.now();
+                        const activeSecs = Math.max(0, Math.floor((outMs - inMs) / 1000));
+                        const date = new Date(shift.clockIn.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                        
+                        if (!taskCoveredKeys.has(`${emp.id}_${date}`)) {
+                            const rate = emp.hourly_rate ? parseFloat(emp.hourly_rate) : 0;
+                            virtualTasks.push({
+                                id: `virtual_${emp.id}_${date}`,
+                                assigned_to_id: emp.id,
+                                employee_name: emp.name,
+                                mo_reference: 'Unassigned',
+                                description: 'General Shift',
+                                created_at: shift.clockIn.timestamp,
+                                start_time: shift.clockIn.timestamp,
+                                end_time: shift.clockOut ? shift.clockOut.timestamp : null,
+                                active_seconds: activeSecs,
+                                cost: (activeSecs / 3600) * rate,
+                                status: shift.clockOut ? 'completed' : 'clocked_in'
+                            });
+                        }
+                    });
+                });
+
+                setTasks([...richTasks, ...virtualTasks]);
                 setEmployees((userData || []).filter((u: any) => u.active !== false));
                 setMos(moData || []);
                 setOps(opData || []);

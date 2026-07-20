@@ -233,6 +233,7 @@ export default defineConfig(({ mode }) => {
       }
     ],
     server: {
+      allowedHosts: true,
       proxy: {
         '/api/sync-odoo': {
           target: 'https://us-central1-pythonautomation-430712.cloudfunctions.net',

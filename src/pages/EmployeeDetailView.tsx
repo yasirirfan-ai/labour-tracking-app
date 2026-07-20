@@ -1471,7 +1471,7 @@ export const EmployeeDetailView: React.FC = () => {
                                         <input type="text" className="info-input" value={employee.reporting_to || ''} onChange={(e) => setEmployee(prev => prev ? { ...prev, reporting_to: e.target.value } : null)} placeholder="Enter manager name" />
                                     </div>
                                     <div className="info-field">
-                                        <label>{t('employeeDetail.job.annualPay')}</label>
+                                        <label>Hourly Rate</label>
                                         <div className="info-icon-value">
                                             <span>$</span>
                                             <input
@@ -2436,9 +2436,7 @@ export const EmployeeDetailView: React.FC = () => {
                     margin-bottom: 0;
                     overflow: hidden;
                     box-shadow: 0 4px 24px rgba(0,0,0,0.18);
-                    position: sticky;
-                    top: 70px;
-                    z-index: 200;
+                    position: relative;
                 }
                 .profile-body {
                     padding: 2rem;
@@ -3523,9 +3521,7 @@ export const EmployeeDetailView: React.FC = () => {
                     }
                     .profile-header {
                         border-radius: 0 !important;
-                        position: sticky !important;
-                        top: 64px !important;
-                        z-index: 200 !important;
+                        position: relative !important;
                     }
                     .header-top {
                         padding: 0.75rem 1.25rem;

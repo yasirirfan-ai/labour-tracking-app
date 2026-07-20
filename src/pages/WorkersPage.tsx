@@ -221,10 +221,6 @@ export const WorkersPage: React.FC = () => {
             {(isHistoryOpen || isDetailsOpen) && <div className="modal-overlay active" onClick={() => { setIsHistoryOpen(false); setIsDetailsOpen(false); }}></div>}
 
             <style>{`
-                .workers-page {
-                    min-height: 100vh;
-                    background: var(--bg-main);
-                }
                 .people-header {
                     padding: 1rem 0 2rem;
                     border-bottom: 1px solid var(--border);
@@ -234,6 +230,8 @@ export const WorkersPage: React.FC = () => {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
+                    flex-wrap: wrap;
+                    gap: 1rem;
                 }
                 .people-title {
                     font-size: 2rem;
@@ -250,15 +248,18 @@ export const WorkersPage: React.FC = () => {
                     font-weight: 700;
                     display: flex;
                     align-items: center;
+                    justify-content: center;
                     gap: 8px;
                     cursor: pointer;
                     transition: all 0.2s;
+                    white-space: nowrap;
                 }
                 .btn-new-employee:hover { opacity: 0.9; transform: translateY(-1px); }
 
                 .filter-bar {
                     display: flex;
                     justify-content: flex-end;
+                    flex-wrap: wrap;
                     margin-bottom: 2rem;
                 }
                 .search-filter-group {
@@ -269,6 +270,16 @@ export const WorkersPage: React.FC = () => {
                     width: 100%;
                 }
                 .search-wrapper { position: relative; width: 100%; max-width: 300px; flex: 1 1 200px; }
+
+                @media (max-width: 640px) {
+                    .people-title { font-size: 1.5rem; }
+                    .people-header { padding: 0.5rem 0 1.5rem; margin-bottom: 1.5rem; }
+                    .btn-new-employee { width: 100%; }
+                    .filter-bar { justify-content: flex-start; margin-bottom: 1.5rem; }
+                    .search-wrapper { max-width: none; }
+                    .status-filter { width: 100%; justify-content: space-between; }
+                    .detail-row { grid-template-columns: 1fr; }
+                }
                 .search-wrapper i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
                 .search-wrapper input {
                     width: 100%;
@@ -307,8 +318,9 @@ export const WorkersPage: React.FC = () => {
                     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
                 }
                 .custom-modal.active { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
-                .history-modal { width: 450px; }
-                .details-modal { width: 400px; }
+                .custom-modal { max-height: 85vh; overflow-y: auto; }
+                .history-modal { width: min(450px, 92vw); }
+                .details-modal { width: min(400px, 92vw); }
 
                 .modal-header {
                     padding: 1.5rem;

@@ -4,6 +4,7 @@ import { DisciplinaryService } from '../lib/disciplinaryService';
 import type { SeverityType, ActionStepType } from '../lib/disciplinaryService';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { formatDateTimePST } from '../lib/timezone';
 
 export const DisciplineAdminPage: React.FC = () => {
     const { t } = useTranslation();
@@ -453,7 +454,7 @@ export const DisciplineAdminPage: React.FC = () => {
                                             <i className="fa-solid fa-certificate" style={{ fontSize: '1.5rem' }}></i>
                                             {t('discipline.modals.signatureVerified')}
                                         </div>
-                                        <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 800 }}>{new Date(selectedIncident.signed_at).toLocaleString()}</div>
+                                        <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 800 }}>{formatDateTimePST(selectedIncident.signed_at)}</div>
                                     </div>
                                     <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.6)', borderRadius: '16px', marginBottom: '1.5rem' }}>
                                         <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{t('discipline.modals.workerExplanation')}</div>

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
+import { checkShiftOvertimes } from '../lib/shiftWatchdog';
 
 interface AdminLeaveNotification {
     id: string;
@@ -64,7 +65,7 @@ export const Layout: React.FC = () => {
             try {
                 const { data, error } = await (supabase.from('activity_logs') as any)
                     .select('id, worker_id, event_type, description, timestamp')
-                    .in('event_type', ['clock_in', 'clock_out', 'break_start', 'break_end'])
+                    .in('event_type', ['clock_in', 'clock_out', 'break_start', 'break_end', 'overtime_warning'])
                     .order('timestamp', { ascending: false })
                     .limit(20);
 
@@ -99,6 +100,7 @@ export const Layout: React.FC = () => {
                     clock_out: 'Clocked Out',
                     break_start: 'Started Break',
                     break_end: 'Returned from Break',
+                    overtime_warning: 'Overtime Warning',
                 };
 
                 const newNotifs: any[] = [];
@@ -144,6 +146,16 @@ export const Layout: React.FC = () => {
             isWorkerInitialized.current = false;
             knownWorkerLogIds.current.clear();
         };
+    }, [user?.id]);
+
+    // Shift watchdog — sweeps ALL clocked-in workers for 8h15m overtime warnings / 8h20m
+    // auto clock-outs. Any open Admin/Manager or Worker Portal tab runs this, so it fires as
+    // long as someone, anywhere, has the app open.
+    useEffect(() => {
+        if (!user) return;
+        checkShiftOvertimes();
+        const overtimeInterval = setInterval(checkShiftOvertimes, 60000);
+        return () => clearInterval(overtimeInterval);
     }, [user?.id]);
 
     useEffect(() => {
@@ -328,6 +340,18 @@ export const Layout: React.FC = () => {
                         <button className="mobile-menu-btn" onClick={() => setIsMobileOpen(true)} style={{ position: 'static', marginRight: '1rem' }}>
                             <i className="fa-solid fa-bars"></i>
                         </button>
+                        <div style={{
+                            padding: '0.65rem 1.5rem',
+                            background: 'var(--bg-main)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '999px',
+                            color: 'var(--text-main)',
+                            fontWeight: 800,
+                            fontSize: '1.15rem',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            Babylon Labour Tracking App
+                        </div>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
@@ -439,6 +463,9 @@ export const Layout: React.FC = () => {
                                                 } else if (notif.event_type === 'break_end') {
                                                     badgeColor = '#10B981';
                                                     eventIcon = 'fa-mug-hot';
+                                                } else if (notif.event_type === 'overtime_warning') {
+                                                    badgeColor = '#F59E0B';
+                                                    eventIcon = 'fa-triangle-exclamation';
                                                 }
 
                                                 return (
@@ -515,15 +542,19 @@ export const Layout: React.FC = () => {
                             </button>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <div style={{ textAlign: 'right', display: 'none' }}>
-                                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' }}>{user.name}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>{user.role}</div>
-                            </div>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            padding: '0.4rem 1rem 0.4rem 0.4rem',
+                            background: 'var(--bg-main)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '999px'
+                        }}>
                             <div style={{
                                 width: '40px',
                                 height: '40px',
-                                borderRadius: '12px',
+                                borderRadius: '50%',
                                 background: 'var(--primary)',
                                 color: 'white',
                                 display: 'flex',
@@ -531,9 +562,14 @@ export const Layout: React.FC = () => {
                                 justifyContent: 'center',
                                 fontWeight: 800,
                                 fontSize: '1rem',
+                                flexShrink: 0,
                                 boxShadow: '0 4px 12px rgba(30, 27, 75, 0.2)'
                             }}>
                                 {user.name?.[0]}
+                            </div>
+                            <div style={{ textAlign: 'left', lineHeight: 1.3 }}>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' }}>{user.name}</div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>{user.email || user.username}</div>
                             </div>
                         </div>
                     </div>
@@ -577,6 +613,10 @@ export const Layout: React.FC = () => {
                         badgeColor = '#10B981';
                         eventIcon = 'fa-mug-hot';
                         borderLeftColor = '#10B981';
+                    } else if (toast.event_type === 'overtime_warning') {
+                        badgeColor = '#F59E0B';
+                        eventIcon = 'fa-triangle-exclamation';
+                        borderLeftColor = '#F59E0B';
                     }
 
                     return (

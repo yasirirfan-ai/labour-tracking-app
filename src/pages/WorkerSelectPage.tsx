@@ -42,7 +42,7 @@ export const WorkerSelectPage: React.FC = () => {
     }, [search, workers]);
 
     if (currentUser) {
-        if (currentUser.role === 'manager') return <Navigate to="/" replace />;
+        if (currentUser.role === 'manager' || currentUser.role === 'admin') return <Navigate to="/" replace />;
         return <Navigate to="/worker-portal" replace />;
     }
 

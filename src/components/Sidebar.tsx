@@ -29,11 +29,13 @@ export const Sidebar: React.FC<{
     return (
         <nav className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
             <div className="brand">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem' }}>
-                    <div className="brand-icon" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem', overflow: 'hidden' }}>
+                    <div className="brand-icon" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)', flexShrink: 0 }}>
                         <span style={{ color: 'white', fontWeight: 900 }}>B</span>
                     </div>
-                    <span style={{ letterSpacing: '-0.03em', fontSize: '1.4rem', fontWeight: 900, color: 'white' }}>Babylon</span>
+                    {!isCollapsed && (
+                        <span style={{ letterSpacing: '-0.03em', fontSize: '1.4rem', fontWeight: 900, color: 'white', whiteSpace: 'nowrap' }}>Babylon</span>
+                    )}
                 </div>
                 <button className="sidebar-toggle" onClick={toggleSidebar}>
                     <i className={`fa-solid ${isCollapsed ? 'fa-bars-staggered' : 'fa-chevron-left'}`}></i>
@@ -101,7 +103,7 @@ export const Sidebar: React.FC<{
             <div className="bottom-menu">
                 <ul className="nav-menu">
                     <li>
-                        <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); logout(); }}>
+                        <a href="#" className="nav-item nav-item-danger" onClick={(e) => { e.preventDefault(); logout(); }}>
                             <i className="fa-solid fa-arrow-right-from-bracket"></i> <span>{t('sidebar.logout')}</span>
                         </a>
                     </li>

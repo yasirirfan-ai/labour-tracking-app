@@ -6,14 +6,17 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     authError: string | null;
-    login: (username: string, password: string, requiredRole?: 'manager' | 'employee') => Promise<{ success: boolean; error?: string }>;
+    login: (username: string, password: string, requiredRole?: 'manager' | 'employee' | 'admin') => Promise<{ success: boolean; error?: string }>;
     loginWithPin: (userId: string, pin: string) => Promise<{ success: boolean; error?: string }>;
-    loginWithGoogle: (requiredRole: 'manager' | 'employee') => Promise<{ success: boolean; error?: string }>;
+    loginWithGoogle: (requiredRole: 'manager' | 'employee' | 'admin') => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
     clearAuthError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const portalNameForRole = (role: 'manager' | 'employee' | 'admin') =>
+    role === 'admin' ? 'Admin' : role === 'manager' ? 'Manager' : 'Worker';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -41,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const googleEmail = session.user.email;
             console.log("Checking for Google Email in database:", googleEmail);
 
-            const pendingRole = localStorage.getItem('bt_pending_role') as 'manager' | 'employee' | null;
+            const pendingRole = localStorage.getItem('bt_pending_role') as 'manager' | 'employee' | 'admin' | null;
 
             // Map the Google user's email to our custom public.users table
             const { data, error } = await supabase
@@ -65,13 +68,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             if (pendingRole && (data as any).role !== pendingRole) {
-                const portalName = pendingRole === 'manager' ? 'Admin' : 'Worker';
+                const portalName = portalNameForRole(pendingRole);
                 await supabase.auth.signOut();
                 setAuthError(`Access Denied: This account is not authorized for ${portalName} Portal`);
                 return;
             }
 
-            if ((data as any).role !== 'manager' && (data as any).role !== 'employee') {
+            if ((data as any).role !== 'manager' && (data as any).role !== 'employee' && (data as any).role !== 'admin') {
                 await supabase.auth.signOut();
                 setAuthError("Access denied. Invalid user role.");
                 return;
@@ -96,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
     }, []);
 
-    const login = async (username: string, password: string, requiredRole?: 'manager' | 'employee'): Promise<{ success: boolean; error?: string }> => {
+    const login = async (username: string, password: string, requiredRole?: 'manager' | 'employee' | 'admin'): Promise<{ success: boolean; error?: string }> => {
         const { data, error } = await supabase
             .from('users')
             .select('*')
@@ -109,11 +112,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (requiredRole && (data as any).role !== requiredRole) {
-            const portalName = requiredRole === 'manager' ? 'Admin' : 'Worker';
+            const portalName = portalNameForRole(requiredRole);
             return { success: false, error: `Access Denied: This account is not authorized for ${portalName} Portal` };
         }
 
-        if ((data as any).role !== 'manager' && (data as any).role !== 'employee') {
+        if ((data as any).role !== 'manager' && (data as any).role !== 'employee' && (data as any).role !== 'admin') {
             return { success: false, error: 'Access denied. Invalid user role.' };
         }
 
@@ -145,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true };
     };
 
-    const loginWithGoogle = async (requiredRole: 'manager' | 'employee'): Promise<{ success: boolean; error?: string }> => {
+    const loginWithGoogle = async (requiredRole: 'manager' | 'employee' | 'admin'): Promise<{ success: boolean; error?: string }> => {
         setAuthError(null);
         localStorage.setItem('bt_pending_role', requiredRole);
         const { error } = await supabase.auth.signInWithOAuth({

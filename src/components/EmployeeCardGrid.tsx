@@ -13,7 +13,7 @@ export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, 
     return (
         <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))',
             gap: '1.5rem',
             padding: '1rem 0'
         }}>
@@ -24,11 +24,11 @@ export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, 
                 const workMode = employee.work_mode || 'Onsite';
 
                 // Demo fallback logic mimicking the screenshots
-                let monthlyRemuneration = 0;
-                if (employee.annual_pay) {
-                    monthlyRemuneration = parseFloat(employee.annual_pay) / 12;
-                } else if (employee.hourly_rate) {
-                    monthlyRemuneration = parseFloat(employee.hourly_rate) * 160;
+                let hourlyRateDisplay = 0;
+                if (employee.hourly_rate) {
+                    hourlyRateDisplay = parseFloat(employee.hourly_rate);
+                } else if (employee.annual_pay) {
+                    hourlyRateDisplay = parseFloat(employee.annual_pay) / 2080;
                 }
 
                 const REQUIRED_TRAININGS = [
@@ -101,9 +101,9 @@ export const EmployeeCardGrid: React.FC<Props> = ({ employees, onEmployeeClick, 
 
                         {/* Remuneration */}
                         <div style={{ background: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '16px', border: '1px solid #F1F5F9' }}>
-                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t('workers.monthlyRemuneration')}</div>
+                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>HOURLY RATE</div>
                             <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                                $ {monthlyRemuneration.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                $ {hourlyRateDisplay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / hr
                             </div>
                         </div>
 

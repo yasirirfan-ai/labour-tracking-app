@@ -4,10 +4,29 @@ import type { User, ActivityLog } from '../types';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
 import { pauseAllActiveTasks, resumeAllAutoPausedTasks, completeAllTasks, pauseAllTasksManual } from '../lib/taskService';
 import { todayPST, pstDayStart, pstDayEnd, formatTimePST } from '../lib/timezone';
+import { buildShiftsForWorker, buildBreaksForWorker } from '../lib/shifts';
+import { useAuth } from '../context/AuthContext';
+
+const formatDuration = (totalSeconds: number) => {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.round(totalSeconds % 60);
+    if (h > 0) {
+        return `${h}h ${m}m ${s}s`;
+    }
+    return `${m}m ${s}s`;
+};
 
 export const EmployeeActivityPage: React.FC = () => {
+    const { user: currentUser } = useAuth();
+    const managerName = currentUser?.username === 'admin@gmail.com' ? 'System Admin' : (currentUser?.name || currentUser?.username || 'Manager');
+
     const [users, setUsers] = useState<User[]>([]);
     const [logs, setLogs] = useState<ActivityLog[]>([]);
+    // Unlike `logs` (scoped to the selected date, for the Activity Log timeline), this holds a
+    // worker's full log history so stats can correctly account for shifts that started on a
+    // previous calendar day and are still open (e.g. an overnight shift).
+    const [allLogs, setAllLogs] = useState<ActivityLog[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [expandedWorkerId, setExpandedWorkerId] = useState<string | null>(null);
     const [filterDate, setFilterDate] = useState(todayPST()); // Default today in PST
@@ -18,6 +37,7 @@ export const EmployeeActivityPage: React.FC = () => {
     const [clockOutWorkerId, setClockOutWorkerId] = useState<string | null>(null);
     const [breakModalWorker, setBreakModalWorker] = useState<User | null>(null);
     const [breakReasonText, setBreakReasonText] = useState('');
+    const [busyWorkerId, setBusyWorkerId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -31,19 +51,26 @@ export const EmployeeActivityPage: React.FC = () => {
             const { data: userData } = await supabase.from('users').select('*').eq('role', 'employee').eq('active', true).order('name');
             if (userData) setUsers(userData as User[]);
 
-            // 2. Fetch Logs for Timeline — date boundaries in PST (UTC-8)
-            // pstDayStart("2026-07-15") → "2026-07-15T08:00:00.000Z" (midnight PST)
-            // pstDayEnd("2026-07-15")   → "2026-07-16T07:59:59.999Z" (end of PST day)
-            const startOfDay = pstDayStart(filterDate);
-            const endOfDay   = pstDayEnd(filterDate);
-
+            // 2. Fetch full log history — needed so stats can see a shift's clock_in even when
+            // it happened on a previous calendar day (e.g. an overnight shift still in progress).
             const { data: logData } = await supabase.from('activity_logs')
                 .select('*')
-                .gte('timestamp', startOfDay)
-                .lte('timestamp', endOfDay)
                 .order('timestamp', { ascending: false }); // Descending for timeline flow
 
-            if (logData) setLogs(logData as ActivityLog[]);
+            if (logData) {
+                const allLogsData = logData as ActivityLog[];
+                setAllLogs(allLogsData);
+
+                // Timeline table stays scoped to the selected date — PST boundaries.
+                // pstDayStart("2026-07-15") → "2026-07-15T08:00:00.000Z" (midnight PST)
+                // pstDayEnd("2026-07-15")   → "2026-07-16T07:59:59.999Z" (end of PST day)
+                const startOfDay = new Date(pstDayStart(filterDate)).getTime();
+                const endOfDay = new Date(pstDayEnd(filterDate)).getTime();
+                setLogs(allLogsData.filter(l => {
+                    const t = new Date(l.timestamp).getTime();
+                    return t >= startOfDay && t <= endOfDay;
+                }));
+            }
         } catch (err) {
             console.error('Fetch error:', err);
         } finally {
@@ -52,9 +79,15 @@ export const EmployeeActivityPage: React.FC = () => {
     };
 
     const handleClockIn = async (workerId: string) => {
-        await logActivity(workerId, 'clock_in', 'Clocked In');
-        await updateUserStatus(workerId, 'present', 'available');
-        fetchData();
+        if (busyWorkerId) return;
+        setBusyWorkerId(workerId);
+        try {
+            await logActivity(workerId, 'clock_in', `Clocked In by ${managerName}`);
+            await updateUserStatus(workerId, 'present', 'available');
+            await fetchData();
+        } finally {
+            setBusyWorkerId(null);
+        }
     };
 
     const handleClockOutRequest = (workerId: string) => {
@@ -63,44 +96,109 @@ export const EmployeeActivityPage: React.FC = () => {
     };
 
     const confirmClockOut = async (action: 'complete_all' | 'pause_all') => {
-        if (!clockOutWorkerId) return;
+        if (!clockOutWorkerId || busyWorkerId) return;
+        setBusyWorkerId(clockOutWorkerId);
+        try {
+            if (action === 'complete_all') {
+                await completeAllTasks(clockOutWorkerId);
+            } else {
+                await pauseAllTasksManual(clockOutWorkerId);
+            }
 
-        if (action === 'complete_all') {
-            await completeAllTasks(clockOutWorkerId);
-        } else {
-            await pauseAllTasksManual(clockOutWorkerId);
+            await logActivity(clockOutWorkerId, 'clock_out', `Clocked Out by ${managerName}`);
+            await updateUserStatus(clockOutWorkerId, 'offline', 'available'); // Reset to available for next shift
+
+            // Wait a moment for triggers/updates
+            setTimeout(() => {
+                fetchData();
+            }, 500);
+
+            setShowClockOutModal(false);
+            setClockOutWorkerId(null);
+        } finally {
+            setBusyWorkerId(null);
         }
-
-        await logActivity(clockOutWorkerId, 'clock_out', 'Clocked Out');
-        await updateUserStatus(clockOutWorkerId, 'offline', 'available'); // Reset to available for next shift
-
-        // Wait a moment for triggers/updates
-        setTimeout(() => {
-            fetchData();
-        }, 500);
-
-        setShowClockOutModal(false);
-        setClockOutWorkerId(null);
     };
 
     const toggleBreak = async (worker: User, reason: string = 'Break') => {
-        if (worker.availability === 'break') {
-            // End Break -> Resume
-            await logActivity(worker.id, 'break_end', 'Returned from Break');
-            await updateUserStatus(worker.id, 'present', 'available');
-            await resumeAllAutoPausedTasks(worker.id);
-        } else {
-            // Start Break -> Pause
-            await logActivity(worker.id, 'break_start', reason);
-            await updateUserStatus(worker.id, 'present', 'break');
-            await pauseAllActiveTasks(worker.id, reason);
+        if (busyWorkerId) return;
+
+        // Validation: Block break starting if worker is not clocked in
+        if (worker.status !== 'present' && worker.availability !== 'break') {
+            alert(`Cannot place ${worker.name} on break because they are not clocked in.`);
+            return;
         }
-        fetchData();
+
+        setBusyWorkerId(worker.id);
+        try {
+            if (worker.availability === 'break') {
+                // End Break -> Resume
+                await logActivity(worker.id, 'break_end', `Returned from Break (ended by ${managerName})`);
+                await updateUserStatus(worker.id, 'present', 'available');
+                await resumeAllAutoPausedTasks(worker.id);
+            } else {
+                // Start Break -> Pause
+                const finalReason = reason || 'Break';
+                await logActivity(worker.id, 'break_start', `${finalReason} (started by ${managerName})`);
+                await updateUserStatus(worker.id, 'present', 'break');
+                await pauseAllActiveTasks(worker.id, finalReason);
+            }
+            await fetchData();
+        } finally {
+            setBusyWorkerId(null);
+        }
     };
 
     // Derived Timelines
+    // Display-only: a Manual Entry writes a paired clock_in + clock_out (sharing the same
+    // related_task_id) so shift-pairing/duration math stays correct — see ControlTablePage's
+    // handleCreateTask. That math is untouched here; this only collapses the pair into one
+    // readable "Manual entry created for Xh Ym by <name>" row for this table.
     const getWorkerTimeline = (workerId: string) => {
-        return logs.filter(l => l.worker_id === workerId);
+        const dayLogs = logs
+            .filter(l => l.worker_id === workerId)
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        const consumedIds = new Set<string>();
+        const result: any[] = [];
+
+        dayLogs.forEach((log) => {
+            if (consumedIds.has(log.id)) return;
+
+            if (log.event_type === 'clock_in' && log.related_task_id) {
+                const matchingOut = allLogs.find(
+                    (l) => l.worker_id === workerId
+                        && l.event_type === 'clock_out'
+                        && l.related_task_id === log.related_task_id
+                        && !consumedIds.has(l.id)
+                );
+
+                if (matchingOut) {
+                    consumedIds.add(log.id);
+                    consumedIds.add(matchingOut.id);
+
+                    const durationSeconds = Math.max(0, (new Date(matchingOut.timestamp).getTime() - new Date(log.timestamp).getTime()) / 1000);
+                    const hours = Math.floor(durationSeconds / 3600);
+                    const minutes = Math.round((durationSeconds % 3600) / 60);
+                    const durationLabel = hours > 0
+                        ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`
+                        : `${minutes}m`;
+                    const createdBy = (log.description || '').replace(/^Manual entry by /, '').trim() || 'Admin';
+
+                    result.push({
+                        ...log,
+                        id: `manual-${log.id}`,
+                        event_type: 'manual_entry',
+                        description: `Manual entry created for ${durationLabel} by ${createdBy}`,
+                    });
+                    return;
+                }
+            }
+
+            result.push(log);
+        });
+
+        return result.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     };
 
     // removed unused getWorkerStats
@@ -118,55 +216,40 @@ export const EmployeeActivityPage: React.FC = () => {
 
     const calculateStats = (workerId: string) => {
         // --- 1. Calculate Shift Duration (Payable Hours) ---
-        // Formula: (Time Now - Clock In Time) - (Total Break Duration)
-        // Strictly based on activity logs.
+        // Formula: (Time On Shift within the selected day) - (Time On Break within the selected day).
+        // Uses the worker's full log history (not just the selected day) so a shift that started
+        // on a previous calendar day and is still open still contributes its portion of today,
+        // instead of showing 0 just because its clock_in falls outside today's window.
 
-        const userLogs = logs.filter(l => l.worker_id === workerId);
-        let shiftStart: number | null = null;
-        let totalShiftTime = 0;
-        let totalBreakTime = 0;
-        let breakStart: number | null = null;
-
-        // Sort logs chronologically to replay the day
-        const sortedLogs = [...userLogs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-        sortedLogs.forEach(log => {
-            const time = new Date(log.timestamp).getTime();
-
-            if (log.event_type === 'clock_in') {
-                shiftStart = time;
-            } else if (log.event_type === 'clock_out') {
-                if (shiftStart) {
-                    totalShiftTime += (time - shiftStart);
-                    shiftStart = null;
-                }
-            } else if (log.event_type === 'break_start') {
-                breakStart = time;
-            } else if (log.event_type === 'break_end') {
-                if (breakStart) {
-                    totalBreakTime += (time - breakStart);
-                    breakStart = null;
-                }
-            }
-        });
-
+        const dayStart = new Date(pstDayStart(filterDate)).getTime();
+        const dayEnd = new Date(pstDayEnd(filterDate)).getTime();
         const now = new Date().getTime();
 
-        // If currently clocked in, add time since last clock in
-        if (shiftStart) {
-            totalShiftTime += (now - shiftStart);
-        }
+        const userLogs = allLogs
+            .filter(l => l.worker_id === workerId)
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-        // If currently on break, add time since break start
-        // AND subtract that break time from the shift time we just added above (since break is unpaid/dead time)
-        // Wait, simplicity: Total Shift = (Now - ClockIn) - Breaks.
-        // If we added (Now - ClockIn), we included the break time. So we must accumulate the current break into totalBreakTime
-        // and then subtract totalBreakTime from totalShiftTime.
+        const shifts = buildShiftsForWorker(userLogs);
+        const breaks = buildBreaksForWorker(userLogs);
 
-        if (breakStart) {
-            const currentBreakDuration = (now - breakStart);
-            totalBreakTime += currentBreakDuration;
-        }
+        let totalShiftTime = 0;
+        let totalBreakTime = 0;
+
+        shifts.forEach(shift => {
+            const shiftStart = new Date(shift.clockIn.timestamp).getTime();
+            const shiftEnd = shift.clockOut ? new Date(shift.clockOut.timestamp).getTime() : now;
+
+            const clippedStart = Math.max(shiftStart, dayStart);
+            const clippedEnd = Math.min(shiftEnd, dayEnd, now);
+            if (clippedEnd > clippedStart) totalShiftTime += (clippedEnd - clippedStart);
+        });
+
+        breaks.forEach(b => {
+            const breakEnd = b.endMs ?? now;
+            const clippedStart = Math.max(b.startMs, dayStart);
+            const clippedEnd = Math.min(breakEnd, dayEnd, now);
+            if (clippedEnd > clippedStart) totalBreakTime += (clippedEnd - clippedStart);
+        });
 
         // Net Payable Time = Total Time 'On Clock' - Total Time 'On Break'
         // Ensure non-negative
@@ -174,8 +257,10 @@ export const EmployeeActivityPage: React.FC = () => {
 
 
         // --- 2. Calculate Task Active Time (Productivity) ---
-        // Sum of all active_seconds from tasks assigned to this user
-        const userTasks = rawTasks.filter(t => t.assigned_to_id === workerId);
+        // Sum of all active_seconds from tasks assigned to this user. Manual Entries are
+        // excluded — their clock_in/clock_out pair is already counted above as Shift Duration,
+        // so including them here too would double-count the same hours in both stats.
+        const userTasks = rawTasks.filter(t => t.assigned_to_id === workerId && !t.manual);
         const taskActiveSec = userTasks.reduce((acc, t) => acc + (t.active_seconds || 0), 0);
 
         const worker = users.find(u => u.id === workerId);
@@ -238,12 +323,13 @@ export const EmployeeActivityPage: React.FC = () => {
                                 {/* Controls */}
                                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                                     {!isClockedIn ? (
-                                        <button onClick={() => handleClockIn(worker.id)} className="btn btn-primary" style={{ background: '#0F172A', color: 'white' }}>
+                                        <button disabled={busyWorkerId === worker.id} onClick={() => handleClockIn(worker.id)} className="btn btn-primary" style={{ background: '#0F172A', color: 'white', opacity: busyWorkerId === worker.id ? 0.6 : 1, cursor: busyWorkerId === worker.id ? 'not-allowed' : 'pointer' }}>
                                             Clock In
                                         </button>
                                     ) : (
                                         <>
                                             <button
+                                                disabled={busyWorkerId === worker.id}
                                                 onClick={() => {
                                                     if (isOnBreak) {
                                                         toggleBreak(worker, 'Returned');
@@ -256,17 +342,20 @@ export const EmployeeActivityPage: React.FC = () => {
                                                     padding: '0.6rem 1.25rem', borderRadius: '8px', fontWeight: 600,
                                                     background: isOnBreak ? '#DCFCE7' : '#FEF3C7',
                                                     color: isOnBreak ? '#16A34A' : '#D97706',
-                                                    border: 'none', cursor: 'pointer'
+                                                    border: 'none', cursor: busyWorkerId === worker.id ? 'not-allowed' : 'pointer',
+                                                    opacity: busyWorkerId === worker.id ? 0.6 : 1
                                                 }}
                                             >
                                                 {isOnBreak ? 'End Break' : 'Start Break'}
                                             </button>
                                             <button
+                                                disabled={busyWorkerId === worker.id}
                                                 onClick={() => handleClockOutRequest(worker.id)}
                                                 style={{
                                                     padding: '0.6rem 1.25rem', borderRadius: '8px', fontWeight: 600,
                                                     background: '#F1F5F9', color: '#64748B',
-                                                    border: 'none', cursor: 'pointer'
+                                                    border: 'none', cursor: busyWorkerId === worker.id ? 'not-allowed' : 'pointer',
+                                                    opacity: busyWorkerId === worker.id ? 0.6 : 1
                                                 }}
                                             >
                                                 Clock Out
@@ -281,9 +370,9 @@ export const EmployeeActivityPage: React.FC = () => {
                                 <div style={{ padding: '0 1.5rem 1.5rem', borderTop: '1px solid #F1F5F9', animation: 'fadeIn 0.3s' }}>
                                     {/* Stats Row */}
                                     <div className="summary-grid">
-                                        <SummaryStat label="Shift Duration" value={`${Math.floor(stats.shift_duration / 60)}m ${Math.round(stats.shift_duration % 60)}s`} />
-                                        <SummaryStat label="Break Duration" value={`${Math.floor(stats.break_duration / 60)}m ${Math.round(stats.break_duration % 60)}s`} />
-                                        <SummaryStat label="Task Activity" value={`${Math.floor(stats.task_duration / 60)}m ${Math.round(stats.task_duration % 60)}s`} />
+                                        <SummaryStat label="Shift Duration" value={formatDuration(stats.shift_duration)} />
+                                        <SummaryStat label="Break Duration" value={formatDuration(stats.break_duration)} />
+                                        <SummaryStat label="Task Activity" value={formatDuration(stats.task_duration)} />
                                         <SummaryStat label="Est. Earnings" value={`$${stats.earned.toFixed(2)}`} />
                                     </div>
 

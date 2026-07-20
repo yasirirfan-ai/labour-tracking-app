@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
@@ -11,7 +11,9 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import emailjs from '@emailjs/browser';
 import { syncLeaveBalances } from '../lib/accrualService';
-import { formatTimePST, todayPST, pstDayStart, pstDayEnd } from '../lib/timezone';
+import { formatTimePST, todayPST, pstDayStart, pstDayEnd, formatDateTimePST } from '../lib/timezone';
+import { checkShiftOvertimes } from '../lib/shiftWatchdog';
+import { buildShiftsForWorker, buildBreaksForWorker } from '../lib/shifts';
 
 export const WorkerPortalPage: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -19,6 +21,7 @@ export const WorkerPortalPage: React.FC = () => {
     const { user, loading: authLoading, logout } = useAuth();
     const [localUser, setLocalUser] = useState(user);
     const isSyncing = useRef(false);
+    const isProcessingNfcTap = useRef(false);
     const [loading, setLoading] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [activeTasks, setActiveTasks] = useState<any[]>([]);
@@ -29,8 +32,66 @@ export const WorkerPortalPage: React.FC = () => {
     const [breakReason, setBreakReason] = useState('');
     const [isClockOutModalOpen, setIsClockOutModalOpen] = useState(false);
     const [myActivityLogs, setMyActivityLogs] = useState<any[]>([]);
+
+    // Display-only, mirrors the same merge EmployeeActivityPage does for Admin/Manager: a Manual
+    // Entry writes a paired clock_in + clock_out (sharing related_task_id) so shift-pairing/duration
+    // math stays correct — this just collapses that pair into one readable "Manual entry created
+    // for Xh Ym by <name>" row here too, so both portals show activity the same way. myActivityLogs
+    // itself stays untouched for hour calculations elsewhere (e.g. getTodayShiftHours).
+    const mergedActivityLogs = useMemo(() => {
+        const sorted = [...myActivityLogs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        const consumedIds = new Set<string>();
+        const result: any[] = [];
+
+        sorted.forEach((log) => {
+            if (consumedIds.has(log.id)) return;
+
+            if (log.event_type === 'clock_in' && log.related_task_id) {
+                const matchingOut = sorted.find(
+                    (l) => l.event_type === 'clock_out' && l.related_task_id === log.related_task_id && !consumedIds.has(l.id)
+                );
+
+                if (matchingOut) {
+                    consumedIds.add(log.id);
+                    consumedIds.add(matchingOut.id);
+
+                    const durationSeconds = Math.max(0, (new Date(matchingOut.timestamp).getTime() - new Date(log.timestamp).getTime()) / 1000);
+                    const hours = Math.floor(durationSeconds / 3600);
+                    const minutes = Math.round((durationSeconds % 3600) / 60);
+                    const durationLabel = hours > 0
+                        ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`
+                        : `${minutes}m`;
+                    const createdBy = (log.description || '').replace(/^Manual entry by /, '').trim() || 'Admin';
+                    const mergedDescription = `Manual entry created for ${durationLabel} by ${createdBy}`;
+
+                    result.push({
+                        ...log,
+                        id: `manual-${log.id}`,
+                        event_type: 'manual_entry',
+                        description: mergedDescription,
+                        details: mergedDescription,
+                    });
+                    return;
+                }
+            }
+
+            result.push(log);
+        });
+
+        return result.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }, [myActivityLogs]);
+
     const [dashboardLogsPage, setDashboardLogsPage] = useState(1);
     const [activityLogsPage, setActivityLogsPage] = useState(1);
+    const [activityLogDateFilter, setActivityLogDateFilter] = useState('');
+
+    const filteredActivityLogs = useMemo(() => {
+        if (!activityLogDateFilter) return mergedActivityLogs;
+        return mergedActivityLogs.filter((log: any) => {
+            const logDate = new Date(log.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+            return logDate === activityLogDateFilter;
+        });
+    }, [mergedActivityLogs, activityLogDateFilter]);
     const [requestHistoryPage, setRequestHistoryPage] = useState(1);
     const [ledgerPage, setLedgerPage] = useState(1);
     const [historyTypeFilter, setHistoryTypeFilter] = useState<'all' | 'pto' | 'sick'>('all');
@@ -165,43 +226,29 @@ export const WorkerPortalPage: React.FC = () => {
             return time >= startMs && time <= endMs;
         });
 
-        let shiftStart: number | null = null;
-        let totalShiftTime = 0;
-        let totalBreakTime = 0;
-        let breakStart: number | null = null;
-
-        // Sort logs chronologically
+        // Sort logs chronologically, then pair via the shared, task-aware helpers (src/lib/shifts.ts)
+        // so a Manual Entry's clock_out only ever closes its own clock_in — a naive single-openIn
+        // walk here would let an unrelated clock_out prematurely close it, same bug fixed elsewhere.
         const sortedLogs = [...todayLogs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-        sortedLogs.forEach(log => {
-            const time = new Date(log.timestamp).getTime();
+        const shifts = buildShiftsForWorker(sortedLogs as any);
+        const breaks = buildBreaksForWorker(sortedLogs as any);
+        const timeNow = currentTime.getTime();
 
-            if (log.event_type === 'clock_in') {
-                shiftStart = time;
-            } else if (log.event_type === 'clock_out') {
-                if (shiftStart) {
-                    totalShiftTime += (time - shiftStart);
-                    shiftStart = null;
-                }
-            } else if (log.event_type === 'break_start') {
-                breakStart = time;
-            } else if (log.event_type === 'break_end') {
-                if (breakStart) {
-                    totalBreakTime += (time - breakStart);
-                    breakStart = null;
-                }
-            }
+        let totalShiftTime = 0;
+        shifts.forEach((shift) => {
+            const shiftStart = new Date(shift.clockIn.timestamp).getTime();
+            const shiftEnd = shift.clockOut
+                ? new Date(shift.clockOut.timestamp).getTime()
+                : (isClockedIn ? timeNow : shiftStart);
+            totalShiftTime += Math.max(0, shiftEnd - shiftStart);
         });
 
-        const timeNow = currentTime.getTime();
-        if (isClockedIn && shiftStart) {
-            totalShiftTime += (timeNow - shiftStart);
-        }
-
-        if (localUser?.availability === 'break' && breakStart) {
-            const currentBreakDuration = (timeNow - breakStart);
-            totalBreakTime += currentBreakDuration;
-        }
+        let totalBreakTime = 0;
+        breaks.forEach((b) => {
+            const breakEnd = b.endMs ?? (localUser?.availability === 'break' ? timeNow : b.startMs);
+            totalBreakTime += Math.max(0, breakEnd - b.startMs);
+        });
 
         const netPayableMs = Math.max(0, totalShiftTime - totalBreakTime);
         return (netPayableMs / 1000 / 3600).toFixed(2);
@@ -519,6 +566,7 @@ export const WorkerPortalPage: React.FC = () => {
                 .channel(`public:users:id=eq.${user.id}`)
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` }, (payload) => {
                     setLocalUser(payload.new as any);
+                    fetchMyActivityLogs();
                 })
                 .subscribe();
 
@@ -573,6 +621,67 @@ export const WorkerPortalPage: React.FC = () => {
             };
         }
     }, [user?.id]);
+
+    // Fallback periodic data polling to ensure logs and statuses are synchronized
+    useEffect(() => {
+        if (!user?.id) return;
+        const fallbackInterval = setInterval(() => {
+            fetchUserStatus();
+            fetchMyActivityLogs();
+            fetchActiveTasks();
+        }, 10000);
+
+        return () => clearInterval(fallbackInterval);
+    }, [user?.id]);
+
+    // Shift watchdog — sweeps ALL clocked-in workers for 8h15m overtime warnings / 8h20m
+    // auto clock-outs. Having the Worker Portal open (by anyone) also drives this, not just
+    // Admin/Manager tabs, so it fires as long as someone, anywhere, has the app open.
+    useEffect(() => {
+        if (!user?.id) return;
+        checkShiftOvertimes();
+        const overtimeInterval = setInterval(checkShiftOvertimes, 60000);
+        return () => clearInterval(overtimeInterval);
+    }, [user?.id]);
+
+    // Surface a banner to THIS worker when their own overtime warning / auto clock-out lands
+    const seenOwnEventIds = useRef<Set<string> | null>(null);
+    useEffect(() => {
+        if (!user?.id || myActivityLogs.length === 0) return;
+
+        if (seenOwnEventIds.current === null) {
+            // First load: seed silently so we don't re-surface old historical events
+            seenOwnEventIds.current = new Set(myActivityLogs.map((l: any) => l.id));
+            return;
+        }
+
+        const newOvertimeWarning = myActivityLogs.find(
+            (l: any) => !seenOwnEventIds.current!.has(l.id) && l.event_type === 'overtime_warning'
+        );
+        const newAutoClockOut = myActivityLogs.find(
+            (l: any) => !seenOwnEventIds.current!.has(l.id) && l.event_type === 'clock_out' && l.description?.includes('Automatically clocked out')
+        );
+
+        myActivityLogs.forEach((l: any) => seenOwnEventIds.current!.add(l.id));
+
+        if (newAutoClockOut) {
+            setNotification({
+                show: true,
+                title: 'Automatically Clocked Out',
+                message: 'You were automatically clocked out because your shift exceeded 8 hours 20 minutes.',
+                severity: 'major'
+            });
+            setTimeout(() => setNotification(null), 12000);
+        } else if (newOvertimeWarning) {
+            setNotification({
+                show: true,
+                title: 'Shift Overtime Warning',
+                message: "You've been clocked in for over 8 hours 15 minutes. You'll be automatically clocked out in 5 minutes if you don't clock out yourself.",
+                severity: 'major'
+            });
+            setTimeout(() => setNotification(null), 12000);
+        }
+    }, [myActivityLogs, user?.id]);
 
 
     const fetchUserStatus = async () => {
@@ -747,7 +856,7 @@ export const WorkerPortalPage: React.FC = () => {
     }
 
     const handleClockIn = async () => {
-        if (!user) return;
+        if (!user || loading) return;
         setLoading(true);
         try {
             await updateUserStatus(user.id, 'present', 'available');
@@ -767,7 +876,7 @@ export const WorkerPortalPage: React.FC = () => {
     };
 
     const confirmClockOut = async () => {
-        if (!user) return;
+        if (!user || loading) return;
         setLoading(true);
         try {
             await completeAllTasks(user.id);
@@ -786,9 +895,24 @@ export const WorkerPortalPage: React.FC = () => {
     };
 
     const handleTakeBreak = async (isAuto = false, customReason?: string) => {
-        if (!user) return;
+        if (!user || loading) return;
         setLoading(true);
         try {
+            // Check live user status from database to prevent starting a break when offline/absent
+            const { data: liveUser } = await (supabase.from('users') as any).select('*').eq('id', user.id).single();
+            if (!liveUser || liveUser.status !== 'present') {
+                alert('Cannot start break because you are not clocked in.');
+                setLoading(false);
+                return;
+            }
+
+            if (isAuto) {
+                // The 5-hour timer is scheduled well in advance and can go stale
+                if (liveUser.availability !== 'available') {
+                    setLoading(false);
+                    return;
+                }
+            }
             const finalReason = isAuto ? 'Break Required (5-Hour Limit)' : (customReason || 'Worker requested break');
             await pauseAllActiveTasks(user.id, finalReason);
             await updateUserStatus(user.id, 'present', 'break');
@@ -807,7 +931,7 @@ export const WorkerPortalPage: React.FC = () => {
     };
 
     const handleEndBreak = async () => {
-        if (!user) return;
+        if (!user || loading) return;
         setLoading(true);
         try {
             await updateUserStatus(user.id, 'present', 'available');
@@ -933,6 +1057,8 @@ export const WorkerPortalPage: React.FC = () => {
     };
 
     const processNfcTap = async (tagId: string) => {
+        if (isProcessingNfcTap.current) return;
+        isProcessingNfcTap.current = true;
         try {
             // Find worker by NFC ID
             const { data, error } = await supabase
@@ -996,6 +1122,8 @@ export const WorkerPortalPage: React.FC = () => {
                 message: "System error processing NFC tap.",
                 severity: 'error'
             });
+        } finally {
+            isProcessingNfcTap.current = false;
         }
     };
 
@@ -1020,6 +1148,12 @@ export const WorkerPortalPage: React.FC = () => {
                     display: flex;
                     flex-direction: column;
                     gap: 1.5rem;
+                    flex: 1;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 18px;
+                    box-shadow: var(--shadow-sm);
+                    box-sizing: border-box;
                 }
 
                 .status-card, .profile-section, .conduct-section {
@@ -1111,19 +1245,21 @@ export const WorkerPortalPage: React.FC = () => {
                     display: flex;
                     flex-direction: column;
                     flex: 1;
-                    margin-left: 260px;
+                    margin: var(--panel-gutter) var(--panel-gutter) var(--panel-gutter) calc(var(--sidebar-width) + (var(--panel-gutter) * 2));
+                    gap: var(--panel-gutter);
                     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     min-width: 0;
+                    min-height: calc(100vh - (var(--panel-gutter) * 2));
                 }
-                
+
                 @media (max-width: 1024px) {
                     .worker-main-wrapper {
-                        margin-left: 80px;
+                        margin-left: calc(80px + (var(--panel-gutter) * 2));
                     }
                 }
 
                 .worker-main-wrapper.expanded {
-                    margin-left: 80px;
+                    margin-left: calc(var(--sidebar-collapsed-width) + (var(--panel-gutter) * 2));
                 }
 
                 .on-duty-banner {
@@ -1586,13 +1722,15 @@ export const WorkerPortalPage: React.FC = () => {
                 <header className="worker-topbar" style={{
                     height: '80px',
                     background: 'var(--bg-card)',
-                    borderBottom: '1px solid var(--border)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '18px',
+                    boxShadow: 'var(--shadow-sm)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '0 3.5rem',
-                    position: 'sticky',
-                    top: 0,
+                    position: 'relative',
+                    flexShrink: 0,
                     zIndex: 100
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -1757,26 +1895,26 @@ export const WorkerPortalPage: React.FC = () => {
                                             <h1 className="banner-title" style={{ fontSize: '1.6rem', fontWeight: 900, margin: '0 0 0.5rem 0', textAlign: 'left' }}>{isClockedIn ? t('workerPortal.workerLoggedIn') : t('workerPortal.shiftNotStarted')}</h1>
                                             <div className="banner-time" style={{ fontSize: '0.9rem', fontWeight: 700, opacity: 0.9, textAlign: 'left' }}>
                                                 <i className="fa-regular fa-clock" style={{ marginRight: '10px' }}></i>
-                                                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                                                {currentTime.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                                             </div>
                                         </div>
                                         <div className="banner-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
                                             {!isClockedIn ? (
-                                                <button onClick={handleClockIn} className="clock-btn clock-in" style={{ width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                                                <button disabled={loading} onClick={handleClockIn} className="clock-btn clock-in" style={{ width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
                                                     <i className="fa-solid fa-play"></i> {t('workerPortal.clockIn')}
                                                 </button>
                                             ) : (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
                                                     {localUser?.availability === 'break' ? (
-                                                        <button onClick={handleEndBreak} className="clock-btn break-btn" style={{ background: '#10b981', width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                                                        <button disabled={loading} onClick={handleEndBreak} className="clock-btn break-btn" style={{ background: '#10b981', width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
                                                             <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.endBreak')}
                                                         </button>
                                                     ) : (
-                                                        <button onClick={() => { setBreakReason(''); setIsBreakModalOpen(true); }} className="clock-btn break-btn" style={{ width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                                                        <button disabled={loading} onClick={() => { setBreakReason(''); setIsBreakModalOpen(true); }} className="clock-btn break-btn" style={{ width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
                                                             <i className="fa-solid fa-mug-hot"></i> {t('workerPortal.takeBreak')}
                                                         </button>
                                                     )}
-                                                    <button onClick={handleClockOut} className="clock-btn clock-out" style={{ width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                                                    <button disabled={loading} onClick={handleClockOut} className="clock-btn clock-out" style={{ width: '100%', margin: 0, padding: '0.85rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
                                                         <i className="fa-solid fa-stop"></i> {t('workerPortal.clockOut')}
                                                     </button>
                                                 </div>
@@ -1960,12 +2098,30 @@ export const WorkerPortalPage: React.FC = () => {
 
                             {/* Activity Logs card (Full Width) with Pagination */}
                             <div className="status-card" style={{ margin: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', width: '100%', padding: '2rem', borderRadius: '24px', boxSizing: 'border-box' }}>
-                                <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '1rem', display: 'block' }}>
-                                    <i className="fa-solid fa-clock-rotate-left" style={{ marginRight: '6px' }}></i>
-                                    {t('workerPortal.activityLogs.title', 'Recent Activity')}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                    <div className="status-label" style={{ color: 'var(--text-muted)', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', display: 'block' }}>
+                                        <i className="fa-solid fa-clock-rotate-left" style={{ marginRight: '6px' }}></i>
+                                        {t('workerPortal.activityLogs.title', 'Recent Activity')}
+                                    </div>
+                                    <input 
+                                        type="date" 
+                                        value={activityLogDateFilter}
+                                        onChange={(e) => {
+                                            setActivityLogDateFilter(e.target.value);
+                                            setDashboardLogsPage(1);
+                                        }}
+                                        style={{
+                                            padding: '0.4rem 0.8rem',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border)',
+                                            background: 'var(--bg-main)',
+                                            color: 'var(--text-main)',
+                                            fontSize: '0.85rem'
+                                        }}
+                                    />
                                 </div>
                                 <div style={{ overflowX: 'auto' }}>
-                                    {myActivityLogs.length === 0 ? (
+                                    {filteredActivityLogs.length === 0 ? (
                                         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', background: 'var(--bg-main)', borderRadius: '12px' }}>
                                             {t('workerPortal.activityLogs.noLogs', 'No activity logs found.')}
                                         </div>
@@ -1980,7 +2136,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {myActivityLogs.slice((dashboardLogsPage - 1) * 10, dashboardLogsPage * 10).map((log: any) => {
+                                                    {filteredActivityLogs.slice((dashboardLogsPage - 1) * 10, dashboardLogsPage * 10).map((log: any) => {
                                                         const eventTypeLabels: Record<string, string> = {
                                                             clock_in: 'Clock In',
                                                             clock_out: 'Clock Out',
@@ -1990,7 +2146,8 @@ export const WorkerPortalPage: React.FC = () => {
                                                             task_end: 'End Task',
                                                             task_pause: 'Pause Task',
                                                             task_resume: 'Resume Task',
-                                                            task_complete: 'Complete Task'
+                                                            task_complete: 'Complete Task',
+                                                            manual_entry: 'Manual Entry'
                                                         };
                                                         const label = eventTypeLabels[log.event_type] || log.event_type;
 
@@ -2029,7 +2186,7 @@ export const WorkerPortalPage: React.FC = () => {
                                             {/* Pagination Controls */}
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', padding: '0 0.5rem' }}>
                                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                                                    Showing {Math.min(myActivityLogs.length, (dashboardLogsPage - 1) * 10 + 1)} to {Math.min(myActivityLogs.length, dashboardLogsPage * 10)} of {myActivityLogs.length} entries
+                                                    Showing {filteredActivityLogs.length === 0 ? 0 : (dashboardLogsPage - 1) * 10 + 1} to {Math.min(filteredActivityLogs.length, dashboardLogsPage * 10)} of {filteredActivityLogs.length} entries
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                     <button
@@ -2049,15 +2206,15 @@ export const WorkerPortalPage: React.FC = () => {
                                                         Previous
                                                     </button>
                                                     <button
-                                                        disabled={dashboardLogsPage * 10 >= myActivityLogs.length}
+                                                        disabled={dashboardLogsPage * 10 >= filteredActivityLogs.length}
                                                         onClick={() => setDashboardLogsPage(prev => prev + 1)}
                                                         style={{
                                                             padding: '0.4rem 0.8rem',
                                                             borderRadius: '8px',
                                                             border: '1px solid var(--border)',
-                                                            background: dashboardLogsPage * 10 >= myActivityLogs.length ? 'var(--bg-main)' : 'white',
-                                                            color: dashboardLogsPage * 10 >= myActivityLogs.length ? 'var(--text-muted)' : 'var(--text-main)',
-                                                            cursor: dashboardLogsPage * 10 >= myActivityLogs.length ? 'default' : 'pointer',
+                                                            background: dashboardLogsPage * 10 >= filteredActivityLogs.length ? 'var(--bg-main)' : 'white',
+                                                            color: dashboardLogsPage * 10 >= filteredActivityLogs.length ? 'var(--text-muted)' : 'var(--text-main)',
+                                                            cursor: dashboardLogsPage * 10 >= filteredActivityLogs.length ? 'default' : 'pointer',
                                                             fontWeight: 700,
                                                             fontSize: '0.8rem'
                                                         }}
@@ -3059,7 +3216,7 @@ export const WorkerPortalPage: React.FC = () => {
                                     <h3 style={{ color: 'var(--text-main)' }}>{t('workerPortal.activityLogs.subtitle', 'Recent Activity')}</h3>
                                 </div>
                                 <div style={{ overflowX: 'auto' }}>
-                                    {myActivityLogs.length === 0 ? (
+                                    {mergedActivityLogs.length === 0 ? (
                                         <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                                             {t('workerPortal.activityLogs.noLogs', 'No activity logs found.')}
                                         </div>
@@ -3076,7 +3233,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                 {(() => {
                                                     const perPage = 10;
                                                     const startIndex = (activityLogsPage - 1) * perPage;
-                                                    const paginated = myActivityLogs.slice(startIndex, startIndex + perPage);
+                                                    const paginated = mergedActivityLogs.slice(startIndex, startIndex + perPage);
 
                                                     return paginated.map((log: any) => {
                                                         const eventTypeLabels: Record<string, string> = {
@@ -3088,6 +3245,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                             task_end: 'End Task',
                                                             task_pause: 'Pause Task',
                                                             task_resume: 'Resume Task',
+                                                            manual_entry: 'Manual Entry',
                                                         };
                                                         const label = eventTypeLabels[log.event_type] || log.event_type;
 
@@ -3110,7 +3268,7 @@ export const WorkerPortalPage: React.FC = () => {
                                                         return (
                                                             <tr key={log.id}>
                                                                 <td style={{ color: 'var(--text-main)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                                                                    {new Date(log.timestamp).toLocaleString()}
+                                                                    {formatDateTimePST(log.timestamp)}
                                                                 </td>
                                                                 <td>
                                                                     <span style={{
@@ -3138,7 +3296,7 @@ export const WorkerPortalPage: React.FC = () => {
                                 </div>
                                 {(() => {
                                     const perPage = 10;
-                                    const totalPages = Math.ceil(myActivityLogs.length / perPage);
+                                    const totalPages = Math.ceil(mergedActivityLogs.length / perPage);
                                     if (totalPages <= 1) return null;
                                     return (
                                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--border)' }}>
