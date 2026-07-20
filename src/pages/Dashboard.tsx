@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -203,7 +203,7 @@ export const Dashboard: React.FC = () => {
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => ` Productive Hours: ${ctx.parsed.x.toFixed(1)}`
+                            label: (ctx: any) => ` Productive Hours: ${ctx.parsed.x.toFixed(1)}`
                         }
                     }
                 },
@@ -249,7 +249,7 @@ export const Dashboard: React.FC = () => {
                             padding: 16,
                             font: { size: 12, weight: 'bold' },
                             color: 'var(--text-main)',
-                            generateLabels: (chart) => {
+                            generateLabels: (chart: any) => {
                                 const data = chart.data;
                                 return (data.labels as string[]).map((label, i) => ({
                                     text: `${label}  $${(data.datasets[0].data[i] as number).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -263,7 +263,7 @@ export const Dashboard: React.FC = () => {
                     },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => {
+                            label: (ctx: any) => {
                                 const val = ctx.parsed as number;
                                 const total = (ctx.dataset.data as number[]).reduce((a, b) => a + b, 0);
                                 const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0';

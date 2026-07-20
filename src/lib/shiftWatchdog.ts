@@ -60,7 +60,7 @@ export const checkShiftOvertimes = async () => {
                 );
             } else if (totalDurationMs >= WARNING_THRESHOLD_MS) {
                 const clockInMs = new Date(openShift.clockIn.timestamp).getTime();
-                const alreadyWarned = dailyLogs.some(
+                const alreadyWarned = (dailyLogs as ActivityLog[]).some(
                     (l) => l.event_type === 'overtime_warning' && new Date(l.timestamp).getTime() > clockInMs
                 );
                 if (!alreadyWarned) {
