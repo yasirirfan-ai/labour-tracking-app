@@ -148,7 +148,7 @@ export const Layout: React.FC = () => {
         };
     }, [user?.id]);
 
-    // Shift watchdog — sweeps ALL clocked-in workers for 8h15m overtime warnings / 8h20m
+    // Shift watchdog — sweeps ALL clocked-in workers for 8h40m overtime warnings / 8h45m
     // auto clock-outs. Any open Admin/Manager or Worker Portal tab runs this, so it fires as
     // long as someone, anywhere, has the app open.
     useEffect(() => {

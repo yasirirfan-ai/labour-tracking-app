@@ -18,7 +18,7 @@ export const LeaveRequestsPage: React.FC = () => {
         setIsLoading(true);
         let query = supabase
             .from('leave_requests')
-            .select('*, user:users(name, worker_id)')
+            .select('*')
             .order('created_at', { ascending: false });
 
         if (filter !== 'all') {
@@ -26,8 +26,21 @@ export const LeaveRequestsPage: React.FC = () => {
         }
 
         const { data, error } = await query;
-        if (data) setRequests(data as any);
-        else if (error) console.error('Error fetching requests:', error);
+        
+        if (data) {
+            // Fetch users separately to guarantee no join syntax errors
+            const { data: usersData } = await supabase.from('users').select('id, name, worker_id');
+            const usersMap = new Map((usersData as any[] || []).map(u => [u.id, u]));
+
+            const enrichedData = data.map((req: any) => ({
+                ...req,
+                users: usersMap.get(req.user_id) || { name: 'Unknown', worker_id: '-' }
+            }));
+            
+            setRequests(enrichedData as any);
+        } else if (error) {
+            console.error('Error fetching requests:', error);
+        }
         setIsLoading(false);
     };
 
@@ -140,8 +153,8 @@ export const LeaveRequestsPage: React.FC = () => {
                                 {requests.map(req => (
                                     <tr key={req.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                         <td style={{ padding: '1.25rem 1.5rem' }}>
-                                            <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{req.user?.name}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{req.user?.worker_id}</div>
+                                            <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{(req as any).users?.name}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{(req as any).users?.worker_id}</div>
                                         </td>
                                         <td style={{ padding: '1.25rem 1.5rem' }}>
                                             <span style={{ 

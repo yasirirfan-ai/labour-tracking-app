@@ -1,5 +1,11 @@
 import type { ActivityLog } from '../types';
 
+// Single source of truth for the daily shift ceiling: no worker may accrue more than this in one
+// calendar day, whether live-tracked (clock in/out) or entered manually by an admin/manager. Break
+// time counts toward it — it is wall-clock time from clock-in to clock-out, not payable time.
+export const DAILY_SHIFT_CAP_MS = (8 * 60 + 45) * 60 * 1000; // 8h45m
+export const DAILY_SHIFT_CAP_LABEL = '8 hours 45 minutes';
+
 export interface Shift {
     clockIn: ActivityLog;
     clockOut: ActivityLog | null;
@@ -25,6 +31,13 @@ export const buildShiftsForWorker = (workerLogsSorted: ActivityLog[]): Shift[] =
 
     for (const log of workerLogsSorted) {
         if (log.event_type === 'clock_in') {
+            if (openByBucket.size > 0) {
+                // A worker cannot be physically clocked in twice simultaneously.
+                // If a manual entry was left open but the worker's status got out of sync,
+                // they might click "Clock In" on the portal. We ignore the redundant clock_in
+                // so their shift continues until their next actual clock_out.
+                continue;
+            }
             const key = bucketKey(log);
             if (!openByBucket.has(key)) openByBucket.set(key, log);
         } else if (log.event_type === 'clock_out') {
@@ -33,6 +46,17 @@ export const buildShiftsForWorker = (workerLogsSorted: ActivityLog[]): Shift[] =
             if (openIn) {
                 shifts.push({ clockIn: openIn, clockOut: log });
                 openByBucket.delete(key);
+            } else if (log.related_task_id === null && openByBucket.size > 0) {
+                // If a normal clock_out comes from the Worker Portal but the worker was
+                // clocked in via an open-ended manual entry, the bucket keys won't match.
+                // We fallback to closing the most recently opened shift.
+                const openKeys = Array.from(openByBucket.keys());
+                const latestKey = openKeys[openKeys.length - 1];
+                if (latestKey) {
+                    const latestIn = openByBucket.get(latestKey)!;
+                    shifts.push({ clockIn: latestIn, clockOut: log });
+                    openByBucket.delete(latestKey);
+                }
             }
         }
     }
@@ -46,27 +70,63 @@ export const buildShiftsForWorker = (workerLogsSorted: ActivityLog[]): Shift[] =
     return shifts;
 };
 
+// Sums wall-clock elapsed time (clock-in to clock-out, break time included) across every shift
+// found in the given logs. Pass a worker's logs already scoped to a single PST day to get that
+// day's total against DAILY_SHIFT_CAP_MS. An open (still clocked-in) shift counts up to "now".
+export const getElapsedMsForLogs = (workerLogs: ActivityLog[]): number => {
+    const sorted = [...workerLogs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const shifts = buildShiftsForWorker(sorted);
+    const now = Date.now();
+    let totalMs = 0;
+    for (const shift of shifts) {
+        const clockInMs = new Date(shift.clockIn.timestamp).getTime();
+        const clockOutMs = shift.clockOut ? new Date(shift.clockOut.timestamp).getTime() : now;
+        totalMs += Math.max(0, clockOutMs - clockInMs);
+    }
+    return totalMs;
+};
+
 export interface BreakRange {
     startMs: number;
     endMs: number | null;
+    type: 'paid' | 'unpaid';
 }
+
+// Coffee/short-rest/restroom breaks are paid — they count as payable shift time and are never
+// subtracted from it. Everything else (lunch, personal errand, or any other free-text reason,
+// since break reasons aren't a constrained enum in the UI) is unpaid and IS subtracted. This is
+// the single source of truth for that classification — every duration calculation that subtracts
+// break time from a shift/task's payable total must route through this (or the `type` field it
+// produces on BreakRange) rather than re-deriving its own paid/unpaid rule.
+export const classifyBreakType = (description: string | null | undefined): 'paid' | 'unpaid' => {
+    const desc = (description || '').toLowerCase();
+    if (desc.includes('coffee') || desc.includes('short rest') || desc.includes('restroom')) {
+        return 'paid';
+    }
+    return 'unpaid';
+};
 
 // Same pairing approach for break_start/break_end. A trailing break_start with no break_end yet
 // is returned with endMs: null — the worker is still on break.
 export const buildBreaksForWorker = (workerLogsSorted: ActivityLog[]): BreakRange[] => {
     const breaks: BreakRange[] = [];
     let openStart: number | null = null;
+    let openType: 'paid' | 'unpaid' = 'unpaid';
+
     for (const log of workerLogsSorted) {
         const t = new Date(log.timestamp).getTime();
         if (log.event_type === 'break_start') {
-            if (openStart === null) openStart = t;
+            if (openStart === null) {
+                openStart = t;
+                openType = classifyBreakType(log.description);
+            }
         } else if (log.event_type === 'break_end') {
             if (openStart !== null) {
-                breaks.push({ startMs: openStart, endMs: t });
+                breaks.push({ startMs: openStart, endMs: t, type: openType });
                 openStart = null;
             }
         }
     }
-    if (openStart !== null) breaks.push({ startMs: openStart, endMs: null });
+    if (openStart !== null) breaks.push({ startMs: openStart, endMs: null, type: openType });
     return breaks;
 };

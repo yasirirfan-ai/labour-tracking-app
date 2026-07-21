@@ -1,15 +1,17 @@
 import { supabase } from './supabase';
 import { logActivity, updateUserStatus } from './activityLogger';
 import { completeAllTasks } from './taskService';
-import { buildShiftsForWorker } from './shifts';
+import { buildShiftsForWorker, DAILY_SHIFT_CAP_MS } from './shifts';
 import { todayPST, pstDayStart } from './timezone';
 import type { ActivityLog } from '../types';
 
 // Any open tab (Admin, Manager, or Worker Portal) that calls checkShiftOvertimes() sweeps
 // ALL currently clocked-in workers — not just the current user — so the warning/auto-clockout
 // fires as long as someone, anywhere, has the app open.
-const WARNING_THRESHOLD_MS = (8 * 60 + 10) * 60 * 1000; // 8h10m
-const AUTO_CLOCKOUT_THRESHOLD_MS = (8 * 60 + 15) * 60 * 1000; // 8h15m
+const WARNING_THRESHOLD_MS = (8 * 60 + 40) * 60 * 1000; // 8h40m
+// The hard cutoff is DAILY_SHIFT_CAP_MS (src/lib/shifts.ts) — the same ceiling manual entries
+// and clock-in blocking are validated against, so there's exactly one place that defines "8h45m".
+const AUTO_CLOCKOUT_THRESHOLD_MS = DAILY_SHIFT_CAP_MS;
 
 let isRunning = false;
 
@@ -56,7 +58,7 @@ export const checkShiftOvertimes = async () => {
                 await logActivity(
                     worker.id,
                     'clock_out',
-                    `Automatically clocked out — daily duration exceeded 8 hours 15 minutes`
+                    `Automatically clocked out — daily duration exceeded 8 hours 45 minutes`
                 );
             } else if (totalDurationMs >= WARNING_THRESHOLD_MS) {
                 const clockInMs = new Date(openShift.clockIn.timestamp).getTime();
@@ -67,7 +69,7 @@ export const checkShiftOvertimes = async () => {
                     await logActivity(
                         worker.id,
                         'overtime_warning',
-                        `${worker.name} has been clocked in for over 8 hours 10 minutes and will be automatically clocked out in 5 minutes if still active.`
+                        `${worker.name} has been clocked in for over 8 hours 40 minutes and will be automatically clocked out in 5 minutes if still active.`
                     );
                 }
             }

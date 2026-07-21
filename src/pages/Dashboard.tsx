@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Chart from 'chart.js/auto';
-import { buildShiftsForWorker } from '../lib/shifts';
+import { buildShiftsForWorker, buildBreaksForWorker } from '../lib/shifts';
 
 const CHART_COLORS = [
     '#6366F1', '#10B981', '#F59E0B', '#EF4444',
@@ -70,11 +70,24 @@ export const Dashboard: React.FC = () => {
                         .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
                     const pairedShifts = buildShiftsForWorker(empLogs);
+                    const breaks = buildBreaksForWorker(empLogs); // Import from shifts.ts
 
                     return pairedShifts.map((shift) => {
                         const inMs = new Date(shift.clockIn.timestamp).getTime();
                         const outMs = shift.clockOut ? new Date(shift.clockOut.timestamp).getTime() : Date.now();
-                        const h = Math.max(0, (outMs - inMs) / 3600000);
+                        const grossMs = Math.max(0, outMs - inMs);
+                        
+                        // Find breaks that fall within this shift
+                        let shiftBreakMs = 0;
+                        breaks.forEach((b) => {
+                            if (b.type === 'unpaid' && b.startMs >= inMs && b.startMs <= outMs) {
+                                const breakEndMs = b.endMs ?? Date.now();
+                                shiftBreakMs += Math.max(0, breakEndMs - b.startMs);
+                            }
+                        });
+
+                        const netMs = Math.max(0, grossMs - shiftBreakMs);
+                        const h = netMs / 3600000;
                         const date = new Date(shift.clockIn.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
                         return { date, hours: h };
                     });
@@ -97,8 +110,8 @@ export const Dashboard: React.FC = () => {
                 // Track which worker+days are covered by a task record
                 const taskCoveredKeys = new Set<string>();
 
-                // Accumulate from tasks table
-                taskData.forEach((t: any) => {
+                // Accumulate from tasks table (excluding manual entries, which are tracked via logs)
+                taskData.filter((t: any) => !t.manual).forEach((t: any) => {
                     const emp = userData.find(u => u.id === t.assigned_to_id);
                     if (!emp) return;
                     const name = emp.name;
@@ -139,6 +152,7 @@ export const Dashboard: React.FC = () => {
 
                 // KPI 3 — Today's total hours (tasks + uncovered log shifts)
                 const todayTaskSec = taskData
+                    .filter((t: any) => !t.manual)
                     .filter((t: any) => {
                         const ref = t.start_time || t.created_at;
                         if (!ref) return false;

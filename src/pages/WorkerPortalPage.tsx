@@ -13,7 +13,7 @@ import emailjs from '@emailjs/browser';
 import { syncLeaveBalances } from '../lib/accrualService';
 import { formatTimePST, todayPST, pstDayStart, pstDayEnd, formatDateTimePST } from '../lib/timezone';
 import { checkShiftOvertimes } from '../lib/shiftWatchdog';
-import { buildShiftsForWorker, buildBreaksForWorker } from '../lib/shifts';
+import { buildShiftsForWorker, buildBreaksForWorker, getElapsedMsForLogs, DAILY_SHIFT_CAP_MS, DAILY_SHIFT_CAP_LABEL } from '../lib/shifts';
 
 export const WorkerPortalPage: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -244,13 +244,16 @@ export const WorkerPortalPage: React.FC = () => {
             totalShiftTime += Math.max(0, shiftEnd - shiftStart);
         });
 
-        let totalBreakTime = 0;
+        // Only unpaid breaks (lunch, personal errand) reduce payable time — paid breaks
+        // (coffee, short rest, restroom) count as part of the shift.
+        let totalUnpaidBreakTime = 0;
         breaks.forEach((b) => {
+            if (b.type !== 'unpaid') return;
             const breakEnd = b.endMs ?? (localUser?.availability === 'break' ? timeNow : b.startMs);
-            totalBreakTime += Math.max(0, breakEnd - b.startMs);
+            totalUnpaidBreakTime += Math.max(0, breakEnd - b.startMs);
         });
 
-        const netPayableMs = Math.max(0, totalShiftTime - totalBreakTime);
+        const netPayableMs = Math.max(0, totalShiftTime - totalUnpaidBreakTime);
         return (netPayableMs / 1000 / 3600).toFixed(2);
     };
 
@@ -634,7 +637,7 @@ export const WorkerPortalPage: React.FC = () => {
         return () => clearInterval(fallbackInterval);
     }, [user?.id]);
 
-    // Shift watchdog — sweeps ALL clocked-in workers for 8h15m overtime warnings / 8h20m
+    // Shift watchdog — sweeps ALL clocked-in workers for 8h40m overtime warnings / 8h45m
     // auto clock-outs. Having the Worker Portal open (by anyone) also drives this, not just
     // Admin/Manager tabs, so it fires as long as someone, anywhere, has the app open.
     useEffect(() => {
@@ -668,7 +671,7 @@ export const WorkerPortalPage: React.FC = () => {
             setNotification({
                 show: true,
                 title: 'Automatically Clocked Out',
-                message: 'You were automatically clocked out because your shift exceeded 8 hours 20 minutes.',
+                message: 'You were automatically clocked out because your shift exceeded 8 hours 45 minutes.',
                 severity: 'major'
             });
             setTimeout(() => setNotification(null), 12000);
@@ -676,7 +679,7 @@ export const WorkerPortalPage: React.FC = () => {
             setNotification({
                 show: true,
                 title: 'Shift Overtime Warning',
-                message: "You've been clocked in for over 8 hours 15 minutes. You'll be automatically clocked out in 5 minutes if you don't clock out yourself.",
+                message: "You've been clocked in for over 8 hours 40 minutes. You'll be automatically clocked out in 5 minutes if you don't clock out yourself.",
                 severity: 'major'
             });
             setTimeout(() => setNotification(null), 12000);
@@ -857,8 +860,25 @@ export const WorkerPortalPage: React.FC = () => {
 
     const handleClockIn = async () => {
         if (!user || loading) return;
+
+        // Hard daily cap: once a worker has accrued 8h45m today (break time included), they
+        // cannot clock back in — even if they were auto-clocked-out hours ago. Re-fetch fresh
+        // logs rather than trusting local state, since myActivityLogs can lag a poll cycle.
         setLoading(true);
         try {
+            const { data: freshLogs } = await supabase
+                .from('activity_logs')
+                .select('*')
+                .eq('worker_id', user.id)
+                .gte('timestamp', pstDayStart(todayPST()))
+                .lte('timestamp', pstDayEnd(todayPST()));
+
+            const elapsedMs = getElapsedMsForLogs((freshLogs || []) as any[]);
+            if (elapsedMs >= DAILY_SHIFT_CAP_MS) {
+                alert(`You've already reached the ${DAILY_SHIFT_CAP_LABEL} daily limit. You cannot clock in again today.`);
+                return;
+            }
+
             await updateUserStatus(user.id, 'present', 'available');
             await logActivity(user.id, 'clock_in', 'Worker clocked in via portal');
             await fetchUserStatus();
@@ -872,6 +892,10 @@ export const WorkerPortalPage: React.FC = () => {
     };
 
     const handleClockOut = async () => {
+        if (localUser?.availability === 'break') {
+            alert('Please end your break before clocking out.');
+            return;
+        }
         setIsClockOutModalOpen(true);
     };
 

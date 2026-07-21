@@ -4,7 +4,7 @@ import type { User, ActivityLog } from '../types';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
 import { pauseAllActiveTasks, resumeAllAutoPausedTasks, completeAllTasks, pauseAllTasksManual } from '../lib/taskService';
 import { todayPST, pstDayStart, pstDayEnd, formatTimePST } from '../lib/timezone';
-import { buildShiftsForWorker, buildBreaksForWorker } from '../lib/shifts';
+import { buildShiftsForWorker, buildBreaksForWorker, getElapsedMsForLogs, DAILY_SHIFT_CAP_MS, DAILY_SHIFT_CAP_LABEL } from '../lib/shifts';
 import { useAuth } from '../context/AuthContext';
 
 const formatDuration = (totalSeconds: number) => {
@@ -82,6 +82,22 @@ export const EmployeeActivityPage: React.FC = () => {
         if (busyWorkerId) return;
         setBusyWorkerId(workerId);
         try {
+            // Hard daily cap: once a worker has accrued 8h45m today (break time included), no
+            // one — including a manager — can clock them back in. Re-fetch fresh logs rather
+            // than trusting allLogs, since it's only polled every 5s.
+            const { data: freshLogs } = await supabase
+                .from('activity_logs')
+                .select('*')
+                .eq('worker_id', workerId)
+                .gte('timestamp', pstDayStart(todayPST()))
+                .lte('timestamp', pstDayEnd(todayPST()));
+
+            const elapsedMs = getElapsedMsForLogs((freshLogs || []) as ActivityLog[]);
+            if (elapsedMs >= DAILY_SHIFT_CAP_MS) {
+                alert(`This worker has already reached the ${DAILY_SHIFT_CAP_LABEL} daily limit and cannot clock in again today.`);
+                return;
+            }
+
             await logActivity(workerId, 'clock_in', `Clocked In by ${managerName}`);
             await updateUserStatus(workerId, 'present', 'available');
             await fetchData();
@@ -233,11 +249,18 @@ export const EmployeeActivityPage: React.FC = () => {
         const breaks = buildBreaksForWorker(userLogs);
 
         let totalShiftTime = 0;
-        let totalBreakTime = 0;
+        let unpaidBreakTime = 0;
+        let paidBreakTime = 0;
+
+        const worker = users.find(u => u.id === workerId);
+        const isClockedIn = worker?.status === 'present';
+        const isOnBreak = worker?.availability === 'break';
 
         shifts.forEach(shift => {
             const shiftStart = new Date(shift.clockIn.timestamp).getTime();
-            const shiftEnd = shift.clockOut ? new Date(shift.clockOut.timestamp).getTime() : now;
+            const shiftEnd = shift.clockOut 
+                ? new Date(shift.clockOut.timestamp).getTime() 
+                : (isClockedIn ? now : shiftStart);
 
             const clippedStart = Math.max(shiftStart, dayStart);
             const clippedEnd = Math.min(shiftEnd, dayEnd, now);
@@ -245,16 +268,21 @@ export const EmployeeActivityPage: React.FC = () => {
         });
 
         breaks.forEach(b => {
-            const breakEnd = b.endMs ?? now;
+            const breakEnd = b.endMs ?? (isOnBreak ? now : b.startMs);
             const clippedStart = Math.max(b.startMs, dayStart);
             const clippedEnd = Math.min(breakEnd, dayEnd, now);
-            if (clippedEnd > clippedStart) totalBreakTime += (clippedEnd - clippedStart);
+            if (clippedEnd > clippedStart) {
+                if (b.type === 'unpaid') {
+                    unpaidBreakTime += (clippedEnd - clippedStart);
+                } else {
+                    paidBreakTime += (clippedEnd - clippedStart);
+                }
+            }
         });
 
-        // Net Payable Time = Total Time 'On Clock' - Total Time 'On Break'
+        // Net Payable Time = Total Time 'On Clock' - Total Time 'On Unpaid Break'
         // Ensure non-negative
-        const netPayableTime = Math.max(0, totalShiftTime - totalBreakTime);
-
+        const netPayableTime = Math.max(0, totalShiftTime - unpaidBreakTime);
 
         // --- 2. Calculate Task Active Time (Productivity) ---
         // Sum of all active_seconds from tasks assigned to this user. Manual Entries are
@@ -263,11 +291,12 @@ export const EmployeeActivityPage: React.FC = () => {
         const userTasks = rawTasks.filter(t => t.assigned_to_id === workerId && !t.manual);
         const taskActiveSec = userTasks.reduce((acc, t) => acc + (t.active_seconds || 0), 0);
 
-        const worker = users.find(u => u.id === workerId);
+        // worker is already defined above
 
         return {
             shift_duration: netPayableTime / 1000,
-            break_duration: totalBreakTime / 1000,
+            unpaid_break_duration: unpaidBreakTime / 1000,
+            paid_break_duration: paidBreakTime / 1000,
             task_duration: taskActiveSec, // Just for reference if needed
             earned: (netPayableTime / 1000 / 3600) * (worker?.hourly_rate || 0)
         };
@@ -370,8 +399,9 @@ export const EmployeeActivityPage: React.FC = () => {
                                 <div style={{ padding: '0 1.5rem 1.5rem', borderTop: '1px solid #F1F5F9', animation: 'fadeIn 0.3s' }}>
                                     {/* Stats Row */}
                                     <div className="summary-grid">
-                                        <SummaryStat label="Shift Duration" value={formatDuration(stats.shift_duration)} />
-                                        <SummaryStat label="Break Duration" value={formatDuration(stats.break_duration)} />
+                                        <SummaryStat label="Shift Duration (Net Payable)" value={formatDuration(stats.shift_duration)} />
+                                        <SummaryStat label="Unpaid Break" value={formatDuration(stats.unpaid_break_duration)} />
+                                        <SummaryStat label="Paid Break" value={formatDuration(stats.paid_break_duration)} />
                                         <SummaryStat label="Task Activity" value={formatDuration(stats.task_duration)} />
                                         <SummaryStat label="Est. Earnings" value={`$${stats.earned.toFixed(2)}`} />
                                     </div>
@@ -399,8 +429,13 @@ export const EmployeeActivityPage: React.FC = () => {
                                                                 </td>
                                                                 <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
                                                                     {log.description}
+                                                                    {log.event_type === 'break_start' && (
+                                                                        <span style={{ fontWeight: 600, marginLeft: '0.25rem', color: (log.description || '').toLowerCase().match(/coffee|short rest|restroom/) ? '#10B981' : '#F59E0B' }}>
+                                                                            {(log.description || '').toLowerCase().match(/coffee|short rest|restroom/) ? '(Paid)' : '(Unpaid)'}
+                                                                        </span>
+                                                                    )}
                                                                     {log.details && (log.event_type === 'task_pause' || log.event_type === 'break_start' || log.details === 'Shift Ended') && (
-                                                                        <span style={{ color: '#94A3B8' }}>- {log.details}</span>
+                                                                        <span style={{ color: '#94A3B8', marginLeft: '0.25rem' }}>- {log.details}</span>
                                                                     )}
                                                                 </td>
 

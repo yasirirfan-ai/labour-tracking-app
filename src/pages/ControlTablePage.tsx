@@ -3,9 +3,9 @@ import { supabase } from '../lib/supabase';
 import { sortManufacturingOrders } from '../utils/moSorting';
 import { useAuth } from '../context/AuthContext';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
-import { buildShiftsForWorker } from '../lib/shifts';
+import { buildShiftsForWorker, buildBreaksForWorker, getElapsedMsForLogs, classifyBreakType, DAILY_SHIFT_CAP_MS, DAILY_SHIFT_CAP_LABEL } from '../lib/shifts';
 import { useTranslation } from 'react-i18next';
-import { parsePSTToUTC } from '../lib/timezone';
+import { parsePSTToUTC, pstDayStart, pstDayEnd, todayPST } from '../lib/timezone';
 
 export const ControlTablePage: React.FC = () => {
     const { t } = useTranslation();
@@ -201,8 +201,67 @@ export const ControlTablePage: React.FC = () => {
             }
             if (taskData && empData && logsData) {
                 const richTasks = taskData.map((t: any) => {
-                    const emp = empData.find(e => e.id === t.assigned_to_id);
-                    return { ...t, worker_name: emp?.name || 'Unknown', worker_id_str: emp?.worker_id || '-', worker_avatar: emp?.name?.[0] || '?' };
+                    const emp = empData.find((e: any) => e.id === t.assigned_to_id);
+                    let active_seconds = t.active_seconds;
+                    let status = t.status;
+                    let end_time = t.end_time;
+                    let last_action_time = t.last_action_time;
+
+                    if (t.manual) {
+                        const taskLogs = logsData.filter((l: any) => l.related_task_id === t.id);
+                        const clockInLog = taskLogs.find((l: any) => l.event_type === 'clock_in');
+                        let clockOutLog = taskLogs.find((l: any) => l.event_type === 'clock_out');
+
+                        if (!clockOutLog) {
+                            const shiftOut = getWorkerShiftTimesForDate(t.assigned_to_id, clockInLog ? clockInLog.timestamp : t.created_at || t.start_time, logsData, empData).clockOut;
+                            if (shiftOut) {
+                                clockOutLog = { timestamp: shiftOut } as any;
+                            }
+                        }
+
+                        if (clockInLog) {
+                            const start = new Date(clockInLog.timestamp).getTime();
+                            const end = clockOutLog ? new Date(clockOutLog.timestamp).getTime() : new Date().getTime();
+
+                            const breaks = buildBreaksForWorker(logsData.filter((l: any) => l.worker_id === t.assigned_to_id));
+                            const shiftBreaks = breaks.filter((b) => {
+                                return b.startMs >= start && b.startMs <= end;
+                            });
+
+                            // Only unpaid breaks reduce payable active_seconds — paid breaks
+                            // (coffee/short rest/restroom) count as part of the shift.
+                            let breakSec = 0;
+                            shiftBreaks.forEach((b) => {
+                                if (b.type !== 'unpaid') return;
+                                if (b.endMs !== null) {
+                                    breakSec += Math.floor((b.endMs - b.startMs) / 1000);
+                                } else if (emp?.status === 'present' && emp?.availability === 'break') {
+                                    breakSec += Math.floor((new Date().getTime() - b.startMs) / 1000);
+                                }
+                            });
+
+                            active_seconds = Math.max(0, Math.floor((end - start) / 1000) - breakSec);
+
+                            if (clockOutLog) {
+                                status = 'completed';
+                                end_time = clockOutLog.timestamp;
+                            } else {
+                                status = 'active';
+                                last_action_time = new Date().toISOString();
+                            }
+                        }
+                    }
+
+                    return {
+                        ...t,
+                        active_seconds,
+                        status,
+                        end_time,
+                        last_action_time,
+                        worker_name: emp?.name || 'Unknown',
+                        worker_id_str: emp?.worker_id || '-',
+                        worker_avatar: emp?.name?.[0] || '?'
+                    };
                 });
 
                 const virtualTasks: any[] = [];
@@ -217,7 +276,7 @@ export const ControlTablePage: React.FC = () => {
                         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
                     const shifts = buildShiftsForWorker(workerLogs);
-                    
+
                     // Group shifts by local date (PST)
                     const shiftsByDay = new Map<string, typeof shifts>();
                     shifts.forEach((shift) => {
@@ -234,46 +293,39 @@ export const ControlTablePage: React.FC = () => {
 
                         const clockInTime = firstShift.clockIn.timestamp;
                         const isPresent = emp.status === 'present';
-                        const clockOutTime = lastShift.clockOut 
-                            ? lastShift.clockOut.timestamp 
+                        const clockOutTime = lastShift.clockOut
+                            ? lastShift.clockOut.timestamp
                             : (isPresent ? null : (emp.last_status_change || firstShift.clockIn.timestamp));
 
                         // Calculate total active seconds (excluding breaks) for all shifts on this day
                         let totalActiveSeconds = 0;
+                        const breaks = buildBreaksForWorker(workerLogs);
+                        let totalBreakSeconds = 0; // Just for reference, but active_seconds is what matters
+
                         dayShifts.forEach((s) => {
-                            const start = new Date(s.clockIn.timestamp).getTime();
-                            const end = s.clockOut 
-                                ? new Date(s.clockOut.timestamp).getTime() 
+                            const shiftStart = new Date(s.clockIn.timestamp).getTime();
+                            const shiftEnd = s.clockOut
+                                ? new Date(s.clockOut.timestamp).getTime()
                                 : (isPresent ? new Date().getTime() : new Date(emp.last_status_change || s.clockIn.timestamp).getTime());
-                            totalActiveSeconds += Math.max(0, Math.floor((end - start) / 1000));
-                        });
 
-                        // Calculate total break seconds for this worker on this day
-                        const dayBreaks = logsData.filter((l: any) => {
-                            if (l.worker_id !== emp.id) return false;
-                            if (l.event_type !== 'break_start' && l.event_type !== 'break_end') return false;
-                            const logDate = new Date(l.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-                            return logDate === dateStr;
-                        }).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                            let shiftActiveMs = shiftEnd - shiftStart;
 
-                        let totalBreakSeconds = 0;
-                        let openBreakStart: number | null = null;
-                        dayBreaks.forEach((log) => {
-                            if (log.event_type === 'break_start') {
-                                if (!openBreakStart) openBreakStart = new Date(log.timestamp).getTime();
-                            } else if (log.event_type === 'break_end') {
-                                if (openBreakStart) {
-                                    totalBreakSeconds += Math.max(0, Math.floor((new Date(log.timestamp).getTime() - openBreakStart) / 1000));
-                                    openBreakStart = null;
+                            // totalBreakSeconds tracks ALL break time taken (informational). Only
+                            // unpaid breaks reduce shiftActiveMs — paid breaks stay payable.
+                            breaks.forEach(b => {
+                                const breakEnd = b.endMs ?? (isPresent ? new Date().getTime() : new Date(emp.last_status_change || b.startMs).getTime());
+                                const clippedStart = Math.max(b.startMs, shiftStart);
+                                const clippedEnd = Math.min(breakEnd, shiftEnd);
+                                if (clippedEnd > clippedStart) {
+                                    totalBreakSeconds += Math.max(0, Math.floor((clippedEnd - clippedStart) / 1000));
+                                    if (b.type === 'unpaid') {
+                                        shiftActiveMs -= (clippedEnd - clippedStart);
+                                    }
                                 }
-                            }
-                        });
-                        if (openBreakStart && !clockOutTime) {
-                            totalBreakSeconds += Math.max(0, Math.floor((new Date().getTime() - openBreakStart) / 1000));
-                        }
+                            });
 
-                        // Deduct break seconds from active seconds
-                        totalActiveSeconds = Math.max(0, totalActiveSeconds - totalBreakSeconds);
+                            totalActiveSeconds += Math.max(0, Math.floor(shiftActiveMs / 1000));
+                        });
 
                         // Audit Record: Find the last audit description or manager action of the day
                         let auditRecord = 'Worker action';
@@ -310,14 +362,16 @@ export const ControlTablePage: React.FC = () => {
                             clock_in_time: clockInTime,
                             clock_out_time: clockOutTime,
                             audit_record: auditRecord,
-                            open_break_start: openBreakStart ? new Date(openBreakStart).toISOString() : null
+                            open_break_start: breaks.find(b => b.endMs === null)?.startMs
+                                ? new Date(breaks.find(b => b.endMs === null)!.startMs).toISOString()
+                                : null
                         });
                     });
                 });
 
                 // Group everything (richTasks + virtualTasks) by worker_id and dateStr
                 const consolidatedMap = new Map<string, any[]>();
-                
+
                 // Add all database tasks
                 richTasks.forEach((t: any) => {
                     const taskDate = new Date(t.created_at || t.start_time || new Date());
@@ -368,11 +422,11 @@ export const ControlTablePage: React.FC = () => {
                     const lastItem = sortedItems[sortedItems.length - 1];
 
                     const clockInTime = firstItem.clock_in_time || firstItem.start_time || firstItem.created_at;
-                    
+
                     const isPresent = emp.status === 'present';
                     let clockOutTime: string | null = null;
                     const latestHasClockOut = lastItem.clock_out_time || lastItem.end_time;
-                    
+
                     if (latestHasClockOut) {
                         clockOutTime = latestHasClockOut;
                     } else if (isPresent) {
@@ -384,7 +438,7 @@ export const ControlTablePage: React.FC = () => {
                     // Sum active seconds and break seconds
                     let totalActiveSeconds = 0;
                     let totalBreakSeconds = 0;
-                    
+
                     items.forEach((item) => {
                         totalBreakSeconds += item.break_seconds || 0;
                         totalActiveSeconds += item.active_seconds || 0;
@@ -462,7 +516,8 @@ export const ControlTablePage: React.FC = () => {
     const formatCurrentTime = (task: any) => {
         let total = task.active_seconds || 0;
         if (task.status === 'active' && task.last_action_time) {
-            const diff = Math.floor((new Date().getTime() - new Date(task.last_action_time).getTime()) / 1000);
+            const endToUse = task.end_time ? new Date(task.end_time).getTime() : new Date().getTime();
+            const diff = Math.floor((endToUse - new Date(task.last_action_time).getTime()) / 1000);
             if (diff > 0) total += diff;
         }
         const h = Math.floor(total / 3600);
@@ -471,12 +526,22 @@ export const ControlTablePage: React.FC = () => {
         return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
     };
 
-    const getWorkerShiftTimesForDate = (workerId: string, taskDateIso: string) => {
-        if (!taskDateIso || !activityLogs || activityLogs.length === 0) {
+    // logsOverride/employeesOverride let callers inside fetchData() pass the just-fetched
+    // logsData/empData directly. Without this, calls made from the polling setInterval (which
+    // captured fetchData once on mount, per its `[]` deps) would keep reading the activityLogs/
+    // employees *state* as it was on that very first render (i.e. still empty) forever, since
+    // that interval closure never gets recreated. That made this helper permanently return
+    // { clockIn: null, clockOut: null } for every call made from within fetchData, which in turn
+    // made manual-entry tasks whose clock-out log isn't tagged to them look perpetually "active"
+    // with a duration that grows every poll instead of settling once the shift actually ended.
+    const getWorkerShiftTimesForDate = (workerId: string, taskDateIso: string, logsOverride?: any[], employeesOverride?: any[]) => {
+        const logs = logsOverride || activityLogs;
+        const emps = employeesOverride || employees;
+        if (!taskDateIso || !logs || logs.length === 0) {
             return { clockIn: null, clockOut: null };
         }
         const taskTime = new Date(taskDateIso).getTime();
-        const workerLogs = activityLogs
+        const workerLogs = logs
             .filter(l => l.worker_id === workerId)
             .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
@@ -484,20 +549,20 @@ export const ControlTablePage: React.FC = () => {
         const shifts = buildShiftsForWorker(workerLogs);
         for (const shift of shifts) {
             const ciTime = new Date(shift.clockIn.timestamp).getTime();
-            
+
             // Look up worker status to resolve open shifts for offline workers
-            const emp = employees.find(e => e.id === workerId);
+            const emp = emps.find(e => e.id === workerId);
             const isCurrentlyPresent = emp?.status === 'present';
-            
-            const coTime = shift.clockOut 
-                ? new Date(shift.clockOut.timestamp).getTime() 
+
+            const coTime = shift.clockOut
+                ? new Date(shift.clockOut.timestamp).getTime()
                 : (isCurrentlyPresent ? Infinity : new Date(emp?.last_status_change || shift.clockIn.timestamp).getTime());
 
             if (taskTime >= ciTime - 60000 && taskTime <= coTime + 60000) {
                 return {
                     clockIn: shift.clockIn.timestamp,
-                    clockOut: shift.clockOut 
-                        ? shift.clockOut.timestamp 
+                    clockOut: shift.clockOut
+                        ? shift.clockOut.timestamp
                         : (isCurrentlyPresent ? null : (emp?.last_status_change || shift.clockIn.timestamp))
                 };
             }
@@ -545,7 +610,7 @@ export const ControlTablePage: React.FC = () => {
 
     const getBreaksForShift = (workerId: string, task: any) => {
         if (!activityLogs || activityLogs.length === 0) return [];
-        
+
         let isDailyVirtual = false;
         let targetDateStr = '';
         if (task.id && String(task.id).startsWith('virtual_')) {
@@ -557,7 +622,7 @@ export const ControlTablePage: React.FC = () => {
         const workerLogs = activityLogs
             .filter(l => l.worker_id === workerId)
             .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-            
+
         const allBreaks: any[] = [];
         let activeBreak: any = null;
 
@@ -568,7 +633,8 @@ export const ControlTablePage: React.FC = () => {
                         id: log.id,
                         start_time: log.timestamp,
                         end_time: null,
-                        reason: log.description || 'Rest Break'
+                        reason: log.description || 'Rest Break',
+                        type: classifyBreakType(log.description)
                     };
                 }
             } else if (log.event_type === 'break_end') {
@@ -590,7 +656,7 @@ export const ControlTablePage: React.FC = () => {
             activeBreak.duration_seconds = Math.max(0, duration);
             allBreaks.push(activeBreak);
         }
-        
+
         if (isDailyVirtual) {
             return allBreaks.filter(b => {
                 const bDateStr = new Date(b.start_time).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
@@ -613,7 +679,7 @@ export const ControlTablePage: React.FC = () => {
         if (!isoString) return '';
         const d = new Date(isoString);
         if (isNaN(d.getTime())) return '';
-        
+
         const formatter = new Intl.DateTimeFormat('en-US', {
             timeZone: 'America/Los_Angeles',
             year: 'numeric', month: '2-digit', day: '2-digit',
@@ -622,14 +688,14 @@ export const ControlTablePage: React.FC = () => {
         });
         const parts = formatter.formatToParts(d);
         const getVal = (type: string) => parts.find(p => p.type === type)!.value;
-        
+
         const y = getVal('year');
         const m = getVal('month');
         const day = getVal('day');
         let h = getVal('hour');
         if (h === '24') h = '00';
         const min = getVal('minute');
-        
+
         return `${y}-${m}-${day}T${h}:${min}`;
     };
 
@@ -687,7 +753,7 @@ export const ControlTablePage: React.FC = () => {
 
         setEditForm({
             created_at: task.created_at ? task.created_at.substring(0, 16) : '',
-            start_time: task.start_time ? task.start_time.substring(0, 16) : '',
+            start_time: (task.is_virtual || !task.start_time) ? '' : task.start_time.substring(0, 16),
             end_time: task.end_time ? task.end_time.substring(0, 16) : '',
             last_action_time: task.last_action_time ? task.last_action_time.substring(0, 16) : '',
             status: task.status,
@@ -709,6 +775,19 @@ export const ControlTablePage: React.FC = () => {
             const { clockIn, clockOut } = getWorkerShiftTimesForDate(editingTask.assigned_to_id, taskTime);
             const shiftStart = clockIn || taskTime;
             const shiftEnd = clockOut || editingTask.end_time || new Date().toISOString();
+
+            // Defensive daily-cap check, validated before any writes happen. The shift's own
+            // clock-in/out span (gross elapsed time) doesn't change from editing breaks — only
+            // the paid/unpaid split within it does — so this is really a backstop against
+            // re-saving over a pre-existing entry that was already above the cap, not something
+            // this edit itself could newly cause.
+            if (!editingTask.is_virtual) {
+                const grossMs = new Date(shiftEnd).getTime() - new Date(shiftStart).getTime();
+                if (grossMs > DAILY_SHIFT_CAP_MS) {
+                    showCustomAlert(`This entry's total duration exceeds the ${DAILY_SHIFT_CAP_LABEL} daily limit. Please shorten it.`);
+                    return;
+                }
+            }
 
             await (supabase.from('activity_logs') as any)
                 .delete()
@@ -748,13 +827,33 @@ export const ControlTablePage: React.FC = () => {
             }
 
             await fetchData();
-            
+
             // Refresh breakDetailTask state to reflect changes in the drawer
             if (editingTask.is_virtual) {
                 setBreakDetailTask({
                     ...editingTask
                 });
             } else {
+                // break_seconds stays the TOTAL (paid + unpaid) for display/audit purposes.
+                // active_seconds — the payable figure — is recomputed from the shift's fixed
+                // gross span minus only the unpaid portion, so paid breaks (coffee/short
+                // rest/restroom) stay counted as payable time instead of being deducted.
+                const newBreakSeconds = editBreaks.reduce((sum, b) => sum + (b.duration_seconds || 0), 0);
+                const newUnpaidBreakSeconds = editBreaks
+                    .filter(b => classifyBreakType(b.reason) === 'unpaid')
+                    .reduce((sum, b) => sum + (b.duration_seconds || 0), 0);
+                const grossSeconds = Math.max(0, Math.floor((new Date(shiftEnd).getTime() - new Date(shiftStart).getTime()) / 1000));
+                const newActiveSeconds = Math.max(0, grossSeconds - newUnpaidBreakSeconds);
+                const auditName = currentUser?.username === 'admin@gmail.com' ? 'System Admin' : (currentUser?.name || currentUser?.username || 'Manager');
+
+                await (supabase.from('tasks') as any)
+                    .update({
+                        break_seconds: newBreakSeconds,
+                        active_seconds: newActiveSeconds,
+                        reason: `Breaks updated by ${auditName}`
+                    })
+                    .eq('id', editingTask.id);
+
                 const { data: updatedTasks } = await (supabase.from('tasks') as any).select('*').eq('id', editingTask.id);
                 if (updatedTasks && updatedTasks[0]) {
                     const emp = employees.find(e => e.id === updatedTasks[0].assigned_to_id);
@@ -774,6 +873,19 @@ export const ControlTablePage: React.FC = () => {
             console.error('Error updating breaks:', err);
             alert('Failed to update breaks.');
         }
+    };
+
+    // Enforces "one task entry per worker per day": looks up whether the worker already has a
+    // task row on the given PST day (optionally excluding a specific task id, e.g. the one
+    // currently being edited/moved). Returns the row if found, else null.
+    const findWorkerTaskForDay = async (workerId: string, dateStr: string, excludeTaskId?: string) => {
+        const { data } = await supabase.from('tasks').select('*').eq('assigned_to_id', workerId) as { data: any[] | null };
+        const match = (data || []).find((t: any) => {
+            if (excludeTaskId && t.id === excludeTaskId) return false;
+            const tDate = new Date(t.created_at || t.start_time).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+            return tDate === dateStr;
+        });
+        return match || null;
     };
 
     const handleUpdateTask = async () => {
@@ -799,6 +911,13 @@ export const ControlTablePage: React.FC = () => {
                     totalSeconds = (parseInt(String(editForm.active_hours)) * 3600) + (parseInt(String(editForm.active_minutes)) * 60);
                 }
 
+                // Hard daily cap: this day's total (break time included) can never exceed 8h45m,
+                // whether it's a live shift or an admin editing it after the fact.
+                if (totalSeconds > DAILY_SHIFT_CAP_MS / 1000) {
+                    showCustomAlert(`This day's duration exceeds the ${DAILY_SHIFT_CAP_LABEL} daily limit. Please shorten it.`);
+                    return;
+                }
+
                 // 2. Fetch all tasks for this worker to see if there are manual tasks on this day
                 const { data: dbTasks, error: tasksErr } = await supabase
                     .from('tasks')
@@ -813,39 +932,47 @@ export const ControlTablePage: React.FC = () => {
                     return tDate === dateStr;
                 });
 
-                // Breaks reduce active/payable time — without this, an edited-in break would sit
-                // alongside the shift instead of being deducted from its duration.
+                // Unpaid breaks reduce active/payable time — without this, an edited-in unpaid
+                // break would sit alongside the shift instead of being deducted from its
+                // duration. Paid breaks (coffee/short rest/restroom) stay counted as payable
+                // time, so only the unpaid portion is subtracted from netActiveSeconds.
                 const totalBreakSecondsForEdit = editBreaks.reduce((sum: number, b: any) => sum + (b.duration_seconds || 0), 0);
-                const netActiveSeconds = Math.max(0, totalSeconds - totalBreakSecondsForEdit);
+                const unpaidBreakSecondsForEdit = editBreaks
+                    .filter((b: any) => classifyBreakType(b.reason) === 'unpaid')
+                    .reduce((sum: number, b: any) => sum + (b.duration_seconds || 0), 0);
+                const netActiveSeconds = Math.max(0, totalSeconds - unpaidBreakSecondsForEdit);
 
                 if (dayTasks.length > 0) {
-                    // Update all database tasks of that day with the updated values
+                    // One entry per worker per day: update only that single task, not every row
+                    // in dayTasks — looping and writing the same totals onto each one would
+                    // duplicate the day's duration N times over the next time it's summed. If
+                    // legacy data somehow has more than one task for this day, only the first
+                    // is updated here; it isn't split across the rest.
                     const auditName = currentUser?.username === 'admin@gmail.com' ? 'System Admin' : (currentUser?.name || currentUser?.username || 'Manager');
+                    const t = (dayTasks as any[])[0];
 
-                    for (const t of (dayTasks as any[])) {
-                        const taskUpdates: any = {
-                            active_seconds: netActiveSeconds,
-                            break_seconds: totalBreakSecondsForEdit,
-                            mo_reference: editForm.mo_reference,
-                            description: editForm.description,
-                            hourly_rate: editForm.hourly_rate,
-                            status: editForm.end_time ? 'completed' : editForm.status,
-                            reason: `Updated by ${auditName}`
-                        };
-                        if (editForm.created_at) taskUpdates.created_at = parsePSTToUTC(editForm.created_at).toISOString();
-                        if (editForm.start_time) taskUpdates.start_time = parsePSTToUTC(editForm.start_time).toISOString();
-                        if (editForm.end_time) {
-                            taskUpdates.end_time = parsePSTToUTC(editForm.end_time).toISOString();
-                            taskUpdates.last_action_time = taskUpdates.end_time;
-                        } else {
-                            taskUpdates.end_time = null;
-                            if (editForm.last_action_time) taskUpdates.last_action_time = parsePSTToUTC(editForm.last_action_time).toISOString();
-                        }
-
-                        await (supabase.from('tasks') as any)
-                            .update(taskUpdates)
-                            .eq('id', t.id);
+                    const taskUpdates: any = {
+                        active_seconds: netActiveSeconds,
+                        break_seconds: totalBreakSecondsForEdit,
+                        mo_reference: editForm.mo_reference,
+                        description: editForm.description,
+                        hourly_rate: editForm.hourly_rate,
+                        status: editForm.end_time ? 'completed' : editForm.status,
+                        reason: `Updated by ${auditName}`
+                    };
+                    if (editForm.created_at) taskUpdates.created_at = parsePSTToUTC(editForm.created_at).toISOString();
+                    if (editForm.start_time) taskUpdates.start_time = parsePSTToUTC(editForm.start_time).toISOString();
+                    if (editForm.end_time) {
+                        taskUpdates.end_time = parsePSTToUTC(editForm.end_time).toISOString();
+                        taskUpdates.last_action_time = taskUpdates.end_time;
+                    } else {
+                        taskUpdates.end_time = null;
+                        if (editForm.last_action_time) taskUpdates.last_action_time = parsePSTToUTC(editForm.last_action_time).toISOString();
                     }
+
+                    await (supabase.from('tasks') as any)
+                        .update(taskUpdates)
+                        .eq('id', t.id);
                 }
 
                 // 3. Update activity logs (clock-in, clock-out, breaks)
@@ -867,6 +994,17 @@ export const ControlTablePage: React.FC = () => {
                     const firstShift = dayShifts[0];
                     const lastShift = dayShifts[dayShifts.length - 1];
 
+                    // One entry per worker per day: this edit collapses the day to a single
+                    // clock-in/clock-out pair (first shift's start, last shift's end). Any shift
+                    // strictly in between is removed rather than left unedited and orphaned.
+                    const middleShifts = dayShifts.slice(1, -1);
+                    for (const mid of middleShifts) {
+                        await (supabase.from('activity_logs') as any).delete().eq('id', mid.clockIn.id);
+                        if (mid.clockOut) {
+                            await (supabase.from('activity_logs') as any).delete().eq('id', mid.clockOut.id);
+                        }
+                    }
+
                     const clockIn = firstShift.clockIn.timestamp;
                     const clockOut = lastShift.clockOut ? lastShift.clockOut.timestamp : null;
 
@@ -879,7 +1017,7 @@ export const ControlTablePage: React.FC = () => {
                             .eq('event_type', 'clock_in')
                             .eq('timestamp', clockIn);
                     }
-                    
+
                     // Update clock_out log:
                     if (editForm.end_time) {
                         const newClockOutIso = parsePSTToUTC(editForm.end_time).toISOString();
@@ -1010,34 +1148,45 @@ export const ControlTablePage: React.FC = () => {
             }
         }
 
+        // totalBreakSeconds (all breaks) is stored for display/audit. Only unpaid breaks reduce
+        // payable time — paid breaks (coffee/short rest/restroom) stay inside netSeconds, so
+        // gross = netSeconds + unpaidBreakSeconds, not netSeconds + totalBreakSeconds.
+        const totalBreakSeconds = editBreaks.reduce((sum, b) => sum + (b.duration_seconds || 0), 0);
+        const unpaidBreakSeconds = editBreaks
+            .filter(b => classifyBreakType(b.reason) === 'unpaid')
+            .reduce((sum, b) => sum + (b.duration_seconds || 0), 0);
+
         // Calculate active_seconds logic:
-        // Prioritize actual time difference if start and end are provided
-        // Otherwise fallback to manual duration inputs
-        let totalSeconds = 0;
+        let netSeconds = 0;
+        let grossSeconds = 0;
         if (editForm.start_time && editForm.end_time) {
             const start = parsePSTToUTC(editForm.start_time).getTime();
             const end = parsePSTToUTC(editForm.end_time).getTime();
             if (!isNaN(start) && !isNaN(end) && end >= start) {
-                totalSeconds = Math.floor((end - start) / 1000);
+                grossSeconds = Math.floor((end - start) / 1000);
+                netSeconds = Math.max(0, grossSeconds - unpaidBreakSeconds);
             } else {
-                // Fallback if invalid range
-                totalSeconds = (parseInt(String(editForm.active_hours)) * 3600) + (parseInt(String(editForm.active_minutes)) * 60);
+                netSeconds = (parseInt(String(editForm.active_hours)) * 3600) + (parseInt(String(editForm.active_minutes)) * 60);
+                grossSeconds = netSeconds + unpaidBreakSeconds;
             }
         } else {
-            // No end time, trust the manual duration
-            totalSeconds = (parseInt(String(editForm.active_hours)) * 3600) + (parseInt(String(editForm.active_minutes)) * 60);
+            netSeconds = (parseInt(String(editForm.active_hours)) * 3600) + (parseInt(String(editForm.active_minutes)) * 60);
+            grossSeconds = netSeconds + unpaidBreakSeconds;
         }
 
-        // Calculate total break seconds
-        const totalBreakSeconds = editBreaks.reduce((sum, b) => sum + (b.duration_seconds || 0), 0);
+        // Hard daily cap: total elapsed time (break time included) can never exceed 8h45m.
+        if (grossSeconds > DAILY_SHIFT_CAP_MS / 1000) {
+            showCustomAlert(`This entry's duration exceeds the ${DAILY_SHIFT_CAP_LABEL} daily limit. Please shorten it.`);
+            return;
+        }
 
         // Prepare updates
         const auditName = currentUser?.username === 'admin@gmail.com' ? 'System Admin' : (currentUser?.name || currentUser?.username || 'Manager');
         const updates: any = {
             status: editForm.status,
-            active_seconds: totalSeconds,
+            active_seconds: netSeconds,
             break_seconds: totalBreakSeconds,
-            total_duration_seconds: totalSeconds + totalBreakSeconds,
+            total_duration_seconds: grossSeconds,
             created_at: editForm.created_at ? parsePSTToUTC(editForm.created_at).toISOString() : editingTask.created_at,
             start_time: editForm.start_time ? parsePSTToUTC(editForm.start_time).toISOString() : null,
             last_action_time: editForm.last_action_time ? parsePSTToUTC(editForm.last_action_time).toISOString() : editingTask.last_action_time,
@@ -1058,18 +1207,94 @@ export const ControlTablePage: React.FC = () => {
         }
 
         try {
-            const { error } = await (supabase.from('tasks') as any).update(updates).eq('id', editingTask.id);
+            // One entry per worker per day: if this edit moves the entry onto a day the worker
+            // already has a different entry for, merge into that existing entry instead of
+            // saving this one in place — which would leave two rows for the same day.
+            const workerId = editingTask.assigned_to_id;
+            const targetDateStr = new Date(updates.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+            const collisionTask = await findWorkerTaskForDay(workerId, targetDateStr, editingTask.id);
+
+            if (collisionTask && !collisionTask.manual) {
+                showCustomAlert('This worker already has a live-tracked entry for that day. Please edit that entry directly instead.');
+                return;
+            }
+
+            const targetTaskId = collisionTask ? collisionTask.id : editingTask.id;
+
+            const { error } = await (supabase.from('tasks') as any).update(updates).eq('id', targetTaskId);
             if (error) throw error;
+
+            if (collisionTask) {
+                // The edited entry has been merged into collisionTask — remove the row it used
+                // to live in so the day doesn't end up with two entries.
+                await (supabase.from('tasks') as any).delete().eq('id', editingTask.id);
+                await (supabase.from('activity_logs') as any)
+                    .delete()
+                    .eq('related_task_id', editingTask.id)
+                    .in('event_type', ['clock_in', 'clock_out']);
+            }
+
+            // Sync activity_logs for clock_in / clock_out if they exist
+            // Sync clock_in if we changed start_time/created_at
+            const newClockIn = updates.start_time || updates.created_at;
+            if (newClockIn) {
+                const { data: inLogs } = await (supabase.from('activity_logs') as any)
+                    .select('*')
+                    .eq('worker_id', workerId)
+                    .eq('event_type', 'clock_in')
+                    .eq('related_task_id', targetTaskId);
+
+                if (inLogs && inLogs.length > 0) {
+                    await (supabase.from('activity_logs') as any)
+                        .update({ timestamp: newClockIn, description: `Clocked In manually updated by ${auditName}` })
+                        .eq('id', inLogs[0].id);
+                } else if (collisionTask) {
+                    // Merged in from a different task id — its own clock_in log won't be found
+                    // under targetTaskId, so create one instead of silently dropping the sync.
+                    await logActivity(workerId, 'clock_in', `Manual entry by ${auditName} (merged)`, updates.reason, targetTaskId, newClockIn);
+                }
+            }
+
+            // Sync clock_out
+            if (updates.end_time) {
+                const { data: outLogs } = await (supabase.from('activity_logs') as any)
+                    .select('*')
+                    .eq('worker_id', workerId)
+                    .eq('event_type', 'clock_out')
+                    .eq('related_task_id', targetTaskId);
+
+                if (outLogs && outLogs.length > 0) {
+                    await (supabase.from('activity_logs') as any)
+                        .update({ timestamp: updates.end_time, description: `Clocked Out manually updated by ${auditName}` })
+                        .eq('id', outLogs[0].id);
+                } else if (editingTask.manual || collisionTask) { // For manual tasks, we must ensure a clock_out exists if they just added an end time
+                    await logActivity(
+                        workerId,
+                        'clock_out',
+                        updates.reason,
+                        `Clocked Out by ${auditName} (Manual Entry)`,
+                        targetTaskId,
+                        updates.end_time
+                    );
+                }
+            } else {
+                // If end_time is removed, delete the clock_out log
+                await (supabase.from('activity_logs') as any)
+                    .delete()
+                    .eq('worker_id', workerId)
+                    .eq('event_type', 'clock_out')
+                    .eq('related_task_id', targetTaskId);
+            }
 
             // Delete old break logs matching the shift time range
             const taskTime = editingTask.created_at || editingTask.start_time;
-            const { clockIn, clockOut } = getWorkerShiftTimesForDate(editingTask.assigned_to_id, taskTime);
+            const { clockIn, clockOut } = getWorkerShiftTimesForDate(workerId, taskTime);
             const shiftStart = clockIn || taskTime;
             const shiftEnd = clockOut || editingTask.end_time || new Date().toISOString();
 
             await (supabase.from('activity_logs') as any)
                 .delete()
-                .eq('worker_id', editingTask.assigned_to_id)
+                .eq('worker_id', workerId)
                 .in('event_type', ['break_start', 'break_end'])
                 .gte('timestamp', new Date(shiftStart).toISOString())
                 .lte('timestamp', new Date(shiftEnd).toISOString());
@@ -1080,18 +1305,18 @@ export const ControlTablePage: React.FC = () => {
                 editBreaks.forEach(b => {
                     if (b.start_time) {
                         logsToInsert.push({
-                            worker_id: editingTask.assigned_to_id,
+                            worker_id: workerId,
                             event_type: 'break_start',
-                            related_task_id: editingTask.id,
+                            related_task_id: targetTaskId,
                             description: b.reason || 'Rest Break',
                             timestamp: parsePSTToUTC(b.start_time).toISOString()
                         });
                     }
                     if (b.end_time) {
                         logsToInsert.push({
-                            worker_id: editingTask.assigned_to_id,
+                            worker_id: workerId,
                             event_type: 'break_end',
-                            related_task_id: editingTask.id,
+                            related_task_id: targetTaskId,
                             description: 'Break ended',
                             timestamp: parsePSTToUTC(b.end_time).toISOString()
                         });
@@ -1107,11 +1332,11 @@ export const ControlTablePage: React.FC = () => {
             if (currentUser) {
                 const auditName = currentUser.username === 'admin@gmail.com' ? 'System Admin' : (currentUser.name || currentUser.username || 'Manager');
                 await logActivity(
-                    editingTask.assigned_to_id,
+                    workerId,
                     'task_start', // or appropriate event type
                     `Manual update by ${auditName}`, // Embed name directly in description
-                    `Status: ${updates.status}, Task ID: ${editingTask.id}`,
-                    editingTask.id
+                    `Status: ${updates.status}, Task ID: ${targetTaskId}`,
+                    targetTaskId
                 );
             }
 
@@ -1123,13 +1348,25 @@ export const ControlTablePage: React.FC = () => {
     };
 
     const handleDeleteTask = async (id: string) => {
+        // Find the task to check its status
+        const taskToDelete = tasks.find(t => t.id === id);
+        if (taskToDelete) {
+            const isOngoingVirtual = taskToDelete.is_virtual && !taskToDelete.clock_out_time;
+            const isOngoingMO = !taskToDelete.is_virtual && (taskToDelete.status === 'active' || taskToDelete.status === 'break' || taskToDelete.status === 'paused');
+
+            if (isOngoingVirtual || isOngoingMO) {
+                showCustomAlert('Please clock out the worker before deleting an ongoing entry.');
+                return;
+            }
+        }
+
         const performDelete = async () => {
             if (id.startsWith('virtual_')) {
                 try {
                     const parts = id.split('_');
                     const workerId = parts[1];
                     const dateStr = parts.slice(2).join('_');
-                    
+
                     // 1. Delete activity logs of that day
                     const { data: logsToDelete } = await supabase
                         .from('activity_logs')
@@ -1169,7 +1406,7 @@ export const ControlTablePage: React.FC = () => {
                                 .in('id', taskIds);
                         }
                     }
-                    
+
                     fetchData();
                 } catch (err: any) {
                     showCustomAlert('Error deleting shift: ' + err.message);
@@ -1256,6 +1493,33 @@ export const ControlTablePage: React.FC = () => {
             totalSeconds = (parseInt(String(createForm.active_hours)) * 3600) + (parseInt(String(createForm.active_minutes)) * 60);
         }
 
+        // Hard daily cap: a manual entry can never itself span more than 8h45m (break time
+        // included), the same ceiling live clock-in/out is held to. No admin/manager override.
+        if (totalSeconds > DAILY_SHIFT_CAP_MS / 1000) {
+            showCustomAlert(`This entry's duration exceeds the ${DAILY_SHIFT_CAP_LABEL} daily limit. Please shorten it.`);
+            return;
+        }
+
+        // effectiveStartTime is already PST wall-clock text (from the form input), so its date
+        // portion is the PST day directly — no conversion needed.
+        const entryDateStr = (effectiveStartTime || '').slice(0, 10) || todayPST();
+
+        // An open-ended entry (no end_time) leaves the worker live clocked-in — block it if
+        // they've already used up today's cap via other entries/shifts, same as a real clock-in.
+        if (!createForm.end_time) {
+            const { data: freshLogs } = await supabase
+                .from('activity_logs')
+                .select('*')
+                .eq('worker_id', createForm.worker_id)
+                .gte('timestamp', pstDayStart(entryDateStr))
+                .lte('timestamp', pstDayEnd(entryDateStr));
+            const elapsedMs = getElapsedMsForLogs((freshLogs || []) as any[]);
+            if (elapsedMs >= DAILY_SHIFT_CAP_MS) {
+                showCustomAlert(`This worker has already reached the ${DAILY_SHIFT_CAP_LABEL} daily limit and cannot be clocked in again today.`);
+                return;
+            }
+        }
+
         // For Tab 2 (Start/Last Action), created_at defaults to "now" (form open time).
         // Override it with start_time so Clock In column and date filters show the correct work date.
         const effectiveCreatedAt = createTab === 'startLastAction' && createForm.start_time
@@ -1263,32 +1527,90 @@ export const ControlTablePage: React.FC = () => {
             : (createForm.created_at || new Date().toISOString());
 
         const auditName = currentUser?.username === 'admin@gmail.com' ? 'System Admin' : (currentUser?.name || currentUser?.username || 'Manager');
-        const newTask: any = {
-            assigned_to_id: createForm.worker_id,
+
+        const taskFields: any = {
             mo_reference: createForm.mo_reference,
             description: createForm.description,
-            status: createForm.status,
+            status: createForm.end_time ? 'completed' : createForm.status,
             active_seconds: totalSeconds,
             created_at: parsePSTToUTC(effectiveCreatedAt).toISOString(),
             start_time: effectiveStartTime ? parsePSTToUTC(effectiveStartTime).toISOString() : null,
             last_action_time: createForm.last_action_time ? parsePSTToUTC(createForm.last_action_time).toISOString() : null,
-            hourly_rate: createForm.hourly_rate,
-            break_seconds: 0,
-            manual: true,
-            reason: `Created by ${auditName}`
+            hourly_rate: createForm.hourly_rate
         };
 
         if (createForm.end_time) {
-            newTask.end_time = parsePSTToUTC(createForm.end_time).toISOString();
+            taskFields.end_time = parsePSTToUTC(createForm.end_time).toISOString();
             if (!createForm.last_action_time) {
-                newTask.last_action_time = newTask.end_time;
+                taskFields.last_action_time = taskFields.end_time;
             }
-            newTask.status = 'completed';
         } else if (effectiveStartTime && !createForm.last_action_time) {
-            newTask.last_action_time = newTask.start_time;
+            taskFields.last_action_time = taskFields.start_time;
         }
 
         try {
+            // One entry per worker per day: if this worker already has a task row on this PST
+            // day, merge into it instead of inserting a second one for the same day.
+            const existingTask = await findWorkerTaskForDay(createForm.worker_id, entryDateStr);
+
+            if (existingTask) {
+                if (!existingTask.manual) {
+                    showCustomAlert('This worker already has a live-tracked entry for this day. Please edit that entry directly instead of creating a new one.');
+                    return;
+                }
+
+                await (supabase.from('tasks') as any)
+                    .update({
+                        ...taskFields,
+                        break_seconds: existingTask.break_seconds || 0,
+                        reason: `Updated by ${auditName} (merged manual entry)`
+                    })
+                    .eq('id', existingTask.id);
+
+                // Replace this entry's own clock_in/clock_out logs with the merged-in times —
+                // avoids stacking a second clock_in on the same task, which would break
+                // shift-pairing for everything after it.
+                await (supabase.from('activity_logs') as any)
+                    .delete()
+                    .eq('related_task_id', existingTask.id)
+                    .in('event_type', ['clock_in', 'clock_out']);
+
+                const details = `MO: ${taskFields.mo_reference}, Task ID: ${existingTask.id}`;
+                await logActivity(
+                    createForm.worker_id,
+                    'clock_in',
+                    `Manual entry by ${auditName}`,
+                    details,
+                    existingTask.id,
+                    taskFields.start_time || taskFields.created_at
+                );
+
+                if (taskFields.end_time) {
+                    await logActivity(
+                        createForm.worker_id,
+                        'clock_out',
+                        `Manual entry by ${auditName}`,
+                        details,
+                        existingTask.id,
+                        taskFields.end_time
+                    );
+                } else {
+                    await updateUserStatus(createForm.worker_id, 'present', 'available');
+                }
+
+                setIsCreateOpen(false);
+                fetchData();
+                return;
+            }
+
+            const newTask: any = {
+                ...taskFields,
+                assigned_to_id: createForm.worker_id,
+                break_seconds: 0,
+                manual: true,
+                reason: `Created by ${auditName}`
+            };
+
             const { data: createdTask, error } = await (supabase.from('tasks') as any).insert(newTask).select().single();
             if (error) throw error;
 
@@ -1297,7 +1619,6 @@ export const ControlTablePage: React.FC = () => {
             // (when it's meant to leave the worker actively clocked in right now). Leaving a
             // clock_in permanently unclosed breaks shift-pairing for every entry that comes after it.
             if (currentUser && createdTask) {
-                const auditName = currentUser.username === 'admin@gmail.com' ? 'System Admin' : (currentUser.name || currentUser.username || 'Manager');
                 const details = `MO: ${newTask.mo_reference}, Task ID: ${createdTask.id}`;
 
                 await logActivity(
@@ -1342,20 +1663,20 @@ export const ControlTablePage: React.FC = () => {
             hour: 'numeric', minute: 'numeric', second: 'numeric',
             hour12: false
         });
-        
+
         const parts = formatter.formatToParts(date);
         const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0', 10);
-        
+
         const y = getPart('year');
         const m = getPart('month');
         const d = getPart('day');
         const hr = getPart('hour');
         const min = getPart('minute');
         const sec = getPart('second');
-        
+
         const pstTimestamp = Date.UTC(y, m - 1, d, hr === 24 ? 0 : hr, min, sec);
         const diff = date.getTime() - pstTimestamp;
-        
+
         return new Date(date.getTime() + diff);
     };
 
@@ -1379,11 +1700,6 @@ export const ControlTablePage: React.FC = () => {
         const taskDate = new Date(t.created_at || t.start_time);
         if (startDate && taskDate < getPSTBound(startDate, false)) matchesDate = false;
         if (endDate && taskDate > getPSTBound(endDate, true)) matchesDate = false;
-
-        if (!t.is_virtual) {
-            const { clockIn } = getWorkerShiftTimesForDate(t.assigned_to_id, t.created_at || t.start_time);
-            if (!clockIn && !t.manual) return false;
-        }
 
         return matchesSearch && matchesWorker && matchesStatus && matchesDate;
     }).sort((a, b) => {
@@ -1447,7 +1763,7 @@ export const ControlTablePage: React.FC = () => {
         applyDateFilter('All'); // Changed to 'All'
 
         fetchData();
-        
+
         // Timer to force re-renders for active durations/counters
         const timeInterval = setInterval(() => {
             setTasks(prev => [...prev]);
@@ -1517,9 +1833,9 @@ export const ControlTablePage: React.FC = () => {
                 </button>
 
                 <div style={{ position: 'relative' }}>
-                    <button 
-                        className="btn btn-secondary" 
-                        onClick={() => setShowColumnFilter(prev => !prev)} 
+                    <button
+                        className="btn btn-secondary"
+                        onClick={() => setShowColumnFilter(prev => !prev)}
                         style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
                     >
                         <i className="fa-solid fa-sliders"></i>
@@ -1545,27 +1861,27 @@ export const ControlTablePage: React.FC = () => {
                             <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 Toggle Columns
                             </div>
-                            
+
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
                                 <input type="checkbox" checked={visibleColumns.mo} onChange={() => toggleColumn('mo')} />
                                 MO Reference
                             </label>
-                            
+
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
                                 <input type="checkbox" checked={visibleColumns.operation} onChange={() => toggleColumn('operation')} />
                                 Operation (Description)
                             </label>
-                            
+
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
                                 <input type="checkbox" checked={visibleColumns.startTime} onChange={() => toggleColumn('startTime')} />
                                 Start Time
                             </label>
-                            
+
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
                                 <input type="checkbox" checked={visibleColumns.lastAction} onChange={() => toggleColumn('lastAction')} />
                                 Last Action
                             </label>
-                            
+
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
                                 <input type="checkbox" checked={visibleColumns.status} onChange={() => toggleColumn('status')} />
                                 Status
@@ -1624,175 +1940,175 @@ export const ControlTablePage: React.FC = () => {
                     <tbody style={{ background: 'var(--bg-card)' }}>
                         {filteredTasks.map(task => (
                             <React.Fragment key={task.id}>
-                                <tr 
+                                <tr
                                     onClick={() => setBreakDetailTask(task)}
-                                    style={{ 
-                                        borderBottom: '1px solid var(--border)', 
-                                        background: 'var(--bg-card)', 
+                                    style={{
+                                        borderBottom: '1px solid var(--border)',
+                                        background: 'var(--bg-card)',
                                         color: 'var(--text-main)',
                                         cursor: 'pointer'
                                     }}
                                     className="table-row-clickable"
                                 >
-                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-muted)', fontFamily: `'JetBrains Mono', monospace`, background: 'var(--bg-card)' }}>{task.worker_id_str}</td>
-                                <td className="sticky-column" style={{ padding: '0.75rem 1rem', left: '100px', background: 'var(--bg-card)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <div style={{ width: '32px', height: '32px', background: 'var(--primary)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '0.8rem' }}>
-                                            {task.worker_avatar}
+                                    <td className="sticky-column" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-muted)', fontFamily: `'JetBrains Mono', monospace`, background: 'var(--bg-card)' }}>{task.worker_id_str}</td>
+                                    <td className="sticky-column" style={{ padding: '0.75rem 1rem', left: '100px', background: 'var(--bg-card)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <div style={{ width: '32px', height: '32px', background: 'var(--primary)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '0.8rem' }}>
+                                                {task.worker_avatar}
+                                            </div>
+                                            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{task.worker_name}</span>
                                         </div>
-                                        <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{task.worker_name}</span>
-                                    </div>
-                                </td>
-                                {visibleColumns.mo && (
-                                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
-                                        <span className="badge badge-blue" style={{ fontSize: '0.75rem' }}>{task.mo_reference}</span>
                                     </td>
-                                )}
-                                {visibleColumns.operation && <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{task.description}</td>}
-                                <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
-                                    {(() => {
-                                        if (task.is_virtual) return formatDateTime(task.clock_in_time);
-                                        if (task.manual) return formatDateTime(task.start_time || task.created_at);
-                                        const taskTime = task.created_at || task.start_time;
-                                        const { clockIn } = getWorkerShiftTimesForDate(task.assigned_to_id, taskTime);
-                                        return clockIn ? formatDateTime(clockIn) : (taskTime ? formatDateTime(taskTime) : '-');
-                                    })()}
-                                </td>
-                                {visibleColumns.startTime && (
+                                    {visibleColumns.mo && (
+                                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                            <span className="badge badge-blue" style={{ fontSize: '0.75rem' }}>{task.mo_reference}</span>
+                                        </td>
+                                    )}
+                                    {visibleColumns.operation && <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{task.description}</td>}
                                     <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
-                                        {formatTimeOnly(task.start_time)}
+                                        {(() => {
+                                            if (task.is_virtual) return formatDateTime(task.clock_in_time);
+                                            if (task.manual) return formatDateTime(task.start_time || task.created_at);
+                                            const taskTime = task.created_at || task.start_time;
+                                            const { clockIn } = getWorkerShiftTimesForDate(task.assigned_to_id, taskTime);
+                                            return clockIn ? formatDateTime(clockIn) : (taskTime ? formatDateTime(taskTime) : '-');
+                                        })()}
                                     </td>
-                                )}
-                                <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
-                                     {(() => {
-                                         if (task.is_virtual) {
-                                             return task.clock_out_time ? formatDateTime(task.clock_out_time) : 'Still Clocked In';
-                                         }
-                                         if (task.manual) {
-                                             return task.end_time ? formatDateTime(task.end_time) : (task.status === 'completed' ? '-' : 'Still Clocked In');
-                                         }
-                                         const { clockOut } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at || task.start_time);
-                                         if (clockOut) return formatDateTime(clockOut);
-                                         return 'Still Clocked In';
-                                     })()}
-                                 </td>
-                                {visibleColumns.lastAction && (
+                                    {visibleColumns.startTime && (
+                                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                            {formatTimeOnly(task.start_time)}
+                                        </td>
+                                    )}
                                     <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
-                                        {formatTimeOnly(task.last_action_time)}
+                                        {(() => {
+                                            if (task.is_virtual) {
+                                                return task.clock_out_time ? formatDateTime(task.clock_out_time) : 'Still Clocked In';
+                                            }
+                                            if (task.manual) {
+                                                return task.end_time ? formatDateTime(task.end_time) : (task.status === 'completed' ? '-' : 'Still Clocked In');
+                                            }
+                                            const { clockOut } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at || task.start_time);
+                                            if (clockOut) return formatDateTime(clockOut);
+                                            return 'Still Clocked In';
+                                        })()}
                                     </td>
-                                )}
-                                <td style={{ padding: '0.75rem 1rem' }}>
-                                     <span style={{ fontFamily: `'JetBrains Mono', monospace`, color: 'var(--text-main)', fontWeight: 600 }}>
-                                          {(() => {
-                                              if (task.is_virtual) {
-                                                  let seconds = task.active_seconds;
-                                                  if (!task.clock_out_time) {
-                                                      const totalSec = Math.max(0, Math.floor((new Date().getTime() - new Date(task.clock_in_time).getTime()) / 1000));
-                                                      let breakSec = task.break_seconds || 0;
-                                                      if (task.status === 'break' && task.open_break_start) {
-                                                          const runningBreak = Math.max(0, Math.floor((new Date().getTime() - new Date(task.open_break_start).getTime()) / 1000));
-                                                          breakSec += runningBreak;
-                                                      }
-                                                      seconds = Math.max(0, totalSec - breakSec);
-                                                  }
-                                                  const h = Math.floor(seconds / 3600);
-                                                  const m = Math.floor((seconds % 3600) / 60);
-                                                  const s = seconds % 60;
-                                                  return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
-                                              }
-                                              if (task.manual) {
-                                                  return formatCurrentTime(task);
-                                              }
-                                              const { clockIn, clockOut } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at || task.start_time);
-                                              if (clockIn) {
-                                                  const start = new Date(clockIn).getTime();
-                                                  const end = clockOut ? new Date(clockOut).getTime() : new Date().getTime();
-                                                  let totalSeconds = Math.max(0, Math.floor((end - start) / 1000));
-                                                  
-                                                  const breaks = getBreaksForShift(task.assigned_to_id, task);
-                                                  const totalBreakSeconds = breaks.reduce((sum, b) => sum + b.duration_seconds, 0);
-                                                  totalSeconds = Math.max(0, totalSeconds - totalBreakSeconds);
-  
-                                                  const h = Math.floor(totalSeconds / 3600);
-                                                  const m = Math.floor((totalSeconds % 3600) / 60);
-                                                  const s = totalSeconds % 60;
-                                                  return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
-                                              }
-                                              return formatCurrentTime(task);
-                                          })()}
-                                     </span>
-                                 </td>
-                                {visibleColumns.status && <td style={{ padding: '0.75rem 1rem' }}>{getStatusLabel(task.status)}</td>}
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                    {(() => {
-                                        if (task.is_virtual) {
-                                            if (task.audit_record && task.audit_record.includes('by ')) {
-                                                const name = task.audit_record.split('by ')[1];
-                                                const actionText = task.audit_record;
+                                    {visibleColumns.lastAction && (
+                                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                            {formatTimeOnly(task.last_action_time)}
+                                        </td>
+                                    )}
+                                    <td style={{ padding: '0.75rem 1rem' }}>
+                                        <span style={{ fontFamily: `'JetBrains Mono', monospace`, color: 'var(--text-main)', fontWeight: 600 }}>
+                                            {(() => {
+                                                if (task.is_virtual) {
+                                                    let seconds = task.active_seconds;
+                                                    if (!task.clock_out_time) {
+                                                        const totalSec = Math.max(0, Math.floor((new Date().getTime() - new Date(task.clock_in_time).getTime()) / 1000));
+                                                        let breakSec = task.break_seconds || 0;
+                                                        if (task.status === 'break' && task.open_break_start) {
+                                                            const runningBreak = Math.max(0, Math.floor((new Date().getTime() - new Date(task.open_break_start).getTime()) / 1000));
+                                                            breakSec += runningBreak;
+                                                        }
+                                                        seconds = Math.max(0, totalSec - breakSec);
+                                                    }
+                                                    const h = Math.floor(seconds / 3600);
+                                                    const m = Math.floor((seconds % 3600) / 60);
+                                                    const s = seconds % 60;
+                                                    return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
+                                                }
+                                                if (task.manual) {
+                                                    return formatCurrentTime(task);
+                                                }
+                                                const { clockIn, clockOut } = getWorkerShiftTimesForDate(task.assigned_to_id, task.created_at || task.start_time);
+                                                if (clockIn) {
+                                                    const start = new Date(clockIn).getTime();
+                                                    const end = clockOut ? new Date(clockOut).getTime() : new Date().getTime();
+                                                    let totalSeconds = Math.max(0, Math.floor((end - start) / 1000));
+
+                                                    const breaks = getBreaksForShift(task.assigned_to_id, task);
+                                                    const unpaidBreakSeconds = breaks.filter(b => b.type === 'unpaid').reduce((sum, b) => sum + b.duration_seconds, 0);
+                                                    totalSeconds = Math.max(0, totalSeconds - unpaidBreakSeconds);
+
+                                                    const h = Math.floor(totalSeconds / 3600);
+                                                    const m = Math.floor((totalSeconds % 3600) / 60);
+                                                    const s = totalSeconds % 60;
+                                                    return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
+                                                }
+                                                return formatCurrentTime(task);
+                                            })()}
+                                        </span>
+                                    </td>
+                                    {visibleColumns.status && <td style={{ padding: '0.75rem 1rem' }}>{getStatusLabel(task.status)}</td>}
+                                    <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                        {(() => {
+                                            if (task.is_virtual) {
+                                                if (task.audit_record && task.audit_record.includes('by ')) {
+                                                    const name = task.audit_record.split('by ')[1];
+                                                    const actionText = task.audit_record;
+                                                    return (
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span style={{ fontWeight: 600, color: 'var(--primary)' }}>By: {name}</span>
+                                                            <span style={{ fontSize: '0.7rem' }}>{actionText}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Worker action</span>;
+                                            }
+                                            if (task.reason && task.reason.includes('by ')) {
+                                                const name = task.reason.split('by ')[1];
+                                                const type = (task.reason.toLowerCase().includes('create') || task.manual) ? 'Manual Creation' : 'Manual Update';
                                                 return (
                                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                         <span style={{ fontWeight: 600, color: 'var(--primary)' }}>By: {name}</span>
-                                                        <span style={{ fontSize: '0.7rem' }}>{actionText}</span>
+                                                        <span style={{ fontSize: '0.7rem' }}>{type}</span>
                                                     </div>
                                                 );
+                                            }
+
+                                            const logs = activityLogs.filter(l => l.related_task_id === task.id);
+                                            const log = logs[0];
+
+                                            if (log) {
+                                                const description = log.description || '';
+                                                const hasManager = description.includes('by ');
+                                                const name = hasManager ? description.split('by ')[1] : (log.performed_by_name || 'Manager');
+
+                                                if (name) {
+                                                    return (
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span style={{ fontWeight: 600, color: 'var(--primary)' }}>By: {name}</span>
+                                                            <span style={{ fontSize: '0.7rem' }}>{description}</span>
+                                                        </div>
+                                                    );
+                                                }
                                             }
                                             return <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Worker action</span>;
-                                        }
-                                        if (task.reason && task.reason.includes('by ')) {
-                                            const name = task.reason.split('by ')[1];
-                                            const type = (task.reason.toLowerCase().includes('create') || task.manual) ? 'Manual Creation' : 'Manual Update';
-                                            return (
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <span style={{ fontWeight: 600, color: 'var(--primary)' }}>By: {name}</span>
-                                                    <span style={{ fontSize: '0.7rem' }}>{type}</span>
-                                                </div>
-                                            );
-                                        }
- 
-                                        const logs = activityLogs.filter(l => l.related_task_id === task.id);
-                                        const log = logs[0];
- 
-                                        if (log) {
-                                            const description = log.description || '';
-                                            const hasManager = description.includes('by ');
-                                            const name = hasManager ? description.split('by ')[1] : (log.performed_by_name || 'Manager');
- 
-                                            if (name) {
-                                                return (
-                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                        <span style={{ fontWeight: 600, color: 'var(--primary)' }}>By: {name}</span>
-                                                        <span style={{ fontSize: '0.7rem' }}>{description}</span>
-                                                    </div>
-                                                );
-                                            }
-                                        }
-                                        return <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Worker action</span>;
-                                    })()}
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleEditClick(task); }}
-                                            className="icon-btn"
-                                            title={t('table.columns.edit')}
-                                            style={{ color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
-                                        >
-                                            <i className="fa-solid fa-pen-to-square"></i>
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
-                                            className="icon-btn delete"
-                                            title={t('common.delete')}
-                                            style={{ color: '#EF4444', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
-                                        >
-                                            <i className="fa-regular fa-trash-can"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {/* Inline breaks row removed in favor of right-side sliding drawer details */}
-                        </React.Fragment>
-                    ))}
+                                        })()}
+                                    </td>
+                                    <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleEditClick(task); }}
+                                                className="icon-btn"
+                                                title={t('table.columns.edit')}
+                                                style={{ color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
+                                            >
+                                                <i className="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
+                                                className="icon-btn delete"
+                                                title={t('common.delete')}
+                                                style={{ color: '#EF4444', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
+                                            >
+                                                <i className="fa-regular fa-trash-can"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {/* Inline breaks row removed in favor of right-side sliding drawer details */}
+                            </React.Fragment>
+                        ))}
                     </tbody>
                 </table>
             </div>
@@ -1807,7 +2123,7 @@ export const ControlTablePage: React.FC = () => {
                         }
                     `}</style>
                     {/* Backdrop */}
-                    <div 
+                    <div
                         onClick={() => setBreakDetailTask(null)}
                         style={{
                             position: 'fixed',
@@ -1822,7 +2138,7 @@ export const ControlTablePage: React.FC = () => {
                         }}
                     />
                     {/* Drawer */}
-                    <div 
+                    <div
                         style={{
                             position: 'fixed',
                             top: 0,
@@ -1848,7 +2164,7 @@ export const ControlTablePage: React.FC = () => {
                                     {breakDetailTask.worker_name} ({breakDetailTask.worker_id_str})
                                 </p>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setBreakDetailTask(null)}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}
                             >
@@ -1898,7 +2214,7 @@ export const ControlTablePage: React.FC = () => {
                                             );
                                         }
                                         return breaks.map((b: any, idx: number) => (
-                                            <div 
+                                            <div
                                                 key={b.id || idx}
                                                 style={{
                                                     background: 'white',
@@ -1992,7 +2308,7 @@ export const ControlTablePage: React.FC = () => {
             {isEditBreaksOpen && editingTask && (
                 <>
                     {/* Backdrop */}
-                    <div 
+                    <div
                         onClick={() => setIsEditBreaksOpen(false)}
                         style={{
                             position: 'fixed',
@@ -2032,7 +2348,7 @@ export const ControlTablePage: React.FC = () => {
                                     {editingTask.worker_name} • {editingTask.description}
                                 </p>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setIsEditBreaksOpen(false)}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}
                             >
@@ -2042,16 +2358,16 @@ export const ControlTablePage: React.FC = () => {
                         <div style={{ padding: '1.5rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                                 <label style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.85rem' }}>Shift Break Logs</label>
-                                <button 
+                                <button
                                     type="button"
-                                    className="btn btn-secondary" 
+                                    className="btn btn-secondary"
                                     onClick={handleAddBreakRow}
                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}
                                 >
                                     <i className="fa-solid fa-plus"></i> Add Break
                                 </button>
                             </div>
-                            
+
                             {editBreaks.length === 0 ? (
                                 <div style={{ fontSize: '0.85rem', color: '#94A3B8', padding: '1.5rem', textAlign: 'center', background: '#F8FAFC', borderRadius: '8px', border: '1px dashed #E2E8F0', fontStyle: 'italic', marginBottom: '1.5rem' }}>
                                     No breaks recorded for this shift. Click "Add Break" to insert one.
@@ -2062,35 +2378,35 @@ export const ControlTablePage: React.FC = () => {
                                         <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: '#F8FAFC', padding: '0.75rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                                             <div style={{ flex: 2 }}>
                                                 <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600, marginBottom: '2px' }}>Start Time</span>
-                                                <input 
-                                                    type="datetime-local" 
-                                                    value={b.start_time} 
-                                                    onChange={e => handleBreakChange(index, 'start_time', e.target.value)} 
+                                                <input
+                                                    type="datetime-local"
+                                                    value={b.start_time}
+                                                    onChange={e => handleBreakChange(index, 'start_time', e.target.value)}
                                                     style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
                                                 />
                                             </div>
                                             <div style={{ flex: 2 }}>
                                                 <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600, marginBottom: '2px' }}>End Time</span>
-                                                <input 
-                                                    type="datetime-local" 
-                                                    value={b.end_time} 
-                                                    onChange={e => handleBreakChange(index, 'end_time', e.target.value)} 
+                                                <input
+                                                    type="datetime-local"
+                                                    value={b.end_time}
+                                                    onChange={e => handleBreakChange(index, 'end_time', e.target.value)}
                                                     style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
                                                 />
                                             </div>
                                             <div style={{ flex: 2 }}>
                                                 <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600, marginBottom: '2px' }}>Reason</span>
-                                                <input 
-                                                    type="text" 
-                                                    value={b.reason} 
-                                                    onChange={e => handleBreakChange(index, 'reason', e.target.value)} 
+                                                <input
+                                                    type="text"
+                                                    value={b.reason}
+                                                    onChange={e => handleBreakChange(index, 'reason', e.target.value)}
                                                     placeholder="e.g. Lunch Break"
                                                     style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
                                                 />
                                             </div>
-                                            <button 
+                                            <button
                                                 type="button"
-                                                onClick={() => handleRemoveBreakRow(index)} 
+                                                onClick={() => handleRemoveBreakRow(index)}
                                                 style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '0.5rem 0.25rem 0', alignSelf: 'center' }}
                                                 title="Delete Break"
                                             >
@@ -2102,16 +2418,16 @@ export const ControlTablePage: React.FC = () => {
                             )}
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                                <button 
-                                    className="btn btn-secondary" 
-                                    onClick={() => setIsEditBreaksOpen(false)} 
+                                <button
+                                    className="btn btn-secondary"
+                                    onClick={() => setIsEditBreaksOpen(false)}
                                     style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    className="btn btn-primary" 
-                                    onClick={handleUpdateBreaksOnly} 
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={handleUpdateBreaksOnly}
                                     style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
                                 >
                                     Save Breaks Only
@@ -2239,7 +2555,8 @@ export const ControlTablePage: React.FC = () => {
                                         <input
                                             type="number"
                                             value={editForm.active_minutes}
-                                            onChange={e => setEditForm(prev => ({ ...prev, active_minutes: parseInt(e.target.value) || 0 }))}
+                                            onChange={e => setEditForm(prev => ({ ...prev, active_minutes: Math.min(59, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                                            min="0"
                                             max="59"
                                             style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1.5px solid var(--border)', fontSize: '0.9rem' }}
                                         />
@@ -2278,16 +2595,16 @@ export const ControlTablePage: React.FC = () => {
                             <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.5rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                                     <label style={{ fontWeight: 600, color: '#475569', fontSize: '0.85rem' }}>Itemized Breaks</label>
-                                    <button 
+                                    <button
                                         type="button"
-                                        className="btn btn-secondary" 
+                                        className="btn btn-secondary"
                                         onClick={handleAddBreakRow}
                                         style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}
                                     >
                                         <i className="fa-solid fa-plus"></i> Add Break
                                     </button>
                                 </div>
-                                
+
                                 {editBreaks.length === 0 ? (
                                     <div style={{ fontSize: '0.8rem', color: '#94A3B8', padding: '0.5rem', textAlign: 'center', background: '#F8FAFC', borderRadius: '6px', fontStyle: 'italic' }}>
                                         No breaks recorded for this shift.
@@ -2298,35 +2615,35 @@ export const ControlTablePage: React.FC = () => {
                                             <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: '#F8FAFC', padding: '0.5rem', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
                                                 <div style={{ flex: 2 }}>
                                                     <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600 }}>Start Time</span>
-                                                    <input 
-                                                        type="datetime-local" 
-                                                        value={b.start_time} 
-                                                        onChange={e => handleBreakChange(index, 'start_time', e.target.value)} 
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={b.start_time}
+                                                        onChange={e => handleBreakChange(index, 'start_time', e.target.value)}
                                                         style={{ width: '100%', padding: '0.25rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
                                                     />
                                                 </div>
                                                 <div style={{ flex: 2 }}>
                                                     <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600 }}>End Time</span>
-                                                    <input 
-                                                        type="datetime-local" 
-                                                        value={b.end_time} 
-                                                        onChange={e => handleBreakChange(index, 'end_time', e.target.value)} 
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={b.end_time}
+                                                        onChange={e => handleBreakChange(index, 'end_time', e.target.value)}
                                                         style={{ width: '100%', padding: '0.25rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
                                                     />
                                                 </div>
                                                 <div style={{ flex: 2 }}>
                                                     <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', fontWeight: 600 }}>Reason</span>
-                                                    <input 
-                                                        type="text" 
-                                                        value={b.reason} 
-                                                        onChange={e => handleBreakChange(index, 'reason', e.target.value)} 
+                                                    <input
+                                                        type="text"
+                                                        value={b.reason}
+                                                        onChange={e => handleBreakChange(index, 'reason', e.target.value)}
                                                         placeholder="Lunch, etc."
                                                         style={{ width: '100%', padding: '0.25rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #CBD5E1' }}
                                                     />
                                                 </div>
-                                                <button 
+                                                <button
                                                     type="button"
-                                                    onClick={() => handleRemoveBreakRow(index)} 
+                                                    onClick={() => handleRemoveBreakRow(index)}
                                                     style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '0.5rem 0.25rem 0', alignSelf: 'center' }}
                                                     title="Delete Break"
                                                 >
@@ -2603,25 +2920,25 @@ export const ControlTablePage: React.FC = () => {
                         </p>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                             {!confirmModal.isAlert && (
-                                <button 
-                                    className="btn btn-secondary" 
+                                <button
+                                    className="btn btn-secondary"
                                     onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
                                     style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem', fontWeight: 600, background: 'var(--bg-body)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                                 >
                                     Cancel
                                 </button>
                             )}
-                            <button 
-                                className="btn btn-primary" 
+                            <button
+                                className="btn btn-primary"
                                 onClick={() => {
                                     if (confirmModal.onConfirm) confirmModal.onConfirm();
                                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                                 }}
-                                style={{ 
-                                    padding: '0.6rem 1.5rem', 
-                                    fontSize: '0.85rem', 
-                                    fontWeight: 600, 
-                                    background: confirmModal.isAlert ? 'var(--primary)' : '#EF4444', 
+                                style={{
+                                    padding: '0.6rem 1.5rem',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 600,
+                                    background: confirmModal.isAlert ? 'var(--primary)' : '#EF4444',
                                     border: 'none',
                                     color: 'white',
                                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.15)'

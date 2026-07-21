@@ -84,6 +84,11 @@ export const Sidebar: React.FC<{
                     </NavLink>
                 </li>
                 <li>
+                    <NavLink to="/leave-requests" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
+                        <i className="fa-solid fa-umbrella-beach"></i> <span>Time Off</span>
+                    </NavLink>
+                </li>
+                <li>
                     <NavLink to="/reports" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={handleMobileClose}>
                         <i className="fa-solid fa-chart-column"></i> <span>{t('sidebar.reports')}</span>
                     </NavLink>
