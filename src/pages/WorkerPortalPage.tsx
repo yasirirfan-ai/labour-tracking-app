@@ -12,7 +12,6 @@ import { useTheme } from '../context/ThemeContext';
 import emailjs from '@emailjs/browser';
 import { syncLeaveBalances } from '../lib/accrualService';
 import { formatTimePST, todayPST, pstDayStart, pstDayEnd, formatDateTimePST } from '../lib/timezone';
-import { checkShiftOvertimes } from '../lib/shiftWatchdog';
 import { startVersionCheck } from '../lib/versionCheck';
 import { buildShiftsForWorker, buildBreaksForWorker, getElapsedMsForLogs, DAILY_SHIFT_CAP_MS, DAILY_SHIFT_CAP_LABEL } from '../lib/shifts';
 
@@ -639,20 +638,18 @@ export const WorkerPortalPage: React.FC = () => {
         return () => clearInterval(fallbackInterval);
     }, [user?.id]);
 
-    // Shift watchdog — sweeps ALL clocked-in workers for 8h40m overtime warnings / 8h45m
-    // auto clock-outs. Having the Worker Portal open (by anyone) also drives this, not just
-    // Admin/Manager tabs, so it fires as long as someone, anywhere, has the app open.
-    useEffect(() => {
-        if (!user?.id) return;
-        checkShiftOvertimes();
-        const overtimeInterval = setInterval(checkShiftOvertimes, 60000);
-        return () => clearInterval(overtimeInterval);
-    }, [user?.id]);
+    // The 8h40m overtime warning / 8h45m auto-clockout is enforced ONLY by the server-side
+    // api/check-shift-overtimes.js endpoint (on a fixed external cron schedule) — deliberately
+    // NOT from this client anymore. A client-side version of this check used to run from
+    // whichever Worker Portal tab happened to be open, which meant a single stale kiosk/portal
+    // tab (still running an old threshold from before a deploy) could silently keep
+    // auto-clocking-out every worker company-wide, with no way to tell which device was at
+    // fault and no way to remotely stop it short of finding and closing that exact tab. Moving
+    // this server-side removes the client from the equation entirely, permanently, regardless
+    // of how out of date any given browser tab ever gets in the future.
 
     // Detects a new deployment while this tab is still running an old bundle — see
-    // src/lib/versionCheck.ts. Matters especially here because checkShiftOvertimes above sweeps
-    // ALL workers from whichever tab happens to be open, so a stale kiosk/portal tab can silently
-    // keep enforcing outdated thresholds for everyone until it's refreshed.
+    // src/lib/versionCheck.ts.
     useEffect(() => {
         const stop = startVersionCheck(() => setUpdateAvailable(true));
         return stop;
