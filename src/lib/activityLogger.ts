@@ -28,13 +28,17 @@ export const logActivity = async (
 export const updateUserStatus = async (
     workerId: string,
     status: 'offline' | 'present',
-    availability: 'available' | 'break'
+    availability: 'available' | 'break',
+    // Optional override for "now", same purpose as performTaskAction's asOf — keeps
+    // last_status_change consistent with a backdated clock-out instead of showing a later time
+    // than the activity log / task records it's meant to correspond to.
+    asOf?: Date
 ) => {
     try {
         const { error } = await (supabase.from('users') as any).update({
             status,
             availability,
-            last_status_change: new Date().toISOString()
+            last_status_change: (asOf || new Date()).toISOString()
         }).eq('id', workerId);
 
         if (error) throw error;

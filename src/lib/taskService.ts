@@ -5,18 +5,23 @@ import type { Task } from '../types';
 export const performTaskAction = async (
     task: Task,
     action: 'start' | 'pause' | 'resume' | 'complete' | 'auto_pause' | 'auto_resume',
-    reason?: string
+    reason?: string,
+    // Optional override for "now" — lets a caller (e.g. the shift watchdog) backdate an action
+    // to a precise moment (like the exact instant the daily cap was reached) instead of the
+    // instant the code happened to run. Defaults to the real current time everywhere else.
+    asOf?: Date
 ) => {
     try {
         let updates: any = {};
-        const now = new Date().toISOString();
+        const nowDate = asOf || new Date();
+        const now = nowDate.toISOString();
         let eventType: any = null;
 
         // Calculate time since last update
         // We only add time if the task was 'active' or 'clocked_in'
         const isRunning = task.status === 'active' || task.status === 'clocked_in';
         const diff = isRunning && task.last_action_time
-            ? Math.floor((new Date().getTime() - new Date(task.last_action_time).getTime()) / 1000)
+            ? Math.floor((nowDate.getTime() - new Date(task.last_action_time).getTime()) / 1000)
             : 0;
 
         updates.last_action_time = now;
@@ -89,7 +94,8 @@ export const performTaskAction = async (
                 eventType,
                 logDescription,
                 reason || undefined,
-                task.id
+                task.id,
+                asOf ? now : undefined
             );
         }
 
@@ -124,7 +130,7 @@ export const resumeAllAutoPausedTasks = async (workerId: string) => {
     }
 };
 
-export const completeAllTasks = async (workerId: string) => {
+export const completeAllTasks = async (workerId: string, asOf?: Date) => {
     // Used when clocking out
     const { data: tasks } = await (supabase.from('tasks') as any).select('*')
         .eq('assigned_to_id', workerId)
@@ -133,7 +139,7 @@ export const completeAllTasks = async (workerId: string) => {
     if (!tasks) return;
 
     for (const task of tasks) {
-        await performTaskAction(task, 'complete', 'Shift Ended');
+        await performTaskAction(task, 'complete', 'Shift Ended', asOf);
     }
 };
 

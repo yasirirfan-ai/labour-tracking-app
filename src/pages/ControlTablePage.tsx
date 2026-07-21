@@ -1504,22 +1504,6 @@ export const ControlTablePage: React.FC = () => {
         // portion is the PST day directly — no conversion needed.
         const entryDateStr = (effectiveStartTime || '').slice(0, 10) || todayPST();
 
-        // An open-ended entry (no end_time) leaves the worker live clocked-in — block it if
-        // they've already used up today's cap via other entries/shifts, same as a real clock-in.
-        if (!createForm.end_time) {
-            const { data: freshLogs } = await supabase
-                .from('activity_logs')
-                .select('*')
-                .eq('worker_id', createForm.worker_id)
-                .gte('timestamp', pstDayStart(entryDateStr))
-                .lte('timestamp', pstDayEnd(entryDateStr));
-            const elapsedMs = getElapsedMsForLogs((freshLogs || []) as any[]);
-            if (elapsedMs >= DAILY_SHIFT_CAP_MS) {
-                showCustomAlert(`This worker has already reached the ${DAILY_SHIFT_CAP_LABEL} daily limit and cannot be clocked in again today.`);
-                return;
-            }
-        }
-
         // For Tab 2 (Start/Last Action), created_at defaults to "now" (form open time).
         // Override it with start_time so Clock In column and date filters show the correct work date.
         const effectiveCreatedAt = createTab === 'startLastAction' && createForm.start_time
@@ -1600,6 +1584,22 @@ export const ControlTablePage: React.FC = () => {
 
                 setIsCreateOpen(false);
                 fetchData();
+                return;
+            }
+
+            // No existing task row for this day, but the worker may already have live clock-in
+            // activity accruing (e.g. clocked in via the portal, hasn't started a task yet) —
+            // that time isn't reflected in any task row, so the single-entry check above alone
+            // wouldn't catch a new entry that, combined with it, exceeds the daily cap.
+            const { data: dayLogs } = await supabase
+                .from('activity_logs')
+                .select('*')
+                .eq('worker_id', createForm.worker_id)
+                .gte('timestamp', pstDayStart(entryDateStr))
+                .lte('timestamp', pstDayEnd(entryDateStr));
+            const alreadyElapsedMs = getElapsedMsForLogs((dayLogs || []) as any[]);
+            if (alreadyElapsedMs + totalSeconds * 1000 > DAILY_SHIFT_CAP_MS) {
+                showCustomAlert(`Combined with this worker's existing activity today, this entry would exceed the ${DAILY_SHIFT_CAP_LABEL} daily limit.`);
                 return;
             }
 
@@ -2004,12 +2004,12 @@ export const ControlTablePage: React.FC = () => {
                                                     let seconds = task.active_seconds;
                                                     if (!task.clock_out_time) {
                                                         const totalSec = Math.max(0, Math.floor((new Date().getTime() - new Date(task.clock_in_time).getTime()) / 1000));
-                                                        let breakSec = task.break_seconds || 0;
-                                                        if (task.status === 'break' && task.open_break_start) {
-                                                            const runningBreak = Math.max(0, Math.floor((new Date().getTime() - new Date(task.open_break_start).getTime()) / 1000));
-                                                            breakSec += runningBreak;
-                                                        }
-                                                        seconds = Math.max(0, totalSec - breakSec);
+                                                        // getBreaksForShift already live-computes a currently-open break's duration
+                                                        // against "now", so filtering it for unpaid covers both closed breaks and
+                                                        // an in-progress one — only unpaid time reduces payable duration.
+                                                        const breaks = getBreaksForShift(task.assigned_to_id, task);
+                                                        const unpaidBreakSec = breaks.filter(b => b.type === 'unpaid').reduce((sum, b) => sum + b.duration_seconds, 0);
+                                                        seconds = Math.max(0, totalSec - unpaidBreakSec);
                                                     }
                                                     const h = Math.floor(seconds / 3600);
                                                     const m = Math.floor((seconds % 3600) / 60);

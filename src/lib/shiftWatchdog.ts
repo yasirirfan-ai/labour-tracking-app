@@ -53,12 +53,24 @@ export const checkShiftOvertimes = async () => {
             }
 
             if (totalDurationMs >= AUTO_CLOCKOUT_THRESHOLD_MS) {
-                await completeAllTasks(worker.id);
-                await updateUserStatus(worker.id, 'offline', 'available');
+                // Backdate the clock-out to the exact instant the cap was crossed, not whenever
+                // this sweep happened to run. Without this, the recorded duration is always
+                // "8h45m + however late the sweep was" (up to the ~60s poll interval, or far
+                // more if no tab was open around the crossing) instead of exactly 8h45m.
+                const openClockInMs = new Date(openShift.clockIn.timestamp).getTime();
+                const priorShiftsMs = totalDurationMs - (now - openClockInMs);
+                const capMs = openClockInMs + (AUTO_CLOCKOUT_THRESHOLD_MS - priorShiftsMs);
+                const capTimestamp = new Date(capMs);
+
+                await completeAllTasks(worker.id, capTimestamp);
+                await updateUserStatus(worker.id, 'offline', 'available', capTimestamp);
                 await logActivity(
                     worker.id,
                     'clock_out',
-                    `Automatically clocked out — daily duration exceeded 8 hours 45 minutes`
+                    `Automatically clocked out — daily duration exceeded 8 hours 45 minutes`,
+                    undefined,
+                    undefined,
+                    capTimestamp.toISOString()
                 );
             } else if (totalDurationMs >= WARNING_THRESHOLD_MS) {
                 const clockInMs = new Date(openShift.clockIn.timestamp).getTime();
