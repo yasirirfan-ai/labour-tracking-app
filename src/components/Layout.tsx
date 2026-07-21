@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { checkShiftOvertimes } from '../lib/shiftWatchdog';
+import { startVersionCheck } from '../lib/versionCheck';
 
 interface AdminLeaveNotification {
     id: string;
@@ -22,6 +23,7 @@ export const Layout: React.FC = () => {
     const { t, i18n } = useTranslation();
     const { toggleTheme, setLanguage, currentTheme } = useTheme();
     const navigate = useNavigate();
+    const [updateAvailable, setUpdateAvailable] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [leaveNotifications, setLeaveNotifications] = useState<AdminLeaveNotification[]>([]);
@@ -158,6 +160,15 @@ export const Layout: React.FC = () => {
         return () => clearInterval(overtimeInterval);
     }, [user?.id]);
 
+    // Detects a new deployment while this tab is still running an old bundle — see
+    // src/lib/versionCheck.ts. Matters especially here because checkShiftOvertimes above sweeps
+    // ALL workers from whichever tab happens to be open, so a stale tab can silently keep
+    // enforcing outdated thresholds for everyone until it's refreshed.
+    useEffect(() => {
+        const stop = startVersionCheck(() => setUpdateAvailable(true));
+        return stop;
+    }, []);
+
     useEffect(() => {
         if (!user) return;
 
@@ -228,6 +239,45 @@ export const Layout: React.FC = () => {
 
     return (
         <div className="app-container">
+            {/* A new build has been deployed while this tab is still running an old one — see
+                src/lib/versionCheck.ts for why this specifically matters for this app. */}
+            {updateAvailable && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 100000,
+                    background: '#0F172A',
+                    color: 'white',
+                    padding: '0.65rem 1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+                }}>
+                    <i className="fa-solid fa-circle-exclamation" style={{ color: '#F59E0B' }}></i>
+                    A new version of this app is available — please refresh to get the latest fixes.
+                    <button
+                        onClick={() => window.location.reload()}
+                        style={{
+                            background: '#F59E0B',
+                            color: '#1E293B',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '0.35rem 0.9rem',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Refresh Now
+                    </button>
+                </div>
+            )}
             {/* Admin Leave Request Notifications */}
             <div style={{
                 position: 'fixed',

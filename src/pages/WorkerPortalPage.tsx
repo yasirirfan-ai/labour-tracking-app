@@ -13,6 +13,7 @@ import emailjs from '@emailjs/browser';
 import { syncLeaveBalances } from '../lib/accrualService';
 import { formatTimePST, todayPST, pstDayStart, pstDayEnd, formatDateTimePST } from '../lib/timezone';
 import { checkShiftOvertimes } from '../lib/shiftWatchdog';
+import { startVersionCheck } from '../lib/versionCheck';
 import { buildShiftsForWorker, buildBreaksForWorker, getElapsedMsForLogs, DAILY_SHIFT_CAP_MS, DAILY_SHIFT_CAP_LABEL } from '../lib/shifts';
 
 export const WorkerPortalPage: React.FC = () => {
@@ -23,6 +24,7 @@ export const WorkerPortalPage: React.FC = () => {
     const isSyncing = useRef(false);
     const isProcessingNfcTap = useRef(false);
     const [loading, setLoading] = useState(false);
+    const [updateAvailable, setUpdateAvailable] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [activeTasks, setActiveTasks] = useState<any[]>([]);
     const [disciplinaryIncidents, setDisciplinaryIncidents] = useState<any[]>([]);
@@ -646,6 +648,15 @@ export const WorkerPortalPage: React.FC = () => {
         const overtimeInterval = setInterval(checkShiftOvertimes, 60000);
         return () => clearInterval(overtimeInterval);
     }, [user?.id]);
+
+    // Detects a new deployment while this tab is still running an old bundle — see
+    // src/lib/versionCheck.ts. Matters especially here because checkShiftOvertimes above sweeps
+    // ALL workers from whichever tab happens to be open, so a stale kiosk/portal tab can silently
+    // keep enforcing outdated thresholds for everyone until it's refreshed.
+    useEffect(() => {
+        const stop = startVersionCheck(() => setUpdateAvailable(true));
+        return stop;
+    }, []);
 
     // Surface a banner to THIS worker when their own overtime warning / auto clock-out lands
     const seenOwnEventIds = useRef<Set<string> | null>(null);
@@ -1634,6 +1645,48 @@ export const WorkerPortalPage: React.FC = () => {
                     background: rgba(255, 255, 255, 0.2);
                 }
             ` }} />
+
+            {/* A new build has been deployed while this tab is still running an old one — see
+                src/lib/versionCheck.ts for why this specifically matters for this app. */}
+            {updateAvailable && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 100000,
+                    background: '#0F172A',
+                    color: 'white',
+                    padding: '0.65rem 1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                    flexWrap: 'wrap',
+                    textAlign: 'center'
+                }}>
+                    <i className="fa-solid fa-circle-exclamation" style={{ color: '#F59E0B' }}></i>
+                    A new version of this app is available — please refresh to get the latest fixes.
+                    <button
+                        onClick={() => window.location.reload()}
+                        style={{
+                            background: '#F59E0B',
+                            color: '#1E293B',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '0.35rem 0.9rem',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Refresh Now
+                    </button>
+                </div>
+            )}
 
             {notification?.show && (
                 <div className="notification-popup" style={{

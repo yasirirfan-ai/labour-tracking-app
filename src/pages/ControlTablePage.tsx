@@ -444,10 +444,13 @@ export const ControlTablePage: React.FC = () => {
                         totalActiveSeconds += item.active_seconds || 0;
                     });
 
-                    // Consolidate status
+                    // Consolidate status — a day that already has its own clock-out (closed shift)
+                    // must stay 'completed' regardless of what the worker is doing right now on a
+                    // later day. Only the currently-open day (no clock-out yet) should reflect the
+                    // worker's live present/on-break state.
                     const isOnBreak = emp.availability === 'break';
                     let status = 'completed';
-                    if (isPresent) {
+                    if (!latestHasClockOut && isPresent) {
                         status = isOnBreak ? 'break' : 'clocked_in';
                     }
 
