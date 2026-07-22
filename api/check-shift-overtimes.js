@@ -147,7 +147,7 @@ export default async function handler(req, res) {
 
         const { data: presentUsers, error: usersError } = await supabase
             .from('users')
-            .select('id, name')
+            .select('id, name, availability')
             .eq('role', 'employee')
             .eq('status', 'present');
 
@@ -183,13 +183,28 @@ export default async function handler(req, res) {
             }
 
             if (totalDurationMs >= AUTO_CLOCKOUT_THRESHOLD_MS) {
-                // Backdate to the exact instant the cap was crossed, same reasoning as the
-                // client-side watchdog — see src/lib/shiftWatchdog.ts.
+                // Backdate to the exact instant the cap was crossed, not whenever this sweep
+                // happened to run.
                 const openClockInMs = new Date(openShift.clockIn.timestamp).getTime();
                 const priorShiftsMs = totalDurationMs - (now - openClockInMs);
                 const capMs = openClockInMs + (AUTO_CLOCKOUT_THRESHOLD_MS - priorShiftsMs);
                 const capDate = new Date(capMs);
                 const capIso = capDate.toISOString();
+
+                // Close any open break before clocking out — otherwise the unclosed break_start
+                // gets picked up by the NEXT break_end this worker logs (possibly days later, for
+                // an unrelated break), corrupting every day's break total in between. This is the
+                // exact root cause behind a real incident (see src/lib/activityLogger.ts's
+                // endOpenBreakIfOnBreak, which does the same thing for the two client-side
+                // clock-out paths).
+                if (worker.availability === 'break') {
+                    await supabase.from('activity_logs').insert({
+                        worker_id: worker.id,
+                        event_type: 'break_end',
+                        description: 'Break ended automatically (worker clocked out)',
+                        timestamp: capIso
+                    });
+                }
 
                 await completeAllTasks(supabase, worker.id, capDate);
                 await supabase.from('users').update({

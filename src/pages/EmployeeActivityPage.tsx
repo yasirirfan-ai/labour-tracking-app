@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User, ActivityLog } from '../types';
-import { logActivity, updateUserStatus } from '../lib/activityLogger';
+import { logActivity, updateUserStatus, endOpenBreakIfOnBreak } from '../lib/activityLogger';
 import { pauseAllActiveTasks, resumeAllAutoPausedTasks, completeAllTasks, pauseAllTasksManual } from '../lib/taskService';
 import { todayPST, pstDayStart, pstDayEnd, formatTimePST } from '../lib/timezone';
 import { buildShiftsForWorker, buildBreaksForWorker, getElapsedMsForLogs, DAILY_SHIFT_CAP_MS, DAILY_SHIFT_CAP_LABEL } from '../lib/shifts';
@@ -115,6 +115,7 @@ export const EmployeeActivityPage: React.FC = () => {
         if (!clockOutWorkerId || busyWorkerId) return;
         setBusyWorkerId(clockOutWorkerId);
         try {
+            await endOpenBreakIfOnBreak(clockOutWorkerId);
             if (action === 'complete_all') {
                 await completeAllTasks(clockOutWorkerId);
             } else {

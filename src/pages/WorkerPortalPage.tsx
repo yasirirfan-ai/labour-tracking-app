@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logActivity, updateUserStatus } from '../lib/activityLogger';
+import { logActivity, updateUserStatus, endOpenBreakIfOnBreak } from '../lib/activityLogger';
 import { completeAllTasks, pauseAllActiveTasks, performTaskAction } from '../lib/taskService';
 import { Navigate } from 'react-router-dom';
 import { trainingService } from '../lib/trainingService';
@@ -911,6 +911,7 @@ export const WorkerPortalPage: React.FC = () => {
         if (!user || loading) return;
         setLoading(true);
         try {
+            await endOpenBreakIfOnBreak(user.id);
             await completeAllTasks(user.id);
             await updateUserStatus(user.id, 'offline', 'available');
             await logActivity(user.id, 'clock_out', 'Worker clocked out via portal');
