@@ -944,6 +944,14 @@ export const WorkerPortalPage: React.FC = () => {
                     setLoading(false);
                     return;
                 }
+            } else if (liveUser.availability === 'break') {
+                // A manually-requested break (unlike the auto 5-hour one above) had no guard
+                // against being triggered while already on break — that let a second break_start
+                // get logged with no break_end between them, which just clutters the activity
+                // log even though buildShiftsForWorker's pairing already ignores the redundant one.
+                alert('You are already on a break.');
+                setLoading(false);
+                return;
             }
             const finalReason = isAuto ? 'Break Required (5-Hour Limit)' : (customReason || 'Worker requested break');
             await pauseAllActiveTasks(user.id, finalReason);
