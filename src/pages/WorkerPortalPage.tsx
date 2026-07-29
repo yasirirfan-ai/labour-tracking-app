@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logActivity, updateUserStatus, endOpenBreakIfOnBreak } from '../lib/activityLogger';
-import { completeAllTasks, pauseAllActiveTasks, performTaskAction } from '../lib/taskService';
+import { pauseAllTasksManual, pauseAllActiveTasks, performTaskAction } from '../lib/taskService';
 import { Navigate } from 'react-router-dom';
 import { trainingService } from '../lib/trainingService';
 import type { TrainingMaterial } from '../lib/trainingService';
@@ -20,6 +20,10 @@ export const WorkerPortalPage: React.FC = () => {
     const { toggleTheme, setLanguage, currentTheme } = useTheme();
     const { user, loading: authLoading, logout } = useAuth();
     const [localUser, setLocalUser] = useState(user);
+    // localUser is re-fetched fresh from the users table (see fetchUserStatus), so it's more
+    // reliable than the auth snapshot in `user` if name was ever updated after login. Falls back
+    // to username rather than ever sending a blank actor name into the MO Tracking audit trail.
+    const workerActorName = localUser?.name || user?.name || user?.username || 'Worker';
     const isSyncing = useRef(false);
     const isProcessingNfcTap = useRef(false);
     const [loading, setLoading] = useState(false);
@@ -912,7 +916,10 @@ export const WorkerPortalPage: React.FC = () => {
         setLoading(true);
         try {
             await endOpenBreakIfOnBreak(user.id);
-            await completeAllTasks(user.id);
+            // Pause, don't complete — an MO task that isn't finished yet must survive across the
+            // clock-out (and even across days) with its accumulated time intact, ready to resume
+            // next time this worker clocks in and someone clicks Resume on it.
+            await pauseAllTasksManual(user.id, { id: user.id, name: workerActorName });
             await updateUserStatus(user.id, 'offline', 'available');
             await logActivity(user.id, 'clock_out', 'Worker clocked out via portal');
             await fetchUserStatus();
@@ -955,7 +962,7 @@ export const WorkerPortalPage: React.FC = () => {
                 return;
             }
             const finalReason = isAuto ? 'Break Required (5-Hour Limit)' : (customReason || 'Worker requested break');
-            await pauseAllActiveTasks(user.id, finalReason);
+            await pauseAllActiveTasks(user.id, finalReason, { id: user.id, name: workerActorName });
             await updateUserStatus(user.id, 'present', 'break');
             await logActivity(user.id, 'break_start', finalReason);
             await fetchUserStatus();
@@ -1038,7 +1045,7 @@ export const WorkerPortalPage: React.FC = () => {
 
         setLoading(true);
         try {
-            const success = await performTaskAction(task, action);
+            const success = await performTaskAction(task, action, undefined, undefined, { id: user?.id, name: workerActorName });
             if (success) {
                 await fetchActiveTasks();
                 await fetchMyActivityLogs();
@@ -1125,9 +1132,11 @@ export const WorkerPortalPage: React.FC = () => {
             const newStatus = isCurrentlyIn ? 'offline' : 'present';
 
             // Confirm clock out if they have tasks (only if it's the current user, otherwise auto-clock-out)
-            // For a "Terminal" feel, we auto-clock out.
+            // For a "Terminal" feel, we auto-clock out. Pause (not complete) any running MO task —
+            // same reasoning as the main portal clock-out: unfinished MO work must survive to be
+            // resumed later, not get force-marked done just because the shift ended.
             if (isCurrentlyIn) {
-                await completeAllTasks(worker.id);
+                await pauseAllTasksManual(worker.id, { id: worker.id, name: worker.name || worker.username || 'Worker' });
             }
 
             await updateUserStatus(worker.id, newStatus, 'available');

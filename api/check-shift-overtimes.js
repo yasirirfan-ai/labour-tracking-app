@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 // Hobby plan only supports once-a-day cron jobs, which is useless for a per-minute check.
 //
 // Mirrors src/lib/shiftWatchdog.ts, src/lib/shifts.ts (buildShiftsForWorker), src/lib/timezone.ts
-// (pstDayStart/todayPST), and src/lib/taskService.ts (completeAllTasks/performTaskAction 'complete').
+// (pstDayStart/todayPST), and src/lib/taskService.ts (pauseAllTasksManual/performTaskAction 'pause').
 // If those change, mirror the change here too — kept as a separate, self-contained file
 // (rather than importing from src/lib) so this serverless function's build doesn't depend on the
 // Vite-bundled frontend's TypeScript module graph.
@@ -83,8 +83,13 @@ function pstDayStart(dateStr) {
     return new Date(utcDate.getTime() + offsetMs).toISOString();
 }
 
-// --- Ported from src/lib/taskService.ts: performTaskAction('complete') + completeAllTasks ---
-async function completeAllTasks(supabase, workerId, asOfDate) {
+// --- Ported from src/lib/taskService.ts: performTaskAction('pause') + pauseAllTasksManual ---
+// Pauses (does NOT complete) any task still running when the daily cap is hit — an MO task that
+// isn't finished yet must survive the auto-clockout with its accumulated time intact, ready to
+// resume (via an explicit Start/Resume click) whenever this worker next clocks in, even if that's
+// a different day. Only 'active'/'break' tasks are touched; 'paused'/'pending' tasks are already
+// stopped and are left alone, exactly like pauseAllTasksManual.
+async function pauseRunningTasks(supabase, workerId, asOfDate) {
     const { data: tasks } = await supabase.from('tasks').select('*').eq('assigned_to_id', workerId).neq('status', 'completed');
     if (!tasks) return;
 
@@ -92,15 +97,16 @@ async function completeAllTasks(supabase, workerId, asOfDate) {
     const nowIso = asOfDate.toISOString();
 
     for (const task of tasks) {
-        const isRunning = task.status === 'active' || task.status === 'clocked_in';
-        const diff = isRunning && task.last_action_time
+        if (task.status !== 'active' && task.status !== 'break') continue;
+
+        const diff = task.last_action_time
             ? Math.floor((nowMs - new Date(task.last_action_time).getTime()) / 1000)
             : 0;
 
         const updates = {
-            status: 'completed',
-            active_seconds: (task.active_seconds || 0) + diff,
-            end_time: nowIso,
+            status: 'paused',
+            active_seconds: (task.active_seconds || 0) + Math.max(0, diff),
+            reason: 'Shift Ended (auto clock-out)',
             last_action_time: nowIso
         };
 
@@ -108,11 +114,12 @@ async function completeAllTasks(supabase, workerId, asOfDate) {
 
         await supabase.from('activity_logs').insert({
             worker_id: task.assigned_to_id,
-            event_type: 'task_complete',
+            event_type: 'task_pause',
             description: task.description,
-            details: 'Shift Ended',
+            details: 'Shift Ended (auto clock-out)',
             related_task_id: task.id,
-            timestamp: nowIso
+            timestamp: nowIso,
+            performed_by_name: 'System (Auto Clock-Out)'
         });
     }
 }
@@ -206,7 +213,7 @@ export default async function handler(req, res) {
                     });
                 }
 
-                await completeAllTasks(supabase, worker.id, capDate);
+                await pauseRunningTasks(supabase, worker.id, capDate);
                 await supabase.from('users').update({
                     status: 'offline',
                     availability: 'available',

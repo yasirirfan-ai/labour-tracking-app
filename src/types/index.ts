@@ -158,7 +158,7 @@ export interface PolicyAcknowledgment {
 export interface ActivityLog {
     id: string;
     worker_id: string;
-    event_type: 'clock_in' | 'clock_out' | 'break_start' | 'break_end' | 'task_start' | 'task_stop' | 'task_pause' | 'task_resume' | 'task_complete' | 'overtime_warning';
+    event_type: 'clock_in' | 'clock_out' | 'break_start' | 'break_end' | 'task_start' | 'task_stop' | 'task_pause' | 'task_resume' | 'task_complete' | 'task_edit' | 'overtime_warning';
     related_task_id?: string;
     description: string;
     details?: string;

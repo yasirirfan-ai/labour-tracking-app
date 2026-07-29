@@ -57,7 +57,7 @@ export const ManufacturingOrdersPage: React.FC = () => {
 
                 const newItemPOs = result.items.map((i: any) => i.po_number).filter(Boolean);
                 const { data: existingData } = await supabase.from('manufacturing_orders')
-                    .select('id, po_number')
+                    .select('id, po_number, sort_order')
                     .in('po_number', newItemPOs);
 
                 const existingMap = new Map();
@@ -65,17 +65,31 @@ export const ManufacturingOrdersPage: React.FC = () => {
                     existingMap.set(row.po_number, row.id);
                 });
 
+                // New MOs from this sync should land above everything already in the list, without
+                // disturbing the existing ones' order (their sort_order, including any manual
+                // drag-reorder/pin the admin already did, is left untouched below). Figure out how
+                // many are actually new first, so the whole new batch can be given sort_order values
+                // below the current minimum, in the same order Odoo returned them.
+                const relevantItems = result.items.filter((item: any) => {
+                    const po = item.po_number || '';
+                    if (!po) return false;
+                    if (item.current_status && item.current_status.toLowerCase() === 'greenlit') return false;
+                    return true;
+                });
+                const newItemsCount = relevantItems.filter((item: any) => !existingMap.has(item.po_number)).length;
+                const currentMinSortOrder = existingData && existingData.length > 0
+                    ? Math.min(...existingData.map((row: any) => row.sort_order || 0))
+                    : 0;
+                let newItemPosition = 0;
+
                 const promises: Promise<any>[] = [];
 
-                for (const item of result.items) {
+                for (const item of relevantItems) {
                     const po = item.po_number || '';
-                    if (!po) continue;
-                    if (item.current_status && item.current_status.toLowerCase() === 'greenlit') continue;
-
                     const mo = newIndex.toString();
                     const existingId = existingMap.get(po);
 
-                    const payload = {
+                    const payload: any = {
                         mo_number: mo,
                         quantity: typeof item.quantity === 'number' ? item.quantity : 0,
                         po_number: po,
@@ -83,13 +97,14 @@ export const ManufacturingOrdersPage: React.FC = () => {
                         sku: item.sku,
                         event_id: item.event_id,
                         scheduled_date: item.scheduled_date || null,
-                        current_status: item.current_status,
-                        sort_order: newIndex * 1000
+                        current_status: item.current_status
                     };
 
                     if (existingId) {
                         promises.push((supabase.from('manufacturing_orders') as any).update(payload).eq('id', existingId));
                     } else {
+                        payload.sort_order = currentMinSortOrder - (newItemsCount - newItemPosition) * 1000;
+                        newItemPosition++;
                         promises.push((supabase.from('manufacturing_orders') as any).insert(payload));
                     }
                     count++;

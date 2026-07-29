@@ -9,7 +9,12 @@ export const performTaskAction = async (
     // Optional override for "now" — lets a caller (e.g. the shift watchdog) backdate an action
     // to a precise moment (like the exact instant the daily cap was reached) instead of the
     // instant the code happened to run. Defaults to the real current time everywhere else.
-    asOf?: Date
+    asOf?: Date,
+    // Who clicked the button — a manager (Control Matrix) or the worker themselves (Worker
+    // Portal). Feeds the Control Table MO Tracking audit trail. Left undefined for
+    // system-triggered actions (auto-pause on break, auto-clockout), which stay attributable via
+    // their `reason` text alone.
+    actor?: { id?: string; name?: string }
 ) => {
     try {
         let updates: any = {};
@@ -95,7 +100,9 @@ export const performTaskAction = async (
                 logDescription,
                 reason || undefined,
                 task.id,
-                asOf ? now : undefined
+                asOf ? now : undefined,
+                actor?.id,
+                actor?.name
             );
         }
 
@@ -106,7 +113,14 @@ export const performTaskAction = async (
     }
 };
 
-export const pauseAllActiveTasks = async (workerId: string, reason: string = 'Worker on Break') => {
+export const pauseAllActiveTasks = async (
+    workerId: string,
+    reason: string = 'Worker on Break',
+    // Whoever triggered the break (the worker themselves, or a manager toggling it for them) —
+    // without this, every break-triggered pause showed up in the MO audit trail as "Unknown",
+    // even though a real person did click something to cause it.
+    actor?: { id?: string; name?: string }
+) => {
     const { data: tasks } = await (supabase.from('tasks') as any).select('*')
         .eq('assigned_to_id', workerId)
         .eq('status', 'active');
@@ -114,11 +128,11 @@ export const pauseAllActiveTasks = async (workerId: string, reason: string = 'Wo
     if (!tasks || tasks.length === 0) return;
 
     for (const task of tasks) {
-        await performTaskAction(task, 'auto_pause', reason);
+        await performTaskAction(task, 'auto_pause', reason, undefined, actor);
     }
 };
 
-export const resumeAllAutoPausedTasks = async (workerId: string) => {
+export const resumeAllAutoPausedTasks = async (workerId: string, actor?: { id?: string; name?: string }) => {
     const { data: tasks } = await (supabase.from('tasks') as any).select('*')
         .eq('assigned_to_id', workerId)
         .eq('status', 'break'); // Only resume 'break' status (auto-paused)
@@ -126,11 +140,11 @@ export const resumeAllAutoPausedTasks = async (workerId: string) => {
     if (!tasks || tasks.length === 0) return;
 
     for (const task of tasks) {
-        await performTaskAction(task, 'auto_resume');
+        await performTaskAction(task, 'auto_resume', undefined, undefined, actor);
     }
 };
 
-export const completeAllTasks = async (workerId: string, asOf?: Date) => {
+export const completeAllTasks = async (workerId: string, asOf?: Date, actor?: { id?: string; name?: string }) => {
     // Used when clocking out
     const { data: tasks } = await (supabase.from('tasks') as any).select('*')
         .eq('assigned_to_id', workerId)
@@ -139,11 +153,11 @@ export const completeAllTasks = async (workerId: string, asOf?: Date) => {
     if (!tasks) return;
 
     for (const task of tasks) {
-        await performTaskAction(task, 'complete', 'Shift Ended', asOf);
+        await performTaskAction(task, 'complete', 'Shift Ended', asOf, actor);
     }
 };
 
-export const pauseAllTasksManual = async (workerId: string) => {
+export const pauseAllTasksManual = async (workerId: string, actor?: { id?: string; name?: string }) => {
     // Used when clocking out (Option: Pause All)
     const { data: tasks } = await (supabase.from('tasks') as any).select('*')
         .eq('assigned_to_id', workerId)
@@ -153,7 +167,7 @@ export const pauseAllTasksManual = async (workerId: string) => {
 
     for (const task of tasks as any[]) {
         if (task.status === 'active' || task.status === 'break') {
-            await performTaskAction(task, 'pause', 'Shift Ended');
+            await performTaskAction(task, 'pause', 'Shift Ended', undefined, actor);
             // Ensure last action time matches clock out if needed, though pause sets it to now. 
             // Ideally performTaskAction handles time. 
             // BUT, to be precise, we rely on performTaskAction using 'now'.

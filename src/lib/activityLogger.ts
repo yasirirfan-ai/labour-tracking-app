@@ -7,7 +7,12 @@ export const logActivity = async (
     description: string,
     details?: string,
     taskId?: string,
-    timestamp?: string
+    timestamp?: string,
+    // Who actually clicked the button — a manager/admin (from Control Matrix) or the worker
+    // themselves (from Worker Portal). Lets the Control Table MO audit trail show a real name
+    // instead of a guess. Omitted for system-triggered events (auto break-pause, auto clockout).
+    performedById?: string,
+    performedByName?: string
 ) => {
     try {
         const { error } = await (supabase.from('activity_logs') as any).insert({
@@ -16,7 +21,9 @@ export const logActivity = async (
             description,
             details,
             related_task_id: taskId,
-            timestamp: timestamp || new Date().toISOString()
+            timestamp: timestamp || new Date().toISOString(),
+            performed_by: performedById || null,
+            performed_by_name: performedByName || null
         });
         if (error) throw error;
     } catch (err) {

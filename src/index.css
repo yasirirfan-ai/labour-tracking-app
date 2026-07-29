@@ -689,31 +689,63 @@ th.sticky-column {
 
 /* Matrix Styles */
 .matrix-container {
-    overflow-x: auto;
+    /* The header bar and scrolling body below are two separate elements stacked in a column —
+       the header structurally never scrolls, so it can never be overlapped/glitched by scrolled
+       row content the way position:sticky was (that approach kept fighting table/grid gap-bleed
+       and display:contents stacking quirks across browsers). */
+    display: flex;
+    flex-direction: column;
+    max-height: 75vh;
     background: var(--bg-card);
     border-radius: 12px;
     padding: 1.25rem;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.matrix-header-bar {
+    flex-shrink: 0;
+    overflow: hidden;
+    /* Never scrolled directly by the user — syncMatrixHeaderScroll (ControlMatrixPage) sets its
+       scrollLeft to match the body below, purely in response to the body's own scroll events. */
+}
+
+.matrix-scroll-body {
+    flex: 1;
+    overflow: auto;
+    /* Scrollbar hidden but the element stays fully scrollable via wheel/trackpad/touch/drag. */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* legacy Edge */
+}
+
+.matrix-scroll-body::-webkit-scrollbar {
+    display: none; /* Chrome/Safari/Edge (Chromium) */
 }
 
 .matrix-grid {
-    display: table;
+    /* CSS Grid instead of display:table — table layout's border-spacing left transparent gaps
+       between cells for scrolled content to bleed through. grid-template-columns is set inline
+       from React (see ControlMatrixPage) — the header bar and scroll body each render their own
+       .matrix-grid with the identical column template, which is what keeps their columns aligned
+       even though they're now two separate, independently-scrolled elements. */
+    display: grid;
+    gap: 10px;
     width: 100%;
     min-width: 800px;
-    border-collapse: separate;
-    border-spacing: 8px;
 }
 
 .matrix-row {
-    display: table-row;
+    /* display:contents makes this div layout-transparent — its children become direct grid items
+       of .matrix-grid (so they land in the right columns/rows) while still letting the JSX group
+       one MO's cells together as a semantic unit. */
+    display: contents;
 }
 
 .matrix-header-cell {
-    display: table-cell;
     text-align: center;
     padding-bottom: 0.75rem;
-    vertical-align: bottom;
+    align-self: end;
 }
 
 .mo-badge {
@@ -733,20 +765,16 @@ th.sticky-column {
 }
 
 .matrix-label-cell {
-    display: table-cell;
-    vertical-align: middle;
+    align-self: center;
     font-weight: 600;
     color: var(--text-main);
     padding-right: 1.5rem;
     white-space: nowrap;
-    width: 150px;
 }
 
 .matrix-cell {
-    display: table-cell;
-    vertical-align: top;
+    align-self: start;
     height: 105px;
-    width: 170px;
     background: var(--bg-main);
     border: 1px solid var(--border);
     border-radius: 10px;

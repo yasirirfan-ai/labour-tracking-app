@@ -6,6 +6,7 @@ import { logActivity, updateUserStatus } from '../lib/activityLogger';
 import { buildShiftsForWorker, buildBreaksForWorker, getElapsedMsForLogs, classifyBreakType, DAILY_SHIFT_CAP_MS, DAILY_SHIFT_CAP_LABEL } from '../lib/shifts';
 import { useTranslation } from 'react-i18next';
 import { parsePSTToUTC, pstDayStart, pstDayEnd, todayPST } from '../lib/timezone';
+import { MoTrackingTable } from '../components/MoTrackingTable';
 
 export const ControlTablePage: React.FC = () => {
     const { t } = useTranslation();
@@ -37,6 +38,13 @@ export const ControlTablePage: React.FC = () => {
     const toggleColumn = (col: keyof typeof visibleColumns) => {
         setVisibleColumns(prev => ({ ...prev, [col]: !prev[col] }));
     };
+
+    // Attendance (clock in/out + breaks, payroll hours) vs MO Tracking (per-task cost against a
+    // Manufacturing Order) are deliberately two separate views fed by two separate arrays below —
+    // 'tasks'/consolidatedRows for Attendance, 'moTasks' for MO Tracking — so a worker's payable
+    // shift hours and their per-MO labor cost never share a calculation path.
+    const [viewMode, setViewMode] = useState<'attendance' | 'mo'>('attendance');
+    const [moTasks, setMoTasks] = useState<any[]>([]);
 
 
 
@@ -264,6 +272,11 @@ export const ControlTablePage: React.FC = () => {
                     };
                 });
 
+                // MO Tracking view — one row per real task tied to a Manufacturing Order, with its
+                // own cost (own active_seconds x own hourly_rate). Deliberately built from richTasks
+                // directly, independent of the attendance day-consolidation below.
+                setMoTasks(richTasks.filter((t: any) => t.mo_reference));
+
                 const virtualTasks: any[] = [];
                 empData.forEach((emp: any) => {
                     const workerLogs = logsData
@@ -383,21 +396,24 @@ export const ControlTablePage: React.FC = () => {
                     consolidatedMap.get(key)!.push({ ...t, is_db_task: true });
                 });
 
-                // Add virtual shifts for worker+day combos that have NO DB tasks, OR where every
-                // DB task present is a Manual Entry. For a real (non-manual) tracked task, the
-                // activity logs that generated the virtual shift belong to that task — adding both
-                // would double-count active_seconds (e.g. 8.5h task + 8.5h virtual = 17h shown), so
-                // that case still stays suppressed exactly as before. A Manual Entry is different:
-                // its own clock_in/clock_out logs were already excluded above (related_task_id), so
-                // what's left here is time NOT covered by any task and safe to add on top — this is
-                // what lets a Manual Entry's hours combine with an existing same-day shift instead
-                // of silently replacing it.
+                // Add virtual shifts for worker+day combos unless EVERY DB task present that day
+                // is a Manual Entry. A Manual Entry's own clock_in/clock_out logs are tagged with
+                // related_task_id and already excluded above, so when every task that day is a
+                // Manual Entry, the virtual shift built from those (now-excluded) logs would be
+                // empty/redundant — the Manual Entry rows already carry that time themselves.
+                // A real MO task (started from Control Matrix/Worker Portal) is different: it never
+                // writes its own clock_in/clock_out log at all — its active_seconds comes purely
+                // from task_start/pause/resume/complete events, a completely separate timer from
+                // the worker's actual clock-in/out. So a real task's presence must NEVER suppress
+                // the real clock-in/out shift — doing so previously caused Attendance's Clock In
+                // column to silently swap to that task's start_time (and its audit record to blank
+                // out), which is exactly the "clock in / MO tracking must stay separate" bug.
                 virtualTasks.forEach((v: any) => {
                     const key = `${v.assigned_to_id}_${v.id.split('_')[2]}`;
                     const dbTasksForDay = (consolidatedMap.get(key) || []).filter((item: any) => item.is_db_task);
                     const hasDbTask = dbTasksForDay.length > 0;
                     const allDbTasksAreManual = hasDbTask && dbTasksForDay.every((item: any) => item.manual);
-                    if (!hasDbTask || allDbTasksAreManual) {
+                    if (!hasDbTask || !allDbTasksAreManual) {
                         if (!consolidatedMap.has(key)) {
                             consolidatedMap.set(key, []);
                         }
@@ -421,11 +437,28 @@ export const ControlTablePage: React.FC = () => {
                     const firstItem = sortedItems[0];
                     const lastItem = sortedItems[sortedItems.length - 1];
 
-                    const clockInTime = firstItem.clock_in_time || firstItem.start_time || firstItem.created_at;
+                    // Attendance answers "how long was this worker in the building" — it must be
+                    // built ONLY from items that actually represent attendance: the real clock-in/
+                    // out shift (is_virtual_shift), or a Manual Entry's own recorded times (which
+                    // are themselves derived from a real clock log, see fetchData's `t.manual`
+                    // branch above). A real, non-manual MO task's created_at (its assignment time —
+                    // managers can and should be able to pre-assign work before a worker clocks in,
+                    // that's a legitimate workflow) or its end_time (task completion) must never be
+                    // read as if it were the worker's own clock-in/out — doing so previously showed
+                    // a pre-assigned task's creation time as "Clock In", or a completed task's
+                    // finish time as "Clock Out", for workers whose real shift said something else
+                    // entirely (or who were still clocked in and simply working on something else).
+                    const attendanceItems = sortedItems.filter((item: any) => item.is_virtual_shift || item.manual);
+                    const firstAttendanceItem = attendanceItems.length > 0 ? attendanceItems[0] : firstItem;
+                    const lastAttendanceItem = attendanceItems.length > 0
+                        ? attendanceItems[attendanceItems.length - 1]
+                        : lastItem;
+
+                    const clockInTime = firstAttendanceItem.clock_in_time || firstAttendanceItem.start_time || firstAttendanceItem.created_at;
 
                     const isPresent = emp.status === 'present';
                     let clockOutTime: string | null = null;
-                    const latestHasClockOut = lastItem.clock_out_time || lastItem.end_time;
+                    const latestHasClockOut = lastAttendanceItem.clock_out_time || lastAttendanceItem.end_time;
 
                     if (latestHasClockOut) {
                         clockOutTime = latestHasClockOut;
@@ -435,11 +468,17 @@ export const ControlTablePage: React.FC = () => {
                         clockOutTime = emp.last_status_change || clockInTime;
                     }
 
-                    // Sum active seconds and break seconds
+                    // Sum active seconds and break seconds — same reasoning as above: only
+                    // attendance items contribute. A real MO task's active_seconds must never be
+                    // added on top of the shift's own total — that task's time already happened
+                    // during the clocked-in window and is already included in the shift's elapsed
+                    // time, so adding it again would double-count hours and inflate payable time.
+                    // MO Tracking (a completely separate view) is where that task's own hours/cost
+                    // belong; Attendance only ever reflects clock-in-to-clock-out.
                     let totalActiveSeconds = 0;
                     let totalBreakSeconds = 0;
 
-                    items.forEach((item) => {
+                    attendanceItems.forEach((item: any) => {
                         totalBreakSeconds += item.break_seconds || 0;
                         totalActiveSeconds += item.active_seconds || 0;
                     });
@@ -607,8 +646,44 @@ export const ControlTablePage: React.FC = () => {
         if (s === 'active') return <span className="status-badge badge-green" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.timerRunning')}</span>;
         if (s === 'clocked_in') return <span className="status-badge badge-blue" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.clockedIn')}</span>;
         if (s === 'break') return <span className="status-badge badge-yellow" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.onBreak')}</span>;
+        if (s === 'paused') return <span className="status-badge badge-yellow" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.paused')}</span>;
         if (s === 'completed') return <span className="status-badge badge-gray" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.completed')}</span>;
         return <span className="status-badge badge-gray" style={{ fontSize: '0.7rem' }}>{t('table.statusLabels.pending')}</span>;
+    };
+
+    // MO Tracking cost — this task's own active_seconds x its own hourly_rate, independent of
+    // any attendance/payroll calculation.
+    const getTaskCost = (task: any) => {
+        let seconds = task.active_seconds || 0;
+        if (task.status === 'active' && task.last_action_time) {
+            const diff = Math.floor((new Date().getTime() - new Date(task.last_action_time).getTime()) / 1000);
+            if (diff > 0) seconds += diff;
+        }
+        return (seconds / 3600) * (task.hourly_rate || 0);
+    };
+
+    const TASK_LIFECYCLE_EVENTS = ['task_start', 'task_resume', 'task_pause', 'task_complete', 'task_edit'];
+    const auditActionLabel: Record<string, string> = {
+        task_start: 'Started',
+        task_resume: 'Resumed',
+        task_pause: 'Paused',
+        task_complete: 'Completed',
+        task_edit: 'Edited'
+    };
+
+    // Per-task audit trail for MO Tracking — who started/paused/resumed/completed this specific
+    // task, built from activity_logs.performed_by_name (populated going forward). Logs recorded
+    // before that field existed have no actor on file and are labeled "Unknown".
+    const getTaskAuditTrail = (task: any) => {
+        return activityLogs
+            .filter(l => l.related_task_id === task.id && TASK_LIFECYCLE_EVENTS.includes(l.event_type))
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+            .map(l => ({
+                action: auditActionLabel[l.event_type] || l.event_type,
+                actor: l.performed_by_name || 'Unknown',
+                time: formatTimeOnly(l.timestamp),
+                reason: l.details || undefined
+            }));
     };
 
     const getBreaksForShift = (workerId: string, task: any) => {
@@ -954,11 +1029,16 @@ export const ControlTablePage: React.FC = () => {
                     const auditName = currentUser?.username === 'admin@gmail.com' ? 'System Admin' : (currentUser?.name || currentUser?.username || 'Manager');
                     const t = (dayTasks as any[])[0];
 
+                    // Deliberately NOT touching mo_reference/description here. editForm was
+                    // pre-filled from this virtual/consolidated Attendance row, whose mo_reference
+                    // and description are already a comma-joined summary of every real MO task that
+                    // day (e.g. "1, 5" / "Clocked In (No active task), Receiving, Shipping"). Writing
+                    // that combined summary back onto a single real task row corrupts its actual MO
+                    // link — Attendance edits must stay confined to clock-in/out and break fields,
+                    // never MO Tracking's own fields.
                     const taskUpdates: any = {
                         active_seconds: netActiveSeconds,
                         break_seconds: totalBreakSecondsForEdit,
-                        mo_reference: editForm.mo_reference,
-                        description: editForm.description,
                         hourly_rate: editForm.hourly_rate,
                         status: editForm.end_time ? 'completed' : editForm.status,
                         reason: `Updated by ${auditName}`
@@ -1795,6 +1875,56 @@ export const ControlTablePage: React.FC = () => {
                 </button>
             </div>
 
+            {/* Attendance vs MO Tracking toggle — these are two independent views/calculations */}
+            <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.5rem', background: 'var(--bg-card)', padding: '0.35rem', borderRadius: '10px', border: '1px solid var(--border)', width: 'fit-content' }}>
+                <button
+                    onClick={() => setViewMode('attendance')}
+                    style={{
+                        padding: '0.55rem 1.1rem', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                        fontWeight: 600, fontSize: '0.85rem',
+                        background: viewMode === 'attendance' ? 'var(--primary)' : 'transparent',
+                        color: viewMode === 'attendance' ? 'white' : 'var(--text-muted)'
+                    }}
+                >
+                    <i className="fa-solid fa-clock" style={{ marginRight: '8px' }}></i>{t('table.viewToggle.attendance')}
+                </button>
+                <button
+                    onClick={() => setViewMode('mo')}
+                    style={{
+                        padding: '0.55rem 1.1rem', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                        fontWeight: 600, fontSize: '0.85rem',
+                        background: viewMode === 'mo' ? 'var(--primary)' : 'transparent',
+                        color: viewMode === 'mo' ? 'white' : 'var(--text-muted)'
+                    }}
+                >
+                    <i className="fa-solid fa-industry" style={{ marginRight: '8px' }}></i>{t('table.viewToggle.moTracking')}
+                </button>
+            </div>
+
+            {viewMode === 'mo' ? (
+                <MoTrackingTable
+                    moTasks={moTasks}
+                    employees={employees}
+                    mos={mos}
+                    search={search}
+                    setSearch={setSearch}
+                    workerFilter={workerFilter}
+                    setWorkerFilter={setWorkerFilter}
+                    startDate={startDate}
+                    endDate={endDate}
+                    setStartDate={setStartDate}
+                    setEndDate={setEndDate}
+                    getPSTBound={getPSTBound}
+                    getStatusLabel={getStatusLabel}
+                    getTaskCost={getTaskCost}
+                    getTaskAuditTrail={getTaskAuditTrail}
+                    formatDateTime={formatDateTime}
+                    currentUserName={currentUser?.name || 'Admin'}
+                    onRefresh={fetchData}
+                    t={t}
+                />
+            ) : (
+            <>
             {/* Search Filter Bar (Restored Inline Styles) */}
             <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', background: 'var(--bg-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
@@ -2115,6 +2245,8 @@ export const ControlTablePage: React.FC = () => {
                     </tbody>
                 </table>
             </div>
+            </>
+            )}
 
             {/* Break History Drawer (Slides out from right) */}
             {breakDetailTask && (

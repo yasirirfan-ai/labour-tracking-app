@@ -160,6 +160,7 @@
     "errorAssigning": "Error assigning worker",
     "removeAssignment": "Remove this worker assignment?",
     "cannotActionBreak": "Cannot {{action}} task. {{name}} is currently on break.",
+    "cannotActionNotClockedIn": "Cannot start/resume this task. {{name}} is not clocked in.",
     "manualPause": "Manual Pause",
     "status": {
       "active": "ACTIVE",
@@ -189,6 +190,19 @@
     "from": "From:",
     "to": "To:",
     "reset": "Reset",
+    "viewToggle": {
+      "attendance": "Attendance",
+      "moTracking": "MO Tracking"
+    },
+    "mo": {
+      "cost": "Cost",
+      "auditRecord": "Audit Record",
+      "costByMo": "Cost by MO",
+      "total": "Total",
+      "noResults": "No MO-linked tasks found for this filter.",
+      "noAuditYet": "No actions logged yet",
+      "liveTaskEditNote": "This task is still running, so only Start Time is editable — duration will keep counting up live from that time."
+    },
     "chips": {
       "all": "All",
       "today": "Today",
@@ -214,6 +228,7 @@
       "timerRunning": "TIMER RUNNING",
       "clockedIn": "CLOCKED IN",
       "onBreak": "ON BREAK",
+      "paused": "PAUSED",
       "completed": "COMPLETED",
       "pending": "PENDING"
     },

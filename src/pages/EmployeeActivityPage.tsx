@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User, ActivityLog } from '../types';
 import { logActivity, updateUserStatus, endOpenBreakIfOnBreak } from '../lib/activityLogger';
-import { pauseAllActiveTasks, resumeAllAutoPausedTasks, completeAllTasks, pauseAllTasksManual } from '../lib/taskService';
+import { pauseAllActiveTasks, completeAllTasks, pauseAllTasksManual } from '../lib/taskService';
 import { todayPST, pstDayStart, pstDayEnd, formatTimePST } from '../lib/timezone';
 import { buildShiftsForWorker, buildBreaksForWorker, getElapsedMsForLogs, DAILY_SHIFT_CAP_MS, DAILY_SHIFT_CAP_LABEL } from '../lib/shifts';
 import { useAuth } from '../context/AuthContext';
@@ -116,10 +116,11 @@ export const EmployeeActivityPage: React.FC = () => {
         setBusyWorkerId(clockOutWorkerId);
         try {
             await endOpenBreakIfOnBreak(clockOutWorkerId);
+            const actor = { id: currentUser?.id, name: managerName };
             if (action === 'complete_all') {
-                await completeAllTasks(clockOutWorkerId);
+                await completeAllTasks(clockOutWorkerId, undefined, actor);
             } else {
-                await pauseAllTasksManual(clockOutWorkerId);
+                await pauseAllTasksManual(clockOutWorkerId, actor);
             }
 
             await logActivity(clockOutWorkerId, 'clock_out', `Clocked Out by ${managerName}`);
@@ -149,16 +150,18 @@ export const EmployeeActivityPage: React.FC = () => {
         setBusyWorkerId(worker.id);
         try {
             if (worker.availability === 'break') {
-                // End Break -> Resume
+                // End Break -> Available again. Deliberately NOT auto-resuming MO tasks here —
+                // matches Worker Portal's own handleEndBreak: a task paused for a break must be
+                // resumed by an explicit Start/Resume click (worker or manager), never silently
+                // restarted just because the break ended.
                 await logActivity(worker.id, 'break_end', `Returned from Break (ended by ${managerName})`);
                 await updateUserStatus(worker.id, 'present', 'available');
-                await resumeAllAutoPausedTasks(worker.id);
             } else {
                 // Start Break -> Pause
                 const finalReason = reason || 'Break';
                 await logActivity(worker.id, 'break_start', `${finalReason} (started by ${managerName})`);
                 await updateUserStatus(worker.id, 'present', 'break');
-                await pauseAllActiveTasks(worker.id, finalReason);
+                await pauseAllActiveTasks(worker.id, finalReason, { id: currentUser?.id, name: managerName });
             }
             await fetchData();
         } finally {

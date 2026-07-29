@@ -5,9 +5,28 @@ import { performTaskAction } from '../lib/taskService';
 import type { Task, User, ManufacturingOrder } from '../types';
 import { sortManufacturingOrders } from '../utils/moSorting';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 
 export const ControlMatrixPage: React.FC = () => {
     const { t } = useTranslation();
+    const { user: currentUser } = useAuth();
+    // Same fallback chain as ControlTablePage's auditName / EmployeeActivityPage's managerName —
+    // currentUser.name can be empty for some accounts, so fall back to username, then a generic
+    // label, rather than ever sending a blank actor name into the audit trail.
+    const currentUserName = currentUser?.username === 'admin@gmail.com'
+        ? 'System Admin'
+        : (currentUser?.name || currentUser?.username || 'Manager');
+    // The operation header bar lives outside the scrolling body entirely (see render below) so it
+    // can never be overlapped/glitched by scrolled row content the way position:sticky was —
+    // instead its horizontal scroll position is just kept in sync with the body's via this handler.
+    const matrixHeaderRef = useRef<HTMLDivElement>(null);
+    const matrixBodyRef = useRef<HTMLDivElement>(null);
+    const syncMatrixHeaderScroll = () => {
+        if (matrixHeaderRef.current && matrixBodyRef.current) {
+            matrixHeaderRef.current.scrollLeft = matrixBodyRef.current.scrollLeft;
+        }
+    };
+
     const [mos, setMos] = useState<any[]>([]);
     const [operations, setOperations] = useState<string[]>([]);
     const [employees, setEmployees] = useState<User[]>([]);
@@ -156,15 +175,25 @@ export const ControlMatrixPage: React.FC = () => {
     };
 
     const handleTaskAction = async (task: Task, action: 'start' | 'pause' | 'resume' | 'complete', reason?: string) => {
-        // Check if worker is on break
         const worker = employees.find(e => e.id === task.assigned_to_id);
+
+        // A task can only run while its worker is actually clocked in — mirrors the same guard
+        // Worker Portal already enforces for a worker's own Start/Resume. Without this, an MO
+        // could keep "running" against a worker who's gone home, or get resumed on their behalf
+        // before they've clocked back in.
+        if (worker && worker.status !== 'present' && (action === 'start' || action === 'resume')) {
+            alert(t('matrix.cannotActionNotClockedIn', { name: worker.name }));
+            return;
+        }
+
+        // Check if worker is on break
         if (worker && worker.availability === 'break' && (action === 'start' || action === 'resume')) {
             alert(t('matrix.cannotActionBreak', { action, name: worker.name }));
             return;
         }
 
         // Use the centralized service
-        await performTaskAction(task, action, reason);
+        await performTaskAction(task, action, reason, undefined, { id: currentUser?.id, name: currentUserName });
         await fetchData(false);
     };
 
@@ -238,24 +267,33 @@ export const ControlMatrixPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="matrix-container table-responsive-container">
-                <div className="matrix-grid">
-                    <div className="matrix-row">
-                        <div className="matrix-header-cell" style={{ textAlign: 'left', paddingLeft: '20px' }}>
-                            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
-                                <i className="fa-regular fa-clipboard"></i> {t('matrix.manufacturingOrders')}
-                            </span>
-                        </div>
-                        {operations.map(op => (
-                            <div key={op} className="matrix-header-cell">
-                                <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{t(`matrix.ops.${op}`, op)}</div>
+            <div className="matrix-container">
+                {/* Header lives in its own non-scrolling bar, structurally outside the body that
+                    actually scrolls — it can never be overlapped/glitched by scrolled row content
+                    this way (unlike position:sticky, which was). Horizontal position is kept in
+                    sync with the body via syncMatrixHeaderScroll below. */}
+                <div className="matrix-header-bar" ref={matrixHeaderRef}>
+                    <div className="matrix-grid" style={{ gridTemplateColumns: `200px repeat(${operations.length}, minmax(170px, 1fr))` }}>
+                        <div className="matrix-row matrix-header-row">
+                            <div className="matrix-header-cell" style={{ textAlign: 'left', paddingLeft: '20px' }}>
+                                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                                    <i className="fa-regular fa-clipboard"></i> {t('matrix.manufacturingOrders')}
+                                </span>
                             </div>
-                        ))}
+                            {operations.map(op => (
+                                <div key={op} className="matrix-header-cell">
+                                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{t(`matrix.ops.${op}`, op)}</div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
+                </div>
 
+                <div className="matrix-scroll-body" ref={matrixBodyRef} onScroll={syncMatrixHeaderScroll}>
+                <div className="matrix-grid" style={{ gridTemplateColumns: `200px repeat(${operations.length}, minmax(170px, 1fr))` }}>
                     {mos.map(mo => (
                         <div key={mo.id} className="matrix-row" id={`mo-${mo.mo_number}`}>
-                            <div className="matrix-label-cell" style={{ width: '200px' }}>
+                            <div className="matrix-label-cell">
                                 <Link to="/manufacturing-orders" className="mo-badge" style={{ textDecoration: 'none' }}>{mo.mo_number}</Link>
                                 <div
                                     className="mo-details"
@@ -317,6 +355,7 @@ export const ControlMatrixPage: React.FC = () => {
                             }
                         </div>
                     ))}
+                </div>
                 </div>
             </div >
 

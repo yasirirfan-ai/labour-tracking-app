@@ -160,6 +160,7 @@
     "errorAssigning": "Error al asignar trabajador",
     "removeAssignment": "¿Eliminar esta asignación de trabajador?",
     "cannotActionBreak": "No se puede {{action}} la tarea. {{name}} está actualmente en descanso.",
+    "cannotActionNotClockedIn": "No se puede iniciar/reanudar esta tarea. {{name}} no ha marcado entrada.",
     "manualPause": "Pausa Manual",
     "status": {
       "active": "ACTIVO",
@@ -189,6 +190,19 @@
     "from": "Desde:",
     "to": "Hasta:",
     "reset": "Restablecer",
+    "viewToggle": {
+      "attendance": "Asistencia",
+      "moTracking": "Seguimiento de MO"
+    },
+    "mo": {
+      "cost": "Costo",
+      "auditRecord": "Registro de Auditoría",
+      "costByMo": "Costo por MO",
+      "total": "Total",
+      "noResults": "No se encontraron tareas vinculadas a una MO para este filtro.",
+      "noAuditYet": "Aún no hay acciones registradas",
+      "liveTaskEditNote": "Esta tarea todavía está en curso, así que solo se puede editar la Hora de Inicio — la duración seguirá contando en vivo desde esa hora."
+    },
     "chips": {
       "all": "Todo",
       "today": "Hoy",
@@ -214,6 +228,7 @@
       "timerRunning": "TEMPORIZADOR EN MARCHA",
       "clockedIn": "EN SERVICIO",
       "onBreak": "EN DESCANSO",
+      "paused": "PAUSADO",
       "completed": "COMPLETADO",
       "pending": "PENDIENTE"
     },
