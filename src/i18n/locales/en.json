@@ -504,6 +504,7 @@
     "sync": "Sync Orders",
     "new": "New Order",
     "searchPlaceholder": "Search MO, Product, PO...",
+    "allStatuses": "All Statuses",
     "moNumber": "MO Number",
     "productName": "Product Name",
     "sku": "SKU",

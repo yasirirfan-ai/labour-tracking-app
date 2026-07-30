@@ -522,6 +522,7 @@
     "sync": "Sincronizar Órdenes",
     "new": "Nueva Orden",
     "searchPlaceholder": "Buscar MO, Producto, PO...",
+    "allStatuses": "Todos los Estados",
     "moNumber": "Número de MO",
     "productName": "Nombre del Producto",
     "sku": "SKU",

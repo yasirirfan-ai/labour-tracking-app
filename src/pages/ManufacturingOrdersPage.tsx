@@ -10,6 +10,7 @@ export const ManufacturingOrdersPage: React.FC = () => {
     const [orders, setOrders] = useState<ManufacturingOrder[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
     const [isAddOpen, setIsAddOpen] = useState(false);
 
     const dragItem = useRef<number | null>(null);
@@ -33,7 +34,13 @@ export const ManufacturingOrdersPage: React.FC = () => {
         try {
             const { data } = await supabase.from('manufacturing_orders').select('*');
             if (data) {
-                const activeOnly = (data as ManufacturingOrder[]).filter(o => (o.current_status || '').toLowerCase() !== 'greenlit');
+                // Greenlit and Packed orders are done with active production tracking — never
+                // shown in this active list (Packed ones also never get freshly synced back in,
+                // see handleSync below).
+                const activeOnly = (data as ManufacturingOrder[]).filter(o => {
+                    const status = (o.current_status || '').toLowerCase();
+                    return status !== 'greenlit' && status !== 'packed';
+                });
                 const sorted = sortManufacturingOrders(activeOnly);
                 setOrders(sorted);
             }
@@ -63,6 +70,12 @@ export const ManufacturingOrdersPage: React.FC = () => {
                     if (newItemPOs.includes(row.po_number)) existingMap.set(row.po_number, row.id);
                 });
 
+                // Orders you've explicitly deleted must never come back on a future sync just
+                // because Odoo still has them — deleted_manufacturing_orders is the permanent
+                // record of "don't re-add this one" (see handleDelete below).
+                const { data: deletedRows } = await supabase.from('deleted_manufacturing_orders').select('po_number');
+                const deletedPoNumbers = new Set((deletedRows || []).map((r: any) => r.po_number));
+
                 // mo_number is our own internal label (Odoo never sends us a number — it sends
                 // po_number/event_id, which are the real stable identifiers). It must be assigned
                 // ONCE, the first time we ever see a given po_number, and never touched again on
@@ -84,7 +97,9 @@ export const ManufacturingOrdersPage: React.FC = () => {
                 const relevantItems = result.items.filter((item: any) => {
                     const po = item.po_number || '';
                     if (!po) return false;
-                    if (item.current_status && item.current_status.toLowerCase() === 'greenlit') return false;
+                    const status = (item.current_status || '').toLowerCase();
+                    if (status === 'greenlit' || status === 'packed') return false;
+                    if (deletedPoNumbers.has(po)) return false;
                     return true;
                 });
                 const newItemsCount = relevantItems.filter((item: any) => !existingMap.has(item.po_number)).length;
@@ -162,8 +177,19 @@ export const ManufacturingOrdersPage: React.FC = () => {
 
     const handleDelete = async (id: string) => {
         if (!confirm(t('mo.deleteConfirm'))) return;
+        const order = orders.find(o => o.id === id);
+
         const { error } = await supabase.from('manufacturing_orders').delete().eq('id', id);
-        if (!error) fetchOrders(false);
+        if (error) return;
+
+        // Remember this PO number was deliberately deleted so a future sync never brings the
+        // same order back just because Odoo still has it.
+        if (order?.po_number) {
+            await (supabase.from('deleted_manufacturing_orders') as any)
+                .upsert({ po_number: order.po_number }, { onConflict: 'po_number' });
+        }
+
+        fetchOrders(false);
     };
 
     const togglePin = async (order: ManufacturingOrder) => {
@@ -232,10 +258,12 @@ export const ManufacturingOrdersPage: React.FC = () => {
 
     const filteredOrders = orders.filter(o => {
         const term = search.toLowerCase();
-        return (o.mo_number?.toLowerCase().includes(term) ||
+        const matchesSearch = (o.mo_number?.toLowerCase().includes(term) ||
             o.product_name?.toLowerCase().includes(term) ||
             o.po_number?.toLowerCase().includes(term) ||
             o.sku?.toLowerCase().includes(term));
+        const matchesStatus = statusFilter === 'all' || (o.current_status || '').toLowerCase() === statusFilter;
+        return matchesSearch && matchesStatus;
     });
 
     if (isLoading) return <div className="loading-screen"><div className="loading-spinner"></div><span>{t('mo.loading')}</span></div>;
@@ -259,7 +287,7 @@ export const ManufacturingOrdersPage: React.FC = () => {
                 </div>
             </div>
 
-            <div style={{ marginBottom: '2rem' }}>
+            <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
                     <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '15px', top: '12px', color: 'var(--text-muted)' }}></i>
                     <input
@@ -270,6 +298,22 @@ export const ManufacturingOrdersPage: React.FC = () => {
                         style={{ width: '100%', padding: '0.7rem 1rem 0.7rem 2.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
                     />
                 </div>
+                <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{ padding: '0.7rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                >
+                    <option value="all">{t('mo.allStatuses')}</option>
+                    <option value="draft">{t('mo.statuses.draft')}</option>
+                    <option value="scheduled">{t('mo.statuses.scheduled')}</option>
+                    <option value="staged">{t('mo.statuses.staged')}</option>
+                    <option value="weighed">{t('mo.statuses.weighed')}</option>
+                    <option value="batched">{t('mo.statuses.batched')}</option>
+                    <option value="filled">{t('mo.statuses.filled')}</option>
+                    <option value="putback">{t('mo.statuses.putback')}</option>
+                    <option value="done">{t('mo.statuses.done')}</option>
+                    <option value="shipped">{t('mo.statuses.shipped')}</option>
+                </select>
             </div>
 
             <div className="table-responsive-container">
