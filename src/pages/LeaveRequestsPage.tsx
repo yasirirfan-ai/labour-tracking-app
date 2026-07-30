@@ -45,15 +45,37 @@ export const LeaveRequestsPage: React.FC = () => {
     };
 
     const handleAction = async (request: LeaveRequest, status: 'approved' | 'rejected') => {
+        // Check balance BEFORE prompting for notes/committing anything — an admin should know a
+        // request would overdraw the worker's balance up front, and be able to back out cleanly
+        // rather than the request ending up half-approved.
+        if (status === 'approved') {
+            const balanceField = request.type === 'pto' ? 'pto_balance' : 'sick_balance';
+            const { data: balanceCheckData, error: balanceCheckError } = await supabase
+                .from('users')
+                .select(balanceField)
+                .eq('id', request.user_id)
+                .single();
+
+            if (!balanceCheckError && balanceCheckData) {
+                const available = parseFloat((balanceCheckData as any)[balanceField] || '0');
+                if (request.hours_requested > available) {
+                    const proceed = window.confirm(
+                        `${(request as any).users?.name || 'This worker'} only has ${available} ${request.type.toUpperCase()} hours available, but is requesting ${request.hours_requested}. Approve anyway? This will take their balance negative.`
+                    );
+                    if (!proceed) return;
+                }
+            }
+        }
+
         const adminNotes = window.prompt(t('leave.actions.notePrompt', { status: t(`leave.filters.${status}`) }));
         if (adminNotes === null) return;
 
         setIsProcessing(request.id);
-        
+
         try {
             const { error: reqError } = await (supabase.from('leave_requests') as any)
-                .update({ 
-                    status, 
+                .update({
+                    status,
                     admin_notes: adminNotes,
                     processed_at: new Date().toISOString()
                 })

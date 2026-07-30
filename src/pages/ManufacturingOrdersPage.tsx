@@ -53,17 +53,28 @@ export const ManufacturingOrdersPage: React.FC = () => {
 
             if (result && result.items) {
                 let count = 0;
-                let newIndex = 1;
 
                 const newItemPOs = result.items.map((i: any) => i.po_number).filter(Boolean);
                 const { data: existingData } = await supabase.from('manufacturing_orders')
-                    .select('id, po_number, sort_order')
-                    .in('po_number', newItemPOs);
+                    .select('id, po_number, sort_order');
 
                 const existingMap = new Map();
                 existingData?.forEach((row: any) => {
-                    existingMap.set(row.po_number, row.id);
+                    if (newItemPOs.includes(row.po_number)) existingMap.set(row.po_number, row.id);
                 });
+
+                // mo_number is our own internal label (Odoo never sends us a number — it sends
+                // po_number/event_id, which are the real stable identifiers). It must be assigned
+                // ONCE, the first time we ever see a given po_number, and never touched again on
+                // later syncs — reassigning it every sync from a batch-position counter (the old
+                // behavior) let two completely unrelated orders from different sync runs collide
+                // under the same mo_number, since the counter restarted at 1 every time. New orders
+                // now get numbers continuing from the current highest one in the whole table, so a
+                // fresh number can never collide with any that already exists.
+                let nextMoNumber = 1 + (existingData || []).reduce((max: number, row: any) => {
+                    const n = parseInt((row.mo_number || '').replace(/\D/g, ''), 10);
+                    return isNaN(n) ? max : Math.max(max, n);
+                }, 0);
 
                 // New MOs from this sync should land above everything already in the list, without
                 // disturbing the existing ones' order (their sort_order, including any manual
@@ -86,11 +97,9 @@ export const ManufacturingOrdersPage: React.FC = () => {
 
                 for (const item of relevantItems) {
                     const po = item.po_number || '';
-                    const mo = newIndex.toString();
                     const existingId = existingMap.get(po);
 
                     const payload: any = {
-                        mo_number: mo,
                         quantity: typeof item.quantity === 'number' ? item.quantity : 0,
                         po_number: po,
                         product_name: item.product_name,
@@ -101,14 +110,16 @@ export const ManufacturingOrdersPage: React.FC = () => {
                     };
 
                     if (existingId) {
+                        // Existing order: never touch mo_number or sort_order — only refresh the
+                        // fields that actually come from Odoo.
                         promises.push((supabase.from('manufacturing_orders') as any).update(payload).eq('id', existingId));
                     } else {
+                        payload.mo_number = (nextMoNumber++).toString();
                         payload.sort_order = currentMinSortOrder - (newItemsCount - newItemPosition) * 1000;
                         newItemPosition++;
                         promises.push((supabase.from('manufacturing_orders') as any).insert(payload));
                     }
                     count++;
-                    newIndex++;
                 }
 
                 await Promise.all(promises);

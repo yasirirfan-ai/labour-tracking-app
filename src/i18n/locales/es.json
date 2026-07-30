@@ -558,7 +558,8 @@
       "filled": "Llenado",
       "packed": "Empacado",
       "putback": "Devolución",
-      "done": "Terminado"
+      "done": "Terminado",
+      "shipped": "Enviado"
     }
   },
   "nfc": {

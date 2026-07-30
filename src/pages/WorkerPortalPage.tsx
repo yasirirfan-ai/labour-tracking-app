@@ -300,15 +300,27 @@ export const WorkerPortalPage: React.FC = () => {
     }, [selectedPdf]);
 
 
+    const showLeaveFormError = (message: string) => {
+        setNotification({ show: true, message, severity: 'error' });
+        setTimeout(() => setNotification(null), 6000);
+    };
+
     const handleLeaveSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
         if (!leaveFormData.start_date || !leaveFormData.end_date || leaveFormData.hours_requested <= 0) {
-            alert('Please fill in all required fields correctly.');
+            showLeaveFormError('Please fill in all required fields correctly.');
             return;
         }
         if (leaveFormData.end_date < leaveFormData.start_date) {
-            alert('End date cannot be before start date.');
+            showLeaveFormError('End date cannot be before start date.');
+            return;
+        }
+
+        const balanceField = leaveFormData.type === 'pto' ? 'pto_balance' : 'sick_balance';
+        const availableBalance = parseFloat((localUser as any)?.[balanceField] ?? (user as any)?.[balanceField] ?? '0');
+        if (leaveFormData.hours_requested > availableBalance) {
+            showLeaveFormError(`You don't have enough ${leaveFormData.type === 'pto' ? 'PTO' : 'Sick'} balance. Your available balance is ${availableBalance} hours.`);
             return;
         }
 
@@ -320,7 +332,7 @@ export const WorkerPortalPage: React.FC = () => {
         }]);
 
         if (error) {
-            alert('Error submitting request: ' + error.message);
+            showLeaveFormError('Error submitting request: ' + error.message);
         } else {
             // Send email notification to admin
             try {

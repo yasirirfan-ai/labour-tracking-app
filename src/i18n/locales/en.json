@@ -540,7 +540,8 @@
       "filled": "Filled",
       "packed": "Packed",
       "putback": "Putback",
-      "done": "Done"
+      "done": "Done",
+      "shipped": "Shipped"
     }
   },
   "nfc": {
