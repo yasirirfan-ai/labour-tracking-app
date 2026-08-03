@@ -141,9 +141,19 @@ export const EmployeeActivityPage: React.FC = () => {
     const toggleBreak = async (worker: User, reason: string = 'Break') => {
         if (busyWorkerId) return;
 
-        // Validation: Block break starting if worker is not clocked in
-        if (worker.status !== 'present' && worker.availability !== 'break') {
-            alert(`Cannot place ${worker.name} on break because they are not clocked in.`);
+        // Re-check against the database, not the possibly-stale `worker` prop (this component
+        // only polls every 5s — if this admin's tab was backgrounded/asleep for even a few
+        // seconds, the cached status here could say "present" for a worker who has since clocked
+        // out for real). Without this, clicking Start Break on a stale row would call
+        // updateUserStatus(worker.id, 'present', 'break') unconditionally — silently resurrecting
+        // an offline worker as "present" with no clock-in ever logged. Same class of bug as the
+        // stale-tab shift-overtime incident; Worker Portal's own handleTakeBreak already does this
+        // live check, this admin-side equivalent just never had it.
+        const { data: liveWorker } = await (supabase.from('users') as any).select('status, availability').eq('id', worker.id).single();
+
+        if (!liveWorker || (liveWorker.status !== 'present' && liveWorker.availability !== 'break')) {
+            alert(`Cannot place ${worker.name} on break because they are not currently clocked in. (This page's view of them was out of date — refreshing now.)`);
+            fetchData();
             return;
         }
 
@@ -289,10 +299,21 @@ export const EmployeeActivityPage: React.FC = () => {
         const netPayableTime = Math.max(0, totalShiftTime - unpaidBreakTime);
 
         // --- 2. Calculate Task Active Time (Productivity) ---
-        // Sum of all active_seconds from tasks assigned to this user. Manual Entries are
-        // excluded — their clock_in/clock_out pair is already counted above as Shift Duration,
-        // so including them here too would double-count the same hours in both stats.
-        const userTasks = rawTasks.filter(t => t.assigned_to_id === workerId && !t.manual);
+        // Sum of active_seconds from tasks assigned to this user, touched on the selected day.
+        // Manual Entries are excluded — their clock_in/clock_out pair is already counted above as
+        // Shift Duration, so including them here too would double-count the same hours in both
+        // stats. Tasks not touched on the selected day are excluded too — a task can now span
+        // multiple days (paused overnight, resumed later), and without this filter its entire
+        // lifetime total kept getting added to whatever day happened to be selected, showing
+        // impossible numbers like 15 hours of "Task Activity" inside a 3-hour shift. This isn't a
+        // perfect day-by-day split of a multi-day task's hours (that would need reconstructing
+        // from its own start/pause/resume/complete log history), but it stops stale, untouched
+        // tasks from bleeding into a day they have nothing to do with.
+        const userTasks = rawTasks.filter(t => {
+            if (t.assigned_to_id !== workerId || t.manual) return false;
+            const lastTouched = new Date(t.last_action_time || t.created_at).getTime();
+            return lastTouched >= dayStart && lastTouched <= dayEnd;
+        });
         const taskActiveSec = userTasks.reduce((acc, t) => acc + (t.active_seconds || 0), 0);
 
         // worker is already defined above
