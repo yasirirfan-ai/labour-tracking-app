@@ -10,6 +10,7 @@ interface Props {
     moTasks: any[];
     employees: any[];
     mos: any[];
+    operations: string[];
     search: string;
     setSearch: (v: string) => void;
     workerFilter: string;
@@ -60,7 +61,7 @@ const toPSTDatetimeLocal = (iso: string): string => {
 };
 
 export const MoTrackingTable: React.FC<Props> = ({
-    moTasks, search, setSearch, workerFilter, setWorkerFilter, employees,
+    moTasks, search, setSearch, workerFilter, setWorkerFilter, employees, operations,
     startDate, endDate, setStartDate, setEndDate, getPSTBound,
     getStatusLabel, getTaskCost, getTaskAuditTrail, formatDateTime, currentUserName, onRefresh, t
 }) => {
@@ -75,18 +76,21 @@ export const MoTrackingTable: React.FC<Props> = ({
     const [editingTask, setEditingTask] = useState<any>(null);
     const [editStart, setEditStart] = useState('');
     const [editLastAction, setEditLastAction] = useState('');
+    const [editOperation, setEditOperation] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
     const openEdit = (task: any) => {
         setEditingTask(task);
         setEditStart(toPSTDatetimeLocal(task.start_time));
         setEditLastAction(toPSTDatetimeLocal(task.last_action_time || task.start_time));
+        setEditOperation(task.description || '');
     };
 
     const closeEdit = () => {
         setEditingTask(null);
         setEditStart('');
         setEditLastAction('');
+        setEditOperation('');
     };
 
     // A still-running task's displayed duration is always active_seconds + (now - last_action_time)
@@ -123,7 +127,7 @@ export const MoTrackingTable: React.FC<Props> = ({
         setIsSaving(true);
         try {
             const startIso = parsePSTToUTC(editStart).toISOString();
-            const updates = isLiveTask
+            const updates: any = isLiveTask
                 ? { start_time: startIso, last_action_time: startIso, active_seconds: 0 }
                 : (() => {
                     const lastActionIso = parsePSTToUTC(editLastAction).toISOString();
@@ -133,14 +137,19 @@ export const MoTrackingTable: React.FC<Props> = ({
                     return { start_time: startIso, last_action_time: lastActionIso, active_seconds: newActiveSeconds };
                 })();
 
+            const operationChanged = editOperation && editOperation !== editingTask.description;
+            if (operationChanged) updates.description = editOperation;
+
             const { error } = await (supabase.from('tasks') as any).update(updates).eq('id', editingTask.id);
             if (error) throw error;
 
             await (supabase.from('activity_logs') as any).insert({
                 worker_id: editingTask.assigned_to_id,
                 event_type: 'task_edit',
-                description: `${editingTask.description} — duration adjusted`,
-                details: 'Start/Last Action time edited',
+                description: operationChanged
+                    ? `${editingTask.description} — operation changed to ${editOperation}, duration adjusted`
+                    : `${editingTask.description} — duration adjusted`,
+                details: operationChanged ? 'Start/Last Action time and Operation edited' : 'Start/Last Action time edited',
                 related_task_id: editingTask.id,
                 timestamp: new Date().toISOString(),
                 performed_by_name: currentUserName
@@ -317,6 +326,19 @@ export const MoTrackingTable: React.FC<Props> = ({
                         </div>
                         <div className="offcanvas-body" style={{ padding: '0 1.5rem 1.5rem' }}>
                             <div style={{ marginBottom: '1rem' }}>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-main)', fontSize: '0.85rem' }}>{t('table.columns.operation')}</label>
+                                <select
+                                    value={editOperation}
+                                    onChange={e => setEditOperation(e.target.value)}
+                                    style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1.5px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                                >
+                                    {editOperation && !operations.includes(editOperation) && (
+                                        <option value={editOperation}>{editOperation}</option>
+                                    )}
+                                    {operations.map(op => <option key={op} value={op}>{op}</option>)}
+                                </select>
+                            </div>
+                            <div style={{ marginBottom: '1rem' }}>
                                 <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-main)', fontSize: '0.85rem' }}>{t('table.columns.startTime')}</label>
                                 <input
                                     type="datetime-local"
@@ -349,7 +371,7 @@ export const MoTrackingTable: React.FC<Props> = ({
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                                 <button className="btn btn-secondary" onClick={closeEdit} disabled={isSaving}>{t('common.cancel')}</button>
-                                <button className="btn btn-primary" onClick={saveEdit} disabled={isSaving || !editStart || (!isLiveTask && !editLastAction)}>
+                                <button className="btn btn-primary" onClick={saveEdit} disabled={isSaving || !editStart || !editOperation || (!isLiveTask && !editLastAction)}>
                                     {isSaving ? t('common.saving') : t('common.saveChanges')}
                                 </button>
                             </div>

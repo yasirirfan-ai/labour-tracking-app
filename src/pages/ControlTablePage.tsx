@@ -1919,6 +1919,7 @@ export const ControlTablePage: React.FC = () => {
                     getTaskCost={getTaskCost}
                     getTaskAuditTrail={getTaskAuditTrail}
                     formatDateTime={formatDateTime}
+                    operations={operations}
                     currentUserName={currentUser?.name || 'Admin'}
                     onRefresh={fetchData}
                     t={t}
