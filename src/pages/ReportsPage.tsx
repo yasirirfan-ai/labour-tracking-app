@@ -15,6 +15,8 @@ export const ReportsPage: React.FC = () => {
     const [ops, setOps] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>([]);
+    const [rawLogs, setRawLogs] = useState<any[]>([]);
+    const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
 
     const [filters, setFilters] = useState({ employee: 'all', mo: 'all', operation: 'all', start: '', end: '' });
 
@@ -40,8 +42,12 @@ export const ReportsPage: React.FC = () => {
             const { data: moData } = await supabase.from('manufacturing_orders').select('*') as { data: any[] };
             const { data: opData } = await supabase.from('operations').select('*') as { data: any[] };
             const { data: logsData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: true }) as { data: any[] };
+            const { data: leaveData } = await supabase.from('leave_requests').select('*') as { data: any[] };
             
             const trMaterials = await trainingService.getAllMaterials();
+
+            setRawLogs(logsData || []);
+            setLeaveRequests(leaveData || []);
 
             if (taskData && userData && logsData) {
                 const taskCoveredKeys = new Set<string>();
@@ -423,27 +429,223 @@ export const ReportsPage: React.FC = () => {
     };
 
     const handleExportCSV = () => {
-        const data = getFilteredTasks();
-        const headers = ['Worker', 'Manufacturing Order', 'Operation', 'Start Time (PST)', 'Duration (h)', 'Type', 'Cost ($)'];
+        const targetEmployees = filters.employee === 'all'
+            ? employees
+            : employees.filter(e => e.id === filters.employee);
 
-        const rows = data.map(task => {
-            // Use created_at (Clock In) first — this is what the user entered.
-            // Fall back to start_time for auto entries or Tab 2 manual entries.
-            const displayDate = task.created_at || task.start_time;
-            const startTimePST = displayDate
-                ? new Date(displayDate).toLocaleString('en-US', {
-                    timeZone: 'America/Los_Angeles',
-                    month: '2-digit', day: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit', hour12: false
-                })
-                : 'N/A';
-            const hours = ((task.active_seconds || 0) / 3600).toFixed(2);
-            const cost = (task.cost || 0).toFixed(2);
-            const escape = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
-            return [escape(task.employee_name), escape(task.mo_reference), escape(task.description), escape(startTimePST), hours, task.manual ? 'manual' : 'auto', cost].join(',');
+        const isSingleWorker = filters.employee !== 'all' && targetEmployees.length === 1;
+        const selectedWorkerName = isSingleWorker ? targetEmployees[0]?.name || 'Worker' : '';
+
+        const headers = isSingleWorker
+            ? [selectedWorkerName, 'Clock In', 'Lunch start', 'Lunch end', 'Clock Out', 'Reg Hours', 'OT Hours', 'Sick Hours', 'PTO Hours', 'UTO Hours', 'Notes']
+            : ['Worker', 'Date', 'Clock In', 'Lunch start', 'Lunch end', 'Clock Out', 'Reg Hours', 'OT Hours', 'Sick Hours', 'PTO Hours', 'UTO Hours', 'Notes'];
+
+        const reportsFloorMs = new Date(pstDayStart('2026-07-01')).getTime();
+        const startBoundMs = filters.start ? new Date(pstDayStart(filters.start)).getTime() : reportsFloorMs;
+        const endBoundMs = filters.end ? new Date(pstDayEnd(filters.end)).getTime() : null;
+
+        const csvRows: string[] = [];
+
+        targetEmployees.forEach(emp => {
+            const empLogs = (rawLogs || []).filter((l: any) => l.worker_id === emp.id);
+            const empTasks = (tasks || []).filter((t: any) => t.assigned_to_id === emp.id);
+            const empLeaves = (leaveRequests || []).filter((r: any) => r.user_id === emp.id && r.status === 'approved');
+
+            const pairedShifts = buildShiftsForWorker(empLogs);
+            const pairedBreaks = buildBreaksForWorker(empLogs);
+
+            const dateSet = new Set<string>();
+
+            pairedShifts.forEach(shift => {
+                const d = new Date(shift.clockIn.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                dateSet.add(d);
+            });
+
+            empTasks.forEach(task => {
+                const ref = task.start_time || task.created_at;
+                if (ref) {
+                    const d = new Date(ref).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                    dateSet.add(d);
+                }
+            });
+
+            empLeaves.forEach(leave => {
+                if (leave.start_date) {
+                    const d = leave.start_date.split('T')[0];
+                    dateSet.add(d);
+                }
+            });
+
+            const sortedDates = Array.from(dateSet).sort((a, b) => a.localeCompare(b));
+
+            sortedDates.forEach(dateStr => {
+                const dayStartMs = new Date(pstDayStart(dateStr)).getTime();
+                const dayEndMs = new Date(pstDayEnd(dateStr)).getTime();
+
+                if (startBoundMs !== null && dayEndMs < startBoundMs) return;
+                if (endBoundMs !== null && dayStartMs > endBoundMs) return;
+
+                const dayTasks = empTasks.filter(t => {
+                    const ref = t.start_time || t.created_at;
+                    if (!ref) return false;
+                    const d = new Date(ref).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                    if (d !== dateStr) return false;
+                    if (filters.mo !== 'all' && t.mo_reference !== filters.mo) return false;
+                    if (filters.operation !== 'all' && t.description !== filters.operation) return false;
+                    return true;
+                });
+
+                if ((filters.mo !== 'all' || filters.operation !== 'all') && dayTasks.length === 0) {
+                    return;
+                }
+
+                const [yr, mo, dy] = dateStr.split('-').map(Number);
+                const dateObj = new Date(yr, mo - 1, dy);
+                const formattedDate = dateObj.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+
+                const dayShifts = pairedShifts.filter(shift => {
+                    const d = new Date(shift.clockIn.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                    return d === dateStr;
+                });
+
+                const dayBreaks = pairedBreaks.filter(b => {
+                    const d = new Date(b.startMs).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                    return d === dateStr && b.type === 'unpaid';
+                });
+
+                const formatTime12h = (ts: string | number | null | undefined) => {
+                    if (!ts) return '';
+                    return new Date(ts).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                        timeZone: 'America/Los_Angeles'
+                    });
+                };
+
+                const clockInStr = dayShifts.length > 0 ? formatTime12h(dayShifts[0].clockIn.timestamp) : '';
+
+                let lunchStartStr = '';
+                let lunchEndStr = '';
+                let totalUnpaidBreakSecs = 0;
+
+                if (dayBreaks.length > 0) {
+                    const firstBreak = dayBreaks[0];
+                    lunchStartStr = formatTime12h(firstBreak.startMs);
+                    lunchEndStr = firstBreak.endMs ? formatTime12h(firstBreak.endMs) : '';
+                    dayBreaks.forEach(b => {
+                        const end = b.endMs ?? Date.now();
+                        totalUnpaidBreakSecs += Math.max(0, (end - b.startMs) / 1000);
+                    });
+                }
+
+                let clockOutStr = '';
+                if (dayShifts.length > 0) {
+                    const lastShift = dayShifts[dayShifts.length - 1];
+                    if (lastShift.clockOut) {
+                        clockOutStr = formatTime12h(lastShift.clockOut.timestamp);
+                    }
+                }
+
+                let grossShiftSecs = 0;
+                dayShifts.forEach(shift => {
+                    const inMs = new Date(shift.clockIn.timestamp).getTime();
+                    const outMs = shift.clockOut ? new Date(shift.clockOut.timestamp).getTime() : Date.now();
+                    grossShiftSecs += Math.max(0, (outMs - inMs) / 1000);
+                });
+
+                let netWorkedSecs = Math.max(0, grossShiftSecs - totalUnpaidBreakSecs);
+
+                if (dayShifts.length === 0 && dayTasks.length > 0) {
+                    netWorkedSecs = dayTasks.reduce((sum, t) => sum + (t.active_seconds || 0), 0);
+                }
+
+                const netWorkedHours = netWorkedSecs / 3600;
+
+                let regHoursStr = '0';
+                let otHoursStr = '0.00';
+
+                if (netWorkedHours > 0) {
+                    if (netWorkedHours > 8.0) {
+                        regHoursStr = '8.00';
+                        otHoursStr = (netWorkedHours - 8.0).toFixed(2);
+                    } else {
+                        regHoursStr = netWorkedHours.toFixed(2);
+                        otHoursStr = '0.00';
+                    }
+                }
+
+                const dayLeaves = empLeaves.filter(r => {
+                    if (!r.start_date) return false;
+                    const d = r.start_date.split('T')[0];
+                    return d === dateStr;
+                });
+
+                let sickHours = 0;
+                let ptoHours = 0;
+                let utoHours = 0;
+
+                dayLeaves.forEach(l => {
+                    const h = parseFloat(l.hours_requested || 0);
+                    if (l.type === 'sick') sickHours += h;
+                    else if (l.type === 'pto') ptoHours += h;
+                    else utoHours += h;
+                });
+
+                const sickStr = sickHours > 0 ? sickHours.toString() : '0';
+                const ptoStr = ptoHours > 0 ? ptoHours.toString() : '0';
+                const utoStr = utoHours > 0 ? utoHours.toString() : '0';
+
+                const notesList: string[] = [];
+                dayTasks.forEach(t => {
+                    if (t.description && !notesList.includes(t.description)) notesList.push(t.description);
+                });
+                dayLeaves.forEach(l => {
+                    if (l.reason && !notesList.includes(l.reason)) notesList.push(l.reason);
+                });
+                const notesStr = notesList.join('; ');
+
+                const escape = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
+
+                if (isSingleWorker) {
+                    csvRows.push([
+                        escape(formattedDate),
+                        escape(clockInStr),
+                        escape(lunchStartStr),
+                        escape(lunchEndStr),
+                        escape(clockOutStr),
+                        regHoursStr,
+                        otHoursStr,
+                        sickStr,
+                        ptoStr,
+                        utoStr,
+                        escape(notesStr)
+                    ].join(','));
+                } else {
+                    csvRows.push([
+                        escape(emp.name),
+                        escape(formattedDate),
+                        escape(clockInStr),
+                        escape(lunchStartStr),
+                        escape(lunchEndStr),
+                        escape(clockOutStr),
+                        regHoursStr,
+                        otHoursStr,
+                        sickStr,
+                        ptoStr,
+                        utoStr,
+                        escape(notesStr)
+                    ].join(','));
+                }
+            });
         });
 
-        const csv = [headers.join(','), ...rows].join('\n');
+        const csv = [headers.join(','), ...csvRows].join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
