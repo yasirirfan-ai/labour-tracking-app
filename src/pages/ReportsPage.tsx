@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import Chart from 'chart.js/auto';
 import { trainingService } from '../lib/trainingService';
 import type { TrainingMaterial } from '../lib/trainingService';
-import { buildShiftsForWorker, buildBreaksForWorker } from '../lib/shifts';
+import { buildShiftsForWorker, buildBreaksForWorker, DAILY_SHIFT_CAP_MS } from '../lib/shifts';
 import { pstDayStart, pstDayEnd } from '../lib/timezone';
 import { useTranslation } from 'react-i18next';
 
@@ -447,7 +447,11 @@ export const ReportsPage: React.FC = () => {
         const csvRows: string[] = [];
 
         targetEmployees.forEach(emp => {
-            const empLogs = (rawLogs || []).filter((l: any) => l.worker_id === emp.id);
+            const empLogs = (rawLogs || [])
+                .filter((l: any) => l.worker_id === emp.id)
+                .filter((l: any) => !((l.event_type === 'clock_in' || l.event_type === 'clock_out') && l.related_task_id))
+                .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
             const empTasks = (tasks || []).filter((t: any) => t.assigned_to_id === emp.id);
             const empLeaves = (leaveRequests || []).filter((r: any) => r.user_id === emp.id && r.status === 'approved');
 
@@ -528,7 +532,35 @@ export const ReportsPage: React.FC = () => {
                     });
                 };
 
-                const clockInStr = dayShifts.length > 0 ? formatTime12h(dayShifts[0].clockIn.timestamp) : '';
+                let clockInStr = '';
+                let clockOutStr = '';
+
+                // Prioritize consolidated task/shift timestamps from dayTasks
+                if (dayTasks.length > 0) {
+                    const sortedDayTasks = [...dayTasks].sort((a, b) => {
+                        const aRef = new Date(a.start_time || a.created_at || 0).getTime();
+                        const bRef = new Date(b.start_time || b.created_at || 0).getTime();
+                        return aRef - bRef;
+                    });
+                    const firstTask = sortedDayTasks[0];
+                    const lastTask = sortedDayTasks[sortedDayTasks.length - 1];
+
+                    const firstRef = firstTask.start_time || firstTask.created_at;
+                    if (firstRef) clockInStr = formatTime12h(firstRef);
+
+                    if (lastTask.end_time) clockOutStr = formatTime12h(lastTask.end_time);
+                }
+
+                // Fallback to dayShifts if not set by dayTasks
+                if (!clockInStr && dayShifts.length > 0) {
+                    clockInStr = formatTime12h(dayShifts[0].clockIn.timestamp);
+                }
+                if (!clockOutStr && dayShifts.length > 0) {
+                    const lastShift = dayShifts[dayShifts.length - 1];
+                    if (lastShift.clockOut) {
+                        clockOutStr = formatTime12h(lastShift.clockOut.timestamp);
+                    }
+                }
 
                 let lunchStartStr = '';
                 let lunchEndStr = '';
@@ -544,26 +576,32 @@ export const ReportsPage: React.FC = () => {
                     });
                 }
 
-                let clockOutStr = '';
-                if (dayShifts.length > 0) {
-                    const lastShift = dayShifts[dayShifts.length - 1];
-                    if (lastShift.clockOut) {
-                        clockOutStr = formatTime12h(lastShift.clockOut.timestamp);
-                    }
-                }
-
-                let grossShiftSecs = 0;
-                dayShifts.forEach(shift => {
-                    const inMs = new Date(shift.clockIn.timestamp).getTime();
-                    const outMs = shift.clockOut ? new Date(shift.clockOut.timestamp).getTime() : Date.now();
-                    grossShiftSecs += Math.max(0, (outMs - inMs) / 1000);
-                });
-
-                let netWorkedSecs = Math.max(0, grossShiftSecs - totalUnpaidBreakSecs);
-
-                if (dayShifts.length === 0 && dayTasks.length > 0) {
+                let netWorkedSecs = 0;
+                if (dayTasks.length > 0) {
                     netWorkedSecs = dayTasks.reduce((sum, t) => sum + (t.active_seconds || 0), 0);
+                } else if (dayShifts.length > 0) {
+                    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                    const isToday = dateStr === todayStr;
+                    let grossShiftSecs = 0;
+
+                    dayShifts.forEach(shift => {
+                        const inMs = new Date(shift.clockIn.timestamp).getTime();
+                        let outMs: number;
+                        if (shift.clockOut) {
+                            outMs = new Date(shift.clockOut.timestamp).getTime();
+                        } else if (isToday && emp.status === 'present') {
+                            outMs = Date.now();
+                        } else {
+                            // Historical unclosed shift: cap duration at DAILY_SHIFT_CAP_MS
+                            outMs = inMs + DAILY_SHIFT_CAP_MS;
+                        }
+                        grossShiftSecs += Math.max(0, (outMs - inMs) / 1000);
+                    });
+                    netWorkedSecs = Math.max(0, grossShiftSecs - totalUnpaidBreakSecs);
                 }
+
+                // Cap net worked time per calendar day at DAILY_SHIFT_CAP_MS (8h45m = 31500s)
+                netWorkedSecs = Math.min(netWorkedSecs, DAILY_SHIFT_CAP_MS / 1000);
 
                 const netWorkedHours = netWorkedSecs / 3600;
 
