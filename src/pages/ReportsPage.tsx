@@ -4,7 +4,7 @@ import Chart from 'chart.js/auto';
 import { trainingService } from '../lib/trainingService';
 import type { TrainingMaterial } from '../lib/trainingService';
 import { buildShiftsForWorker, buildBreaksForWorker, DAILY_SHIFT_CAP_MS } from '../lib/shifts';
-import { pstDayStart, pstDayEnd } from '../lib/timezone';
+import { pstDayStart, todayPST } from '../lib/timezone';
 import { useTranslation } from 'react-i18next';
 
 export const ReportsPage: React.FC = () => {
@@ -335,26 +335,18 @@ export const ReportsPage: React.FC = () => {
     };
 
     const getFilteredTasks = () => {
-        // pstDayStart/pstDayEnd always return UTC "...Z" format (toISOString), but task
-        // timestamps come straight from the database with an explicit offset (e.g. "...-07:00")
-        // — comparing those as raw strings is comparing two different formats character-by-
-        // character, which doesn't reliably preserve chronological order. Parse both sides to
-        // actual timestamps instead.
-        const startBoundMs = filters.start ? new Date(pstDayStart(filters.start)).getTime() : null;
-        const endBoundMs = filters.end ? new Date(pstDayEnd(filters.end)).getTime() : null;
-
         return tasks
             .filter(task => {
                 if (filters.employee !== 'all' && task.assigned_to_id !== filters.employee) return false;
                 if (filters.mo !== 'all' && task.mo_reference !== filters.mo) return false;
                 if (filters.operation !== 'all' && task.description !== filters.operation) return false;
 
-                // Use start_time (or created_at as fallback) as the task's representative date.
-                // In-progress tasks (null end_time) are included as long as they started in range.
-                const taskDate = task.start_time || task.created_at;
-                const taskDateMs = taskDate ? new Date(taskDate).getTime() : null;
-                if (startBoundMs !== null && taskDateMs !== null && taskDateMs < startBoundMs) return false;
-                if (endBoundMs !== null && taskDateMs !== null && taskDateMs > endBoundMs) return false;
+                const ref = task.start_time || task.created_at;
+                if (!ref) return false;
+                const taskPstDate = new Date(ref).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+
+                if (filters.start && taskPstDate < filters.start) return false;
+                if (filters.end && taskPstDate > filters.end) return false;
                 return true;
             })
             .sort((a, b) => {
@@ -428,28 +420,47 @@ export const ReportsPage: React.FC = () => {
         }
     };
 
-    const handleExportCSV = () => {
+    const generatePayrollReportData = (): (string | number)[][] => {
         const targetEmployees = filters.employee === 'all'
             ? employees
             : employees.filter(e => e.id === filters.employee);
 
-        const isSingleWorker = filters.employee !== 'all' && targetEmployees.length === 1;
-        const selectedWorkerName = isSingleWorker ? targetEmployees[0]?.name || 'Worker' : '';
+        let startStr = filters.start;
+        let endStr = filters.end;
 
-        const headers = isSingleWorker
-            ? [selectedWorkerName, 'Clock In', 'Lunch start', 'Lunch end', 'Clock Out', 'Reg Hours', 'OT Hours', 'Sick Hours', 'PTO Hours', 'UTO Hours', 'Notes']
-            : ['Worker', 'Date', 'Clock In', 'Lunch start', 'Lunch end', 'Clock Out', 'Reg Hours', 'OT Hours', 'Sick Hours', 'PTO Hours', 'UTO Hours', 'Notes'];
+        if (!startStr || !endStr) {
+            const dates: string[] = [];
+            (rawLogs || []).forEach((l: any) => {
+                if (l.timestamp) dates.push(new Date(l.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }));
+            });
+            (tasks || []).forEach((t: any) => {
+                const ref = t.start_time || t.created_at;
+                if (ref) dates.push(new Date(ref).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }));
+            });
+            dates.sort();
+            if (!startStr) startStr = dates.length > 0 ? dates[0] : todayPST();
+            if (!endStr) endStr = dates.length > 0 ? dates[dates.length - 1] : todayPST();
+        }
 
-        const reportsFloorMs = new Date(pstDayStart('2026-07-01')).getTime();
-        const startBoundMs = filters.start ? new Date(pstDayStart(filters.start)).getTime() : reportsFloorMs;
-        const endBoundMs = filters.end ? new Date(pstDayEnd(filters.end)).getTime() : null;
+        const allDays: string[] = [];
+        const [sy, sm, sd] = startStr.split('-').map(Number);
+        const [ey, em, ed] = endStr.split('-').map(Number);
+        const curr = new Date(Date.UTC(sy, sm - 1, sd, 12, 0, 0));
+        const last = new Date(Date.UTC(ey, em - 1, ed, 12, 0, 0));
 
-        const csvRows: string[] = [];
+        while (curr <= last) {
+            const y = curr.getUTCFullYear();
+            const m = String(curr.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(curr.getUTCDate()).padStart(2, '0');
+            allDays.push(`${y}-${m}-${d}`);
+            curr.setUTCDate(curr.getUTCDate() + 1);
+        }
 
-        targetEmployees.forEach(emp => {
+        const reportMatrix: (string | number)[][] = [];
+
+        targetEmployees.forEach((emp, empIdx) => {
             const empLogs = (rawLogs || [])
                 .filter((l: any) => l.worker_id === emp.id)
-                .filter((l: any) => !((l.event_type === 'clock_in' || l.event_type === 'clock_out') && l.related_task_id))
                 .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
             const empTasks = (tasks || []).filter((t: any) => t.assigned_to_id === emp.id);
@@ -458,36 +469,26 @@ export const ReportsPage: React.FC = () => {
             const pairedShifts = buildShiftsForWorker(empLogs);
             const pairedBreaks = buildBreaksForWorker(empLogs);
 
-            const dateSet = new Set<string>();
+            // Grouped Payroll Header Row matching team's manual tracking sheet format:
+            // Column A: Worker Name | B: Clock In | C: Lunch start | D: Lunch end | E: Clock Out | F: Reg Hours | G: OT Hours | H: Sick Hours | I: PTO Hours | J: UTO Hours | K: Notes
+            reportMatrix.push([
+                emp.name,
+                'Clock In',
+                'Lunch start',
+                'Lunch end',
+                'Clock Out',
+                'Reg Hours',
+                'OT Hours',
+                'Sick Hours',
+                'PTO Hours',
+                'UTO Hours',
+                'Notes'
+            ]);
 
-            pairedShifts.forEach(shift => {
-                const d = new Date(shift.clockIn.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-                dateSet.add(d);
-            });
-
-            empTasks.forEach(task => {
-                const ref = task.start_time || task.created_at;
-                if (ref) {
-                    const d = new Date(ref).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-                    dateSet.add(d);
-                }
-            });
-
-            empLeaves.forEach(leave => {
-                if (leave.start_date) {
-                    const d = leave.start_date.split('T')[0];
-                    dateSet.add(d);
-                }
-            });
-
-            const sortedDates = Array.from(dateSet).sort((a, b) => a.localeCompare(b));
-
-            sortedDates.forEach(dateStr => {
-                const dayStartMs = new Date(pstDayStart(dateStr)).getTime();
-                const dayEndMs = new Date(pstDayEnd(dateStr)).getTime();
-
-                if (startBoundMs !== null && dayEndMs < startBoundMs) return;
-                if (endBoundMs !== null && dayStartMs > endBoundMs) return;
+            allDays.forEach(dateStr => {
+                const [yr, mo, dy] = dateStr.split('-').map(Number);
+                const dateObj = new Date(yr, mo - 1, dy);
+                const dayOfWeek = dateObj.getDay();
 
                 const dayTasks = empTasks.filter(t => {
                     const ref = t.start_time || t.created_at;
@@ -499,19 +500,6 @@ export const ReportsPage: React.FC = () => {
                     return true;
                 });
 
-                if ((filters.mo !== 'all' || filters.operation !== 'all') && dayTasks.length === 0) {
-                    return;
-                }
-
-                const [yr, mo, dy] = dateStr.split('-').map(Number);
-                const dateObj = new Date(yr, mo - 1, dy);
-                const formattedDate = dateObj.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                });
-
                 const dayShifts = pairedShifts.filter(shift => {
                     const d = new Date(shift.clockIn.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
                     return d === dateStr;
@@ -520,6 +508,31 @@ export const ReportsPage: React.FC = () => {
                 const dayBreaks = pairedBreaks.filter(b => {
                     const d = new Date(b.startMs).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
                     return d === dateStr && b.type === 'unpaid';
+                });
+
+                const dayLeaves = empLeaves.filter(r => {
+                    if (!r.start_date) return false;
+                    const d = r.start_date.split('T')[0];
+                    return d === dateStr;
+                });
+
+                const hasActivity = dayTasks.length > 0 || dayShifts.length > 0 || dayLeaves.length > 0;
+
+                // Skip weekends if worker had no activity
+                if ((dayOfWeek === 0 || dayOfWeek === 6) && !hasActivity) {
+                    return;
+                }
+
+                // If MO or Operation filter is active, skip days without matching tasks
+                if ((filters.mo !== 'all' || filters.operation !== 'all') && dayTasks.length === 0) {
+                    return;
+                }
+
+                const formattedDate = dateObj.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
                 });
 
                 const formatTime12h = (ts: string | number | null | undefined) => {
@@ -535,7 +548,6 @@ export const ReportsPage: React.FC = () => {
                 let clockInStr = '';
                 let clockOutStr = '';
 
-                // Prioritize consolidated task/shift timestamps from dayTasks
                 if (dayTasks.length > 0) {
                     const sortedDayTasks = [...dayTasks].sort((a, b) => {
                         const aRef = new Date(a.start_time || a.created_at || 0).getTime();
@@ -547,11 +559,9 @@ export const ReportsPage: React.FC = () => {
 
                     const firstRef = firstTask.start_time || firstTask.created_at;
                     if (firstRef) clockInStr = formatTime12h(firstRef);
-
                     if (lastTask.end_time) clockOutStr = formatTime12h(lastTask.end_time);
                 }
 
-                // Fallback to dayShifts if not set by dayTasks
                 if (!clockInStr && dayShifts.length > 0) {
                     clockInStr = formatTime12h(dayShifts[0].clockIn.timestamp);
                 }
@@ -576,11 +586,9 @@ export const ReportsPage: React.FC = () => {
                     });
                 }
 
-                let netWorkedSecs = 0;
-                if (dayTasks.length > 0) {
-                    netWorkedSecs = dayTasks.reduce((sum, t) => sum + (t.active_seconds || 0), 0);
-                } else if (dayShifts.length > 0) {
-                    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                let netWorkedSecs = dayTasks.reduce((sum, t) => sum + (t.active_seconds || 0), 0);
+                if (netWorkedSecs === 0 && dayShifts.length > 0) {
+                    const todayStr = todayPST();
                     const isToday = dateStr === todayStr;
                     let grossShiftSecs = 0;
 
@@ -592,7 +600,6 @@ export const ReportsPage: React.FC = () => {
                         } else if (isToday && emp.status === 'present') {
                             outMs = Date.now();
                         } else {
-                            // Historical unclosed shift: cap duration at DAILY_SHIFT_CAP_MS
                             outMs = inMs + DAILY_SHIFT_CAP_MS;
                         }
                         grossShiftSecs += Math.max(0, (outMs - inMs) / 1000);
@@ -600,29 +607,21 @@ export const ReportsPage: React.FC = () => {
                     netWorkedSecs = Math.max(0, grossShiftSecs - totalUnpaidBreakSecs);
                 }
 
-                // Cap net worked time per calendar day at DAILY_SHIFT_CAP_MS (8h45m = 31500s)
                 netWorkedSecs = Math.min(netWorkedSecs, DAILY_SHIFT_CAP_MS / 1000);
-
                 const netWorkedHours = netWorkedSecs / 3600;
 
-                let regHoursStr = '0';
-                let otHoursStr = '0.00';
+                let regHours = 0;
+                let otHours = 0;
 
                 if (netWorkedHours > 0) {
                     if (netWorkedHours > 8.0) {
-                        regHoursStr = '8.00';
-                        otHoursStr = (netWorkedHours - 8.0).toFixed(2);
+                        regHours = 8.00;
+                        otHours = parseFloat((netWorkedHours - 8.0).toFixed(2));
                     } else {
-                        regHoursStr = netWorkedHours.toFixed(2);
-                        otHoursStr = '0.00';
+                        regHours = parseFloat(netWorkedHours.toFixed(2));
+                        otHours = 0;
                     }
                 }
-
-                const dayLeaves = empLeaves.filter(r => {
-                    if (!r.start_date) return false;
-                    const d = r.start_date.split('T')[0];
-                    return d === dateStr;
-                });
 
                 let sickHours = 0;
                 let ptoHours = 0;
@@ -635,10 +634,6 @@ export const ReportsPage: React.FC = () => {
                     else utoHours += h;
                 });
 
-                const sickStr = sickHours > 0 ? sickHours.toString() : '0';
-                const ptoStr = ptoHours > 0 ? ptoHours.toString() : '0';
-                const utoStr = utoHours > 0 ? utoHours.toString() : '0';
-
                 const notesList: string[] = [];
                 dayTasks.forEach(t => {
                     if (t.description && !notesList.includes(t.description)) notesList.push(t.description);
@@ -648,43 +643,37 @@ export const ReportsPage: React.FC = () => {
                 });
                 const notesStr = notesList.join('; ');
 
-                const escape = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
-
-                if (isSingleWorker) {
-                    csvRows.push([
-                        escape(formattedDate),
-                        escape(clockInStr),
-                        escape(lunchStartStr),
-                        escape(lunchEndStr),
-                        escape(clockOutStr),
-                        regHoursStr,
-                        otHoursStr,
-                        sickStr,
-                        ptoStr,
-                        utoStr,
-                        escape(notesStr)
-                    ].join(','));
-                } else {
-                    csvRows.push([
-                        escape(emp.name),
-                        escape(formattedDate),
-                        escape(clockInStr),
-                        escape(lunchStartStr),
-                        escape(lunchEndStr),
-                        escape(clockOutStr),
-                        regHoursStr,
-                        otHoursStr,
-                        sickStr,
-                        ptoStr,
-                        utoStr,
-                        escape(notesStr)
-                    ].join(','));
-                }
+                reportMatrix.push([
+                    formattedDate,
+                    clockInStr,
+                    lunchStartStr,
+                    lunchEndStr,
+                    clockOutStr,
+                    regHours,
+                    otHours,
+                    sickHours,
+                    ptoHours,
+                    utoHours,
+                    notesStr
+                ]);
             });
+
+            if (empIdx < targetEmployees.length - 1) {
+                reportMatrix.push([]);
+            }
         });
 
-        const csv = [headers.join(','), ...csvRows].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        return reportMatrix;
+    };
+
+    const handleExportCSV = () => {
+        const matrix = generatePayrollReportData();
+        const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+        const csvContent = matrix
+            .map(row => row.map(escape).join(','))
+            .join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -709,7 +698,7 @@ export const ReportsPage: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                     <button className="btn btn-primary" style={{ width: 'auto' }} onClick={handleExportCSV}>
-                        <i className="fa-solid fa-file-export"></i> {t('reports.exportCsv')}
+                        <i className="fa-solid fa-file-csv"></i> {t('reports.exportCsv')}
                     </button>
                 </div>
             </div>

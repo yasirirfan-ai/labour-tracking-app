@@ -1104,12 +1104,18 @@ export const ControlTablePage: React.FC = () => {
                     // Update clock_out log:
                     if (editForm.end_time) {
                         const newClockOutIso = parsePSTToUTC(editForm.end_time).toISOString();
-                        if (clockOut) {
+                        const { data: dayOutLogs } = await (supabase.from('activity_logs') as any)
+                            .select('id')
+                            .eq('worker_id', workerId)
+                            .eq('event_type', 'clock_out')
+                            .gte('timestamp', pstDayStart(dateStr))
+                            .lte('timestamp', pstDayEnd(dateStr));
+
+                        if (dayOutLogs && dayOutLogs.length > 0) {
+                            const ids = dayOutLogs.map((l: any) => l.id);
                             await (supabase.from('activity_logs') as any)
                                 .update({ timestamp: newClockOutIso })
-                                .eq('worker_id', workerId)
-                                .eq('event_type', 'clock_out')
-                                .eq('timestamp', clockOut);
+                                .in('id', ids);
                         } else {
                             await (supabase.from('activity_logs') as any).insert({
                                 worker_id: workerId,
@@ -1118,12 +1124,13 @@ export const ControlTablePage: React.FC = () => {
                                 timestamp: newClockOutIso
                             });
                         }
-                    } else if (clockOut) {
+                    } else {
                         await (supabase.from('activity_logs') as any)
                             .delete()
                             .eq('worker_id', workerId)
                             .eq('event_type', 'clock_out')
-                            .eq('timestamp', clockOut);
+                            .gte('timestamp', pstDayStart(dateStr))
+                            .lte('timestamp', pstDayEnd(dateStr));
                     }
 
                     // Update breaks (delete old of that day, insert new):
@@ -1340,16 +1347,18 @@ export const ControlTablePage: React.FC = () => {
 
             // Sync clock_out
             if (updates.end_time) {
-                const { data: outLogs } = await (supabase.from('activity_logs') as any)
-                    .select('*')
+                const { data: dayOutLogs } = await (supabase.from('activity_logs') as any)
+                    .select('id')
                     .eq('worker_id', workerId)
                     .eq('event_type', 'clock_out')
-                    .eq('related_task_id', targetTaskId);
+                    .gte('timestamp', pstDayStart(targetDateStr))
+                    .lte('timestamp', pstDayEnd(targetDateStr));
 
-                if (outLogs && outLogs.length > 0) {
+                if (dayOutLogs && dayOutLogs.length > 0) {
+                    const ids = dayOutLogs.map((l: any) => l.id);
                     await (supabase.from('activity_logs') as any)
                         .update({ timestamp: updates.end_time, description: `Clocked Out manually updated by ${auditName}` })
-                        .eq('id', outLogs[0].id);
+                        .in('id', ids);
                 } else if (editingTask.manual || collisionTask) { // For manual tasks, we must ensure a clock_out exists if they just added an end time
                     await logActivity(
                         workerId,
@@ -1361,12 +1370,13 @@ export const ControlTablePage: React.FC = () => {
                     );
                 }
             } else {
-                // If end_time is removed, delete the clock_out log
+                // If end_time is removed, delete all clock_out logs for this worker on this PST day
                 await (supabase.from('activity_logs') as any)
                     .delete()
                     .eq('worker_id', workerId)
                     .eq('event_type', 'clock_out')
-                    .eq('related_task_id', targetTaskId);
+                    .gte('timestamp', pstDayStart(targetDateStr))
+                    .lte('timestamp', pstDayEnd(targetDateStr));
             }
 
             // Delete old break logs matching the shift time range
