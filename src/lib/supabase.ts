@@ -76,3 +76,29 @@ export const supabase = createClient<Database>(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder-key'
 );
+
+/**
+ * Fetches all rows from a Supabase query by automatically paginating in chunks
+ * of batchSize (default 1000) until all available records are retrieved.
+ * READ-ONLY query helper — performs only SELECT queries with range boundaries.
+ */
+export async function fetchAllRows<T = any>(
+  queryBuilderFn: () => any,
+  batchSize: number = 1000
+): Promise<T[]> {
+  let allData: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await queryBuilderFn().range(from, from + batchSize - 1);
+    if (error) {
+      console.error('Error in fetchAllRows:', error);
+      break;
+    }
+    if (!data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < batchSize) break;
+    from += batchSize;
+  }
+  return allData;
+}
+

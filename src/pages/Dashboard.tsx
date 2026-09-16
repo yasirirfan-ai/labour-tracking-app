@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, fetchAllRows } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Chart from 'chart.js/auto';
@@ -50,9 +50,12 @@ export const Dashboard: React.FC = () => {
     const fetchDashboardData = async () => {
         setIsLoading(true);
         try {
-            const { data: userData } = await supabase.from('users').select('*').eq('role', 'employee') as { data: any[] };
-            const { data: taskData } = await supabase.from('tasks').select('*') as { data: any[] };
-            const { data: logsData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: true }) as { data: any[] };
+            const [userRes, taskData, logsData] = await Promise.all([
+                supabase.from('users').select('*').eq('role', 'employee'),
+                fetchAllRows(() => supabase.from('tasks').select('*')),
+                fetchAllRows(() => supabase.from('activity_logs').select('*').order('timestamp', { ascending: true }))
+            ]);
+            const userData = (userRes as any).data as any[];
 
             if (userData && taskData && logsData) {
                 const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });

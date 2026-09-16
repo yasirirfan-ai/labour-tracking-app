@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, fetchAllRows } from '../lib/supabase';
 import { sortManufacturingOrders } from '../utils/moSorting';
 import { useAuth } from '../context/AuthContext';
 import { logActivity, updateUserStatus } from '../lib/activityLogger';
@@ -198,11 +198,16 @@ export const ControlTablePage: React.FC = () => {
 
     const fetchData = async () => {
         try {
-            const { data: taskData } = await supabase.from('tasks').select('*').order('created_at', { ascending: false }) as { data: any[] };
-            const { data: empData } = await supabase.from('users').select('*').eq('role', 'employee') as { data: any[] };
-            const { data: moData } = await supabase.from('manufacturing_orders').select('*').order('created_at', { ascending: false });
-            const { data: opData } = await supabase.from('operations').select('*').order('sort_order', { ascending: true });
-            const { data: logsData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }) as { data: any[] };
+            const [taskData, empRes, moRes, opRes, logsData] = await Promise.all([
+                fetchAllRows(() => supabase.from('tasks').select('*').order('created_at', { ascending: false })),
+                supabase.from('users').select('*').eq('role', 'employee'),
+                supabase.from('manufacturing_orders').select('*').order('created_at', { ascending: false }),
+                supabase.from('operations').select('*').order('sort_order', { ascending: true }),
+                fetchAllRows(() => supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }))
+            ]);
+            const empData = (empRes as any).data as any[];
+            const moData = (moRes as any).data as any[];
+            const opData = (opRes as any).data as any[];
 
             if (logsData) {
                 setActivityLogs(logsData);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, fetchAllRows } from '../lib/supabase';
 import Chart from 'chart.js/auto';
 import { trainingService } from '../lib/trainingService';
 import type { TrainingMaterial } from '../lib/trainingService';
@@ -37,14 +37,20 @@ export const ReportsPage: React.FC = () => {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const { data: taskData } = await supabase.from('tasks').select('*').order('created_at', { ascending: false }) as { data: any[] };
-            const { data: userData } = await supabase.from('users').select('*').eq('role', 'employee') as { data: any[] };
-            const { data: moData } = await supabase.from('manufacturing_orders').select('*') as { data: any[] };
-            const { data: opData } = await supabase.from('operations').select('*') as { data: any[] };
-            const { data: logsData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: true }) as { data: any[] };
-            const { data: leaveData } = await supabase.from('leave_requests').select('*') as { data: any[] };
-            
-            const trMaterials = await trainingService.getAllMaterials();
+            const [taskData, userDataRes, moDataRes, opDataRes, logsData, leaveDataRes, trMaterials] = await Promise.all([
+                fetchAllRows(() => supabase.from('tasks').select('*').order('created_at', { ascending: false })),
+                supabase.from('users').select('*').eq('role', 'employee'),
+                supabase.from('manufacturing_orders').select('*'),
+                supabase.from('operations').select('*'),
+                fetchAllRows(() => supabase.from('activity_logs').select('*').order('timestamp', { ascending: true })),
+                supabase.from('leave_requests').select('*'),
+                trainingService.getAllMaterials()
+            ]);
+
+            const userData = (userDataRes as any).data as any[];
+            const moData = (moDataRes as any).data as any[];
+            const opData = (opDataRes as any).data as any[];
+            const leaveData = (leaveDataRes as any).data as any[];
 
             setRawLogs(logsData || []);
             setLeaveRequests(leaveData || []);
@@ -727,6 +733,7 @@ export const ReportsPage: React.FC = () => {
                             className="form-select" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                         >
                             <option value="all">{t('reports.allOrders')}</option>
+                            <option value="Unassigned">Unassigned (Attendance Only)</option>
                             {mos.map(m => <option key={m.id} value={m.mo_number}>{m.mo_number}</option>)}
                         </select>
                     </div>
@@ -738,6 +745,7 @@ export const ReportsPage: React.FC = () => {
                             className="form-select" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                         >
                             <option value="all">{t('reports.allOperations')}</option>
+                            <option value="General Shift">General Shift (Attendance Only)</option>
                             {ops.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
                         </select>
                     </div>
